@@ -1,0 +1,56 @@
+{
+  "id": "AdminPawCareBookings",
+  "name": "AdminPawCareBookings",
+  "type": "page",
+  "uuid": "091915c0-adfd-4cb1-9170-2d6baef4e8bb",
+  "modelVersion": "2.6",
+  "lastUpdate": 1792591641643,
+  "description": "PawCare Admin – Booking",
+  "rows": [
+    [
+      {
+        "type": "fragment",
+        "dimension": {
+          "xs": 12,
+          "sm": 12,
+          "md": 12,
+          "lg": 12
+        },
+        "propertyValues": {
+          "cssClasses": {
+            "type": "constant",
+            "value": ""
+          },
+          "hidden": {
+            "type": "constant",
+            "value": false
+          }
+        },
+        "reference": "03e2d577-10a7-49a8-b679-5de2033446f2",
+        "hasValidationError": false,
+        "id": "AdminPawCareBookingsFragment",
+        "binding": {}
+      }
+    ]
+  ],
+  "variables": {},
+  "assets": [
+    {
+      "id": "68309c69-8a50-478a-8ef2-aca29112eaeb",
+      "name": "localization.json",
+      "type": "json",
+      "order": 0,
+      "external": false
+    },
+    {
+      "id": "0c201dee-4124-4bd2-b933-308d603fb222",
+      "name": "style.css",
+      "type": "css",
+      "order": 0,
+      "external": false
+    }
+  ],
+  "inactiveAssets": [],
+  "webResources": [],
+  "hasValidationError": false
+}

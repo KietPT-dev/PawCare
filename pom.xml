@@ -16,5 +16,6 @@
   </licenses>
   <modules>
     <module>app</module>
+    <module>extensions</module>
   </modules>
 </project>

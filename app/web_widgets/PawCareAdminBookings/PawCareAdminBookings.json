@@ -1,0 +1,16 @@
+{
+  "id": "pawCareAdminBookings",
+  "name": "PawCareAdminBookings",
+  "type": "widget",
+  "custom": true,
+  "modelVersion": "2.6",
+  "description": "PawCare Admin Bookings widget.",
+  "template": "@pawCareAdminBookings.tpl.html",
+  "controller": "@pawCareAdminBookings.ctrl.js",
+  "properties": [],
+  "assets": [],
+  "requiredModules": [],
+  "webResources": [],
+  "order": 100,
+  "hasHelp": false
+}

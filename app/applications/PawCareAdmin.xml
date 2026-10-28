@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<applications xmlns="http://documentation.bonitasoft.com/application-xml-schema/1.1">
+    <application token="pawcare-admin" version="1.0" profile="Administrator" homePage="dashboard" state="ACTIVATED" layout="custompage_layoutBonita" theme="custompage_themeBonita">
+        <displayName>PawCare Admin</displayName>
+        <description>PawCare back-office for platform administration.</description>
+        <applicationPages>
+            <applicationPage customPage="custompage_AdminPawCarePages" token="dashboard"/>
+            <applicationPage customPage="custompage_AdminPawCareUsers" token="users"/>
+            <applicationPage customPage="custompage_AdminPawCareProviders" token="providers"/>
+            <applicationPage customPage="custompage_AdminPawCareCategories" token="categories"/>
+            <applicationPage customPage="custompage_AdminPawCareBookings" token="bookings"/>
+            <applicationPage customPage="custompage_AdminPawCareComplaints" token="complaints"/>
+        </applicationPages>
+        <applicationMenus>
+            <applicationMenu applicationPage="dashboard"><displayName>Tổng quan</displayName></applicationMenu>
+            <applicationMenu applicationPage="users"><displayName>Người dùng</displayName></applicationMenu>
+            <applicationMenu applicationPage="providers"><displayName>Duyệt Provider</displayName></applicationMenu>
+            <applicationMenu applicationPage="categories"><displayName>Danh mục</displayName></applicationMenu>
+            <applicationMenu applicationPage="bookings"><displayName>Booking</displayName></applicationMenu>
+            <applicationMenu applicationPage="complaints"><displayName>Khiếu nại</displayName></applicationMenu>
+        </applicationMenus>
+    </application>
+</applications>

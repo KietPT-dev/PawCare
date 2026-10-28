@@ -7,3 +7,13 @@ dependency-reduced-pom.xml
 pom.xml.versionsBackup
 node/
 node_modules/
+
+# Generated build caches and locally installed design tooling
+app/dependencies/uid-tmp/
+public-api/target/
+pawcare-provider-web/node_modules/
+pawcare-provider-web/dist/
+pawcare-customer-mobile/.dart_tool/
+pawcare-customer-mobile/build/
+pawcare-customer-mobile/.codex/
+.DS_Store

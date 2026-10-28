@@ -1,0 +1,16 @@
+{
+  "id": "pawCareAdminUsers",
+  "name": "PawCareAdminUsers",
+  "type": "widget",
+  "custom": true,
+  "modelVersion": "2.6",
+  "description": "PawCare Admin Users widget.",
+  "template": "@pawCareAdminUsers.tpl.html",
+  "controller": "@pawCareAdminUsers.ctrl.js",
+  "properties": [],
+  "assets": [],
+  "requiredModules": [],
+  "webResources": [],
+  "order": 100,
+  "hasHelp": false
+}

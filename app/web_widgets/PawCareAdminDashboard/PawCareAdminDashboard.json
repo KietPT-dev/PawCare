@@ -1,0 +1,16 @@
+{
+  "id": "pawCareAdminDashboard",
+  "name": "PawCareAdminDashboard",
+  "type": "widget",
+  "custom": true,
+  "modelVersion": "2.6",
+  "description": "PawCare Admin Dashboard widget.",
+  "template": "@pawCareAdminDashboard.tpl.html",
+  "controller": "@pawCareAdminDashboard.ctrl.js",
+  "properties": [],
+  "assets": [],
+  "requiredModules": [],
+  "webResources": [],
+  "order": 100,
+  "hasHelp": false
+}

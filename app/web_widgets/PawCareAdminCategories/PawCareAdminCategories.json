@@ -1,0 +1,16 @@
+{
+  "id": "pawCareAdminCategories",
+  "name": "PawCareAdminCategories",
+  "type": "widget",
+  "custom": true,
+  "modelVersion": "2.6",
+  "description": "PawCare Admin Categories widget.",
+  "template": "@pawCareAdminCategories.tpl.html",
+  "controller": "@pawCareAdminCategories.ctrl.js",
+  "properties": [],
+  "assets": [],
+  "requiredModules": [],
+  "webResources": [],
+  "order": 100,
+  "hasHelp": false
+}

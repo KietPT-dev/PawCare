@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "PawCare: Start Provider Web",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/start-provider-demo.sh",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    }
+  ]
+}

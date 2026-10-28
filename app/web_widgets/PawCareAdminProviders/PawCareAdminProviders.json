@@ -1,0 +1,16 @@
+{
+  "id": "pawCareAdminProviders",
+  "name": "PawCareAdminProviders",
+  "type": "widget",
+  "custom": true,
+  "modelVersion": "2.6",
+  "description": "PawCare Admin Providers widget.",
+  "template": "@pawCareAdminProviders.tpl.html",
+  "controller": "@pawCareAdminProviders.ctrl.js",
+  "properties": [],
+  "assets": [],
+  "requiredModules": [],
+  "webResources": [],
+  "order": 100,
+  "hasHelp": false
+}

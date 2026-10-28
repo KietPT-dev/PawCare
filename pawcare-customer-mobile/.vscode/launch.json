@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "PawCare - iOS Simulator",
+      "request": "launch",
+      "type": "dart",
+      "toolArgs": ["--dart-define-from-file=config/api.local.json"]
+    },
+    {
+      "name": "PawCare - Physical device",
+      "request": "launch",
+      "type": "dart",
+      "toolArgs": ["--dart-define-from-file=config/api.device.json"]
+    }
+  ]
+}

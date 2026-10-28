@@ -1,0 +1,56 @@
+{
+  "id": "AdminPawCareProviders",
+  "name": "AdminPawCareProviders",
+  "type": "page",
+  "uuid": "a3d3aca5-c660-43af-bf07-3b5fe39f0b7b",
+  "modelVersion": "2.6",
+  "lastUpdate": 1792591641643,
+  "description": "PawCare Admin – Duyệt Provider",
+  "rows": [
+    [
+      {
+        "type": "fragment",
+        "dimension": {
+          "xs": 12,
+          "sm": 12,
+          "md": 12,
+          "lg": 12
+        },
+        "propertyValues": {
+          "cssClasses": {
+            "type": "constant",
+            "value": ""
+          },
+          "hidden": {
+            "type": "constant",
+            "value": false
+          }
+        },
+        "reference": "c3d7c714-d80d-4d1f-b514-073baf7c8dd6",
+        "hasValidationError": false,
+        "id": "AdminPawCareProvidersFragment",
+        "binding": {}
+      }
+    ]
+  ],
+  "variables": {},
+  "assets": [
+    {
+      "id": "68309c69-8a50-478a-8ef2-aca29112eaeb",
+      "name": "localization.json",
+      "type": "json",
+      "order": 0,
+      "external": false
+    },
+    {
+      "id": "0c201dee-4124-4bd2-b933-308d603fb222",
+      "name": "style.css",
+      "type": "css",
+      "order": 0,
+      "external": false
+    }
+  ],
+  "inactiveAssets": [],
+  "webResources": [],
+  "hasValidationError": false
+}

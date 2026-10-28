@@ -1,0 +1,56 @@
+{
+  "id": "AdminPawCareUsers",
+  "name": "AdminPawCareUsers",
+  "type": "page",
+  "uuid": "61be1867-854e-4589-9f31-3890a5b4cd01",
+  "modelVersion": "2.6",
+  "lastUpdate": 1792591641643,
+  "description": "PawCare Admin – Người dùng",
+  "rows": [
+    [
+      {
+        "type": "fragment",
+        "dimension": {
+          "xs": 12,
+          "sm": 12,
+          "md": 12,
+          "lg": 12
+        },
+        "propertyValues": {
+          "cssClasses": {
+            "type": "constant",
+            "value": ""
+          },
+          "hidden": {
+            "type": "constant",
+            "value": false
+          }
+        },
+        "reference": "4b1d7834-6288-483b-90e5-37ac4c045368",
+        "hasValidationError": false,
+        "id": "AdminPawCareUsersFragment",
+        "binding": {}
+      }
+    ]
+  ],
+  "variables": {},
+  "assets": [
+    {
+      "id": "68309c69-8a50-478a-8ef2-aca29112eaeb",
+      "name": "localization.json",
+      "type": "json",
+      "order": 0,
+      "external": false
+    },
+    {
+      "id": "0c201dee-4124-4bd2-b933-308d603fb222",
+      "name": "style.css",
+      "type": "css",
+      "order": 0,
+      "external": false
+    }
+  ],
+  "inactiveAssets": [],
+  "webResources": [],
+  "hasValidationError": false
+}

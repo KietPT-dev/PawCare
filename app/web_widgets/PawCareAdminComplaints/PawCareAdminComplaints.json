@@ -1,0 +1,16 @@
+{
+  "id": "pawCareAdminComplaints",
+  "name": "PawCareAdminComplaints",
+  "type": "widget",
+  "custom": true,
+  "modelVersion": "2.6",
+  "description": "PawCare Admin Complaints widget.",
+  "template": "@pawCareAdminComplaints.tpl.html",
+  "controller": "@pawCareAdminComplaints.ctrl.js",
+  "properties": [],
+  "assets": [],
+  "requiredModules": [],
+  "webResources": [],
+  "order": 100,
+  "hasHelp": false
+}
