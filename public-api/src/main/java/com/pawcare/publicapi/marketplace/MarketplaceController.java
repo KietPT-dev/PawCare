@@ -81,8 +81,11 @@ public class MarketplaceController {
     @PutMapping("/provider/services/{id}")
     public Map<String,Object> updateService(@CurrentUser CurrentPrincipal p,@PathVariable long id,@RequestBody Map<String,Object>b) {
         long pid=providerId(p); own("SELECT id FROM services WHERE id=? AND provider_id=?",id,pid);
+        BigDecimal price=decimal(b,"price"); Integer duration=integer(b,"durationMinutes");
+        if(price!=null&&price.signum()<0) throw new ApiException(400,"price must not be negative");
+        if(duration!=null&&duration<1) throw new ApiException(400,"durationMinutes must be positive");
         db.update("UPDATE services SET name=COALESCE(?,name),description=COALESCE(?,description),price=COALESCE(?,price),duration_minutes=COALESCE(?,duration_minutes),pet_type_supported=COALESCE(?,pet_type_supported),is_active=COALESCE(?,is_active) WHERE id=?",
-          text(b,"name"),text(b,"description"),decimal(b,"price"),integer(b,"durationMinutes"),text(b,"petTypeSupported"),bool(b,"isActive"),id);
+          text(b,"name"),text(b,"description"),price,duration,text(b,"petTypeSupported"),bool(b,"isActive"),id);
         return Map.of("success",true,"id",id);
     }
     @DeleteMapping("/provider/services/{id}")
@@ -109,14 +112,21 @@ public class MarketplaceController {
     }
     @PostMapping("/provider/schedules")
     public Map<String,Object> createSchedule(@CurrentUser CurrentPrincipal p,@RequestBody Map<String,Object>b) {
-        long sid=number(b,"staffId"); own("SELECT id FROM staff WHERE id=? AND provider_id=?",sid,providerId(p));required(b,"startAt");required(b,"endAt");
-        db.update("INSERT INTO staff_schedules(staff_id,start_at,end_at,status,note) VALUES(?,?,?,?,?)",sid,required(b,"startAt"),required(b,"endAt"),or(text(b,"status"),"AVAILABLE"),text(b,"note"));return Map.of("success",true,"id",lastId());
+        long sid=number(b,"staffId"); own("SELECT id FROM staff WHERE id=? AND provider_id=? AND is_active=1",sid,providerId(p));
+        String start=required(b,"startAt"), end=required(b,"endAt"), status=scheduleStatus(b);
+        validateScheduleTimes(start,end);
+        db.update("INSERT INTO staff_schedules(staff_id,start_at,end_at,status,note) VALUES(?,?,?,?,?)",sid,start,end,status,text(b,"note"));return Map.of("success",true,"id",lastId());
     }
 
     @PutMapping("/provider/schedules/{id}")
     public Map<String,Object> updateSchedule(@CurrentUser CurrentPrincipal p,@PathVariable long id,@RequestBody Map<String,Object>b) {
         own("SELECT ss.id FROM staff_schedules ss JOIN staff s ON s.id=ss.staff_id WHERE ss.id=? AND s.provider_id=?",id,providerId(p));
-        db.update("UPDATE staff_schedules SET start_at=COALESCE(?,start_at),end_at=COALESCE(?,end_at),status=COALESCE(?,status),note=COALESCE(?,note) WHERE id=?",text(b,"startAt"),text(b,"endAt"),text(b,"status"),text(b,"note"),id);return Map.of("success",true,"id",id);
+        Map<String,Object> current=one("SELECT * FROM staff_schedules WHERE id=?",id);
+        long staffId=b.get("staffId")==null?((Number)current.get("staff_id")).longValue():number(b,"staffId");
+        own("SELECT id FROM staff WHERE id=? AND provider_id=? AND is_active=1",staffId,providerId(p));
+        String start=or(text(b,"startAt"),String.valueOf(current.get("start_at"))), end=or(text(b,"endAt"),String.valueOf(current.get("end_at")));
+        validateScheduleTimes(start,end);
+        db.update("UPDATE staff_schedules SET staff_id=?,start_at=?,end_at=?,status=?,note=COALESCE(?,note) WHERE id=?",staffId,start,end,b.containsKey("status")?scheduleStatus(b):current.get("status"),text(b,"note"),id);return Map.of("success",true,"id",id);
     }
     @DeleteMapping("/provider/schedules/{id}")
     public Map<String,Object> deleteSchedule(@CurrentUser CurrentPrincipal p,@PathVariable long id) {
@@ -258,5 +268,7 @@ public class MarketplaceController {
     private BigDecimal decimalRequired(Map<String,Object>b,String k){BigDecimal x=decimal(b,k);if(x==null)throw new ApiException(400,k+" is required");return x;}
     private Boolean bool(Map<String,Object>b,String k){return b.get(k)==null?null:Boolean.valueOf(String.valueOf(b.get(k)));}
     private String or(String a,String b){return a==null||a.isBlank()?b:a;}
+    private String scheduleStatus(Map<String,Object>b){String status=or(text(b,"status"),"AVAILABLE").toUpperCase(Locale.ROOT);if(!List.of("AVAILABLE","BOOKED","BLOCKED").contains(status))throw new ApiException(400,"status must be AVAILABLE, BOOKED or BLOCKED");return status;}
+    private void validateScheduleTimes(String start,String end){try{if(!java.time.LocalDateTime.parse(end.replace(' ','T')).isAfter(java.time.LocalDateTime.parse(start.replace(' ','T'))))throw new ApiException(400,"endAt must be after startAt");}catch(ApiException e){throw e;}catch(Exception e){throw new ApiException(400,"startAt and endAt must be valid dates");}}
     private boolean transition(String from,String to){return Map.of("PENDING",List.of("CONFIRMED","REJECTED","CANCELLED"),"CONFIRMED",List.of("CHECKED_IN","CANCELLED"),"CHECKED_IN",List.of("IN_SERVICE","CANCELLED"),"IN_SERVICE",List.of("COMPLETED")).getOrDefault(from,List.of()).contains(to);}
 }
