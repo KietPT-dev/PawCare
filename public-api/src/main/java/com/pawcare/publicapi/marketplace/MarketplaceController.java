@@ -142,10 +142,28 @@ public class MarketplaceController {
 
     // Booking lifecycle ------------------------------------------------------
     @GetMapping("/bookings")
-    public List<Map<String,Object>> bookings(@CurrentUser CurrentPrincipal p) {
+    public List<Map<String,Object>> bookings(@CurrentUser CurrentPrincipal p,@RequestParam(required=false) String status,@RequestParam(required=false) String date,@RequestParam(required=false) String q) {
         if("CUSTOMER".equals(p.role())) return db.queryForList("SELECT b.*,pr.name provider_name,s.name service_name FROM bookings b JOIN providers pr ON pr.id=b.provider_id JOIN services s ON s.id=b.service_id WHERE b.customer_profile_id=? ORDER BY b.booking_start DESC",p.profileId());
-        if("PROVIDER".equals(p.role())) return db.queryForList("SELECT b.*,u.full_name customer_name,s.name service_name FROM bookings b JOIN providers pr ON pr.id=b.provider_id JOIN user_profiles u ON u.id=b.customer_profile_id JOIN services s ON s.id=b.service_id WHERE pr.owner_profile_id=? ORDER BY b.booking_start DESC",p.profileId());
+        if("PROVIDER".equals(p.role())) {
+            StringBuilder sql=new StringBuilder("SELECT b.*,u.full_name customer_name,pt.name pet_name,s.name service_name,st.full_name staff_name FROM bookings b JOIN providers pr ON pr.id=b.provider_id JOIN user_profiles u ON u.id=b.customer_profile_id JOIN pets pt ON pt.id=b.pet_id JOIN services s ON s.id=b.service_id LEFT JOIN staff st ON st.id=b.staff_id WHERE pr.owner_profile_id=?");
+            List<Object> args=new ArrayList<>();args.add(p.profileId());
+            if(status!=null&&!status.isBlank()){sql.append(" AND b.status=?");args.add(status.toUpperCase(Locale.ROOT));}
+            if(date!=null&&!date.isBlank()){sql.append(" AND DATE(b.booking_start)=?");args.add(date);}
+            if(q!=null&&!q.isBlank()){sql.append(" AND (u.full_name LIKE ? OR pt.name LIKE ? OR s.name LIKE ?)");String term="%"+q.trim()+"%";args.add(term);args.add(term);args.add(term);}
+            sql.append(" ORDER BY b.booking_start DESC");return db.queryForList(sql.toString(),args.toArray());
+        }
         throw new ApiException(403,"Unsupported role");
+    }
+    @GetMapping("/bookings/{id}")
+    public Map<String,Object> booking(@CurrentUser CurrentPrincipal p,@PathVariable long id) {
+        accessibleBooking(p,id);
+        Map<String,Object> result=one("SELECT b.*,u.full_name customer_name,u.email customer_email,u.phone customer_phone,pt.name pet_name,pt.species pet_species,pt.breed pet_breed,s.name service_name,s.duration_minutes,st.full_name staff_name,pr.name provider_name FROM bookings b JOIN user_profiles u ON u.id=b.customer_profile_id JOIN pets pt ON pt.id=b.pet_id JOIN services s ON s.id=b.service_id LEFT JOIN staff st ON st.id=b.staff_id JOIN providers pr ON pr.id=b.provider_id WHERE b.id=?",id);
+        if(result==null)throw new ApiException(404,"Booking not found");return result;
+    }
+    @GetMapping("/bookings/{id}/history")
+    public List<Map<String,Object>> bookingHistory(@CurrentUser CurrentPrincipal p,@PathVariable long id) {
+        accessibleBooking(p,id);
+        return db.queryForList("SELECT h.*,u.full_name changed_by_name FROM booking_status_history h LEFT JOIN user_profiles u ON u.id=h.changed_by_profile_id WHERE h.booking_id=? ORDER BY h.changed_at DESC,h.id DESC",id);
     }
     @PostMapping("/bookings")
     public Map<String,Object> createBooking(@CurrentUser CurrentPrincipal p,@RequestBody Map<String,Object>b) {
@@ -159,7 +177,9 @@ public class MarketplaceController {
             if(conflict != null && conflict > 0) throw new ApiException(409,"Selected staff already has an overlapping booking");
         }
         db.update("INSERT INTO bookings(customer_profile_id,pet_id,provider_id,service_id,staff_id,booking_start,booking_end,estimated_price,customer_note) VALUES(?,?,?,?,?,?,DATE_ADD(?,INTERVAL ? MINUTE),?,?)",p.profileId(),pet,provider,service,staff,start,start,s.get("duration_minutes"),s.get("price"),text(b,"customerNote"));
-        return Map.of("success",true,"id",lastId());
+        long id=lastId(); Map<String,Object> owner=one("SELECT owner_profile_id,name FROM providers WHERE id=?",provider);
+        db.update("INSERT INTO notifications(recipient_profile_id,title,content,notification_type,reference_type,reference_id) VALUES(?,?,?,?,?,?)",owner.get("owner_profile_id"),"Booking mới","Bạn có booking #"+id+" cần xác nhận tại "+owner.get("name"),"BOOKING_CREATED","BOOKING",id);
+        return Map.of("success",true,"id",id);
     }
     @PutMapping("/bookings/{id}/status")
     public Map<String,Object> bookingStatus(@CurrentUser CurrentPrincipal p,@PathVariable long id,@RequestBody Map<String,Object>b) {
@@ -254,6 +274,7 @@ public class MarketplaceController {
     }
 
     private Map<String,Object> providerFor(CurrentPrincipal p){if(!"PROVIDER".equals(p.role()))throw new ApiException(403,"Provider account required");Map<String,Object>x=one("SELECT * FROM providers WHERE owner_profile_id=? AND is_active=1",p.profileId());if(x==null)throw new ApiException(403,"Provider profile unavailable");return x;}
+    private Map<String,Object> accessibleBooking(CurrentPrincipal p,long id){Map<String,Object>b=one("SELECT * FROM bookings WHERE id=?",id);if(b==null)throw new ApiException(404,"Booking not found");boolean customer="CUSTOMER".equals(p.role())&&((Number)b.get("customer_profile_id")).longValue()==p.profileId();boolean provider="PROVIDER".equals(p.role())&&ownsProvider(((Number)b.get("provider_id")).longValue(),p.profileId());if(!(customer||provider))throw new ApiException(403,"Booking not found or not owned by you");return b;}
     private long providerId(CurrentPrincipal p){return ((Number)providerFor(p).get("id")).longValue();}
     private boolean ownsProvider(long id,long profile){return one("SELECT id FROM providers WHERE id=? AND owner_profile_id=?",id,profile)!=null;}
     private void customer(CurrentPrincipal p){if(!"CUSTOMER".equals(p.role()))throw new ApiException(403,"Customer account required");}
