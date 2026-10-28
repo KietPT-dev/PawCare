@@ -15,6 +15,7 @@ async function api(path, options = {}, token) {
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) }
   })
   const body = await response.json().catch(() => ({}))
+  if (response.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new Event('pawcare:unauthorized'))
   if (!response.ok) throw new Error(body.error || `Lỗi ${response.status}`)
   return body
 }
@@ -115,6 +116,7 @@ function App() {
   const [error, setError] = useState(''); const [categories,setCategories]=useState([]); const [staffList,setStaffList]=useState([]); const [reload,setReload]=useState(0)
   const clearSession = () => { localStorage.removeItem('pawcareProviderToken'); localStorage.removeItem('pawcareProviderRefreshToken'); localStorage.removeItem('pawcareProviderProfile'); setToken(''); setRefreshToken(''); setProfile(null) }
   const login = (session) => { localStorage.pawcareProviderToken = session.accessToken; localStorage.pawcareProviderRefreshToken = session.refreshToken; localStorage.pawcareProviderProfile = JSON.stringify(session.profile); setToken(session.accessToken); setRefreshToken(session.refreshToken); setProfile(session.profile) }
+  useEffect(() => { const expired=()=>clearSession(); window.addEventListener('pawcare:unauthorized',expired); return ()=>window.removeEventListener('pawcare:unauthorized',expired) }, [])
   useEffect(() => { if (!token || !refreshToken) return; let expiresAt=0; try { expiresAt=JSON.parse(atob(token.split('.')[1])).exp*1000 } catch (_) { clearSession(); return } const wait=Math.max(0,expiresAt-Date.now()-60000); const timer=setTimeout(async()=>{try{login(await api('/auth/refresh',{method:'POST',body:JSON.stringify({refreshToken})}))}catch(_){clearSession()}},wait); return ()=>clearTimeout(timer) }, [token, refreshToken])
   async function logout(){try{if(refreshToken)await api('/auth/logout',{method:'POST',body:JSON.stringify({refreshToken})})}finally{clearSession()}}
   useEffect(() => { if (!token) return; api('/bookings', {}, token).then(rowsOf).then(setBookings).catch(() => setBookings([])); api('/provider/me', {}, token).then(setProvider).catch(() => {}); api('/provider/dashboard', {}, token).then(setDashboard).catch(() => setDashboard({})); api('/provider/revenue', {}, token).then(rowsOf).then(setRevenue).catch(() => setRevenue([])); api('/categories').then(setCategories).catch(()=>{}); api('/provider/staff',{},token).then(rowsOf).then(setStaffList).catch(()=>{}); api('/provider/schedules',{},token).then(rowsOf).then(setSchedules).catch(()=>setSchedules([])); api('/notifications',{},token).then(rowsOf).then(setNotifications).catch(()=>setNotifications([])) }, [token, reload])
