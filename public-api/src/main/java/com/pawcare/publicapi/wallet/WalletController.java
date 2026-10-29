@@ -4,6 +4,7 @@ import com.pawcare.publicapi.auth.CurrentPrincipal;
 import com.pawcare.publicapi.auth.CurrentUser;
 import com.pawcare.publicapi.wallet.dto.WithdrawRequest;
 import com.pawcare.publicapi.wallet.dto.WithdrawalDecisionRequest;
+import com.pawcare.publicapi.wallet.dto.TopUpRequest;
 import java.util.Map;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,6 +23,16 @@ public class WalletController {
     @GetMapping("/wallets/me/transactions")
     public Object transactions(@CurrentUser CurrentPrincipal principal) {
         return wallets.myTransactions(principal);
+    }
+
+    @PostMapping("/wallets/topups")
+    public Map<String, Object> topUp(@CurrentUser CurrentPrincipal principal, @RequestBody TopUpRequest request) {
+        return wallets.createTopUp(principal, request);
+    }
+
+    @GetMapping("/wallets/topups/{id}")
+    public Map<String, Object> topUpStatus(@CurrentUser CurrentPrincipal principal, @PathVariable long id) {
+        return wallets.topUpStatus(principal, id);
     }
 
     @PostMapping("/wallets/withdraw")

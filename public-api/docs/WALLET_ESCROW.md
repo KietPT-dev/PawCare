@@ -2,7 +2,8 @@
 
 ## Run order
 
-Run `database/005_wallet_escrow_ledger.sql` once after migrations `001` to `004`.
+Run `database/005_wallet_escrow_ledger.sql` then `database/006_wallet_topups.sql`
+once after migrations `001` to `004`.
 All balance writes use InnoDB row locks and Spring transactions. Never edit a
 wallet balance directly; use the public API/service so an immutable
 `wallet_transactions` record is written with the change.
@@ -64,6 +65,8 @@ event to this endpoint.
 - `GET /api/v1/wallets/me`
 - `GET /api/v1/wallets/me/transactions`
 - `POST /api/v1/wallets/withdraw`
+- `POST /api/v1/wallets/topups` creates a standalone VietQR top-up; poll
+  `GET /api/v1/wallets/topups/{id}` until its status is `PAID`.
 - `GET /api/v1/admin/withdrawals?status=PENDING` (ADMIN)
 - `PUT /api/v1/admin/withdrawals/{id}` (ADMIN; `APPROVED` or `REJECTED`)
 

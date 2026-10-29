@@ -6,6 +6,7 @@ import '../../../core/widgets/ui.dart';
 import '../../pets/presentation/pets_screen.dart';
 import 'help_center_screen.dart';
 import 'settings_screen.dart';
+import '../../wallet/presentation/wallet_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({
@@ -82,6 +83,16 @@ class ProfileScreen extends StatelessWidget {
                     subtitle: const Text('Tên và email đăng ký'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => _profileInfo(context)),
+                const Divider(),
+                ListTile(
+                    leading: const Icon(Icons.account_balance_wallet_outlined),
+                    title: const Text('Ví của tôi'),
+                    subtitle: const Text('Số dư, nạp/rút tiền và lịch sử'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => WalletScreen(api: api)))),
                 const Divider(),
                 ListTile(
                     leading: const Icon(Icons.pets_outlined),

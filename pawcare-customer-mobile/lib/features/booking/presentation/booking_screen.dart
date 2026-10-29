@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/network/pawcare_api.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../pets/presentation/pets_screen.dart';
+import 'booking_checkout_screen.dart';
 
 class BookingScreen extends StatefulWidget {
   const BookingScreen({
@@ -127,7 +128,7 @@ class _BookingScreenState extends State<BookingScreen> {
                           [
                             'Chọn dịch vụ',
                             'Chọn ngày giờ',
-                            'Xác nhận yêu cầu'
+                            'Xác nhận & thanh toán'
                           ][step],
                           style: Theme.of(context)
                               .textTheme
@@ -153,7 +154,7 @@ class _BookingScreenState extends State<BookingScreen> {
                             child: Text(saving
                                 ? 'Đang gửi...'
                                 : step == 2
-                                    ? 'Gửi yêu cầu'
+                                    ? 'Đi đến thanh toán'
                                     : 'Tiếp tục')),
                       ])
                     ]),
@@ -254,23 +255,27 @@ class _BookingScreenState extends State<BookingScreen> {
       final time = slot.split(':');
       final start = DateTime(date.year, date.month, date.day,
           int.parse(time[0]), int.parse(time[1]));
-      await widget.api.post('/bookings', {
-        'petId': pet!['id'],
-        'providerId': widget.providerId,
-        'serviceId': service!['id'],
-        'bookingStart': start.toIso8601String(),
-        'customerNote': note.text.trim(),
-      });
-      if (!mounted) return;
+      final result = await Navigator.of(context).push<bool>(MaterialPageRoute(
+        builder: (_) => BookingCheckoutScreen(api: widget.api, booking: {
+          'petId': pet!['id'],
+          'providerId': widget.providerId,
+          'serviceId': service!['id'],
+          'bookingStart': start.toIso8601String(),
+          'customerNote': note.text.trim(),
+          'amount': service!['price'],
+          'providerName': widget.providerName,
+          'serviceName': service!['name'],
+        }),
+      ));
+      if (!mounted || result != true) return;
       await showDialog<void>(
           context: context,
-          builder: (_) =>
-              AlertDialog(
+          builder: (_) => AlertDialog(
                   icon: const Icon(Icons.check_circle,
                       color: AppColors.teal, size: 48),
-                  title: const Text('Đã gửi yêu cầu'),
-                  content:
-                      const Text('Provider sẽ xác nhận lịch hẹn của bạn sớm.'),
+                  title: const Text('Đã thanh toán'),
+                  content: const Text(
+                      'Tiền đang được tạm giữ. Provider sẽ xác nhận lịch hẹn của bạn sớm.'),
                   actions: [
                     TextButton(
                         onPressed: () => Navigator.pop(context),

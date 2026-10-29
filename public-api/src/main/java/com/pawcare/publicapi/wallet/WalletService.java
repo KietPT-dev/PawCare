@@ -1,6 +1,7 @@
 package com.pawcare.publicapi.wallet;
 
 import com.pawcare.publicapi.auth.CurrentPrincipal;
+import com.pawcare.publicapi.wallet.dto.TopUpRequest;
 import com.pawcare.publicapi.wallet.dto.WithdrawRequest;
 import com.pawcare.publicapi.wallet.dto.WithdrawalDecisionRequest;
 import com.pawcare.publicapi.web.ApiException;
@@ -117,11 +118,23 @@ public class WalletService {
 
         Map<String, Object> deposit = one("SELECT * FROM payment_deposits WHERE payment_code=? FOR UPDATE", paymentCode);
         if (deposit == null) throw new ApiException(404, "Payment code not found");
-        if ("ESCROW_HELD".equals(deposit.get("status"))) return Map.of("success", true, "idempotent", true, "depositId", deposit.get("id"), "status", "ESCROW_HELD");
+        if ("ESCROW_HELD".equals(deposit.get("status")) || "PAID".equals(deposit.get("status"))) {
+            return Map.of("success", true, "idempotent", true, "depositId", deposit.get("id"), "status", deposit.get("status"));
+        }
         BigDecimal expected = money((BigDecimal) deposit.get("amount"));
         if (money(received).compareTo(expected) != 0) throw new ApiException(409, "Transferred amount does not match payment deposit");
 
         long userId = ((Number) deposit.get("user_id")).longValue();
+        if (deposit.get("booking_id") == null) {
+            Map<String, Object> wallet = lockWallet(USER, userId);
+            BigDecimal before = money((BigDecimal) wallet.get("available_balance"));
+            BigDecimal after = before.add(expected);
+            db.update("UPDATE wallets SET available_balance=? WHERE id=?", after, wallet.get("id"));
+            transaction(wallet, null, "DEPOSIT", expected, before, after,
+                    "VietQR wallet top-up " + bankTransactionId + " for " + paymentCode);
+            db.update("UPDATE payment_deposits SET bank_tran_id=?,status='PAID' WHERE id=?", bankTransactionId, deposit.get("id"));
+            return Map.of("success", true, "idempotent", false, "depositId", deposit.get("id"), "status", "PAID");
+        }
         long bookingId = ((Number) deposit.get("booking_id")).longValue();
         Map<String, Object> booking = one("SELECT * FROM bookings WHERE id=? FOR UPDATE", bookingId);
         if (booking == null || !"PENDING_PAYMENT".equals(booking.get("status"))) {
@@ -204,6 +217,22 @@ public class WalletService {
     public List<Map<String, Object>> myTransactions(CurrentPrincipal principal) {
         Map<String, Object> wallet = ensureWallet(ownerType(principal), ownerId(principal));
         return db.queryForList("SELECT * FROM wallet_transactions WHERE wallet_id=? ORDER BY created_at DESC,id DESC", wallet.get("id"));
+    }
+
+    @Transactional
+    public Map<String, Object> createTopUp(CurrentPrincipal principal, TopUpRequest request) {
+        if (request == null || request.amount() == null || request.amount().signum() <= 0) throw new ApiException(400, "A positive top-up amount is required");
+        if (!"CUSTOMER".equals(principal.role())) throw new ApiException(403, "Only customer wallets can be topped up");
+        BigDecimal amount = money(request.amount());
+        db.update("INSERT INTO payment_deposits(user_id,booking_id,payment_code,amount,status) VALUES(?,NULL,?,?, 'CREATED')", principal.profileId(), "TMP-" + UUID.randomUUID(), amount);
+        long id = lastId();
+        String code = "PAW" + id;
+        db.update("UPDATE payment_deposits SET payment_code=?,qr_url=? WHERE id=?", code, qrUrl(code, amount), id);
+        return depositResponse(requireDepositForUser(principal.profileId(), id));
+    }
+
+    public Map<String, Object> topUpStatus(CurrentPrincipal principal, long id) {
+        return depositResponse(requireDepositForUser(principal.profileId(), id));
     }
 
     @Transactional
@@ -309,8 +338,20 @@ public class WalletService {
         return result;
     }
     private Map<String, Object> depositResponse(Map<String, Object> deposit) {
-        return Map.of("paymentMethod", "VIETQR", "status", deposit.get("status"), "bookingId", deposit.get("booking_id"),
-                "paymentDepositId", deposit.get("id"), "paymentCode", deposit.get("payment_code"), "amount", deposit.get("amount"), "qrUrl", Optional.ofNullable(deposit.get("qr_url")).orElse(""));
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("paymentMethod", "VIETQR");
+        response.put("status", deposit.get("status"));
+        response.put("bookingId", deposit.get("booking_id"));
+        response.put("paymentDepositId", deposit.get("id"));
+        response.put("paymentCode", deposit.get("payment_code"));
+        response.put("amount", deposit.get("amount"));
+        response.put("qrUrl", Optional.ofNullable(deposit.get("qr_url")).orElse(""));
+        return response;
+    }
+    private Map<String, Object> requireDepositForUser(long userId, long id) {
+        Map<String, Object> deposit = one("SELECT * FROM payment_deposits WHERE id=? AND user_id=?", id, userId);
+        if (deposit == null) throw new ApiException(404, "Top-up deposit not found");
+        return deposit;
     }
     private String qrUrl(String code, BigDecimal amount) {
         if (blank(qrBank) || blank(qrAccount)) return "";
