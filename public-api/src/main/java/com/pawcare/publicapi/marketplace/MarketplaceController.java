@@ -2,17 +2,21 @@ package com.pawcare.publicapi.marketplace;
 
 import com.pawcare.publicapi.auth.CurrentPrincipal;
 import com.pawcare.publicapi.auth.CurrentUser;
+import com.pawcare.publicapi.wallet.PaymentMethod;
+import com.pawcare.publicapi.wallet.WalletService;
 import com.pawcare.publicapi.web.ApiException;
 import java.math.BigDecimal;
 import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1")
 public class MarketplaceController {
     private final JdbcTemplate db;
-    public MarketplaceController(JdbcTemplate db) { this.db = db; }
+    private final WalletService wallets;
+    public MarketplaceController(JdbcTemplate db, WalletService wallets) { this.db = db; this.wallets = wallets; }
 
     // Public catalogue --------------------------------------------------------
     @GetMapping("/providers")
@@ -127,17 +131,18 @@ public class MarketplaceController {
     @GetMapping("/provider/customers") public List<Map<String,Object>> providerCustomers(@CurrentUser CurrentPrincipal p) { return db.queryForList("SELECT u.id,u.full_name,u.email,u.phone,COUNT(b.id) booking_count,MAX(b.booking_start) last_booking_at FROM bookings b JOIN user_profiles u ON u.id=b.customer_profile_id WHERE b.provider_id=? GROUP BY u.id,u.full_name,u.email,u.phone ORDER BY last_booking_at DESC", providerId(p)); }
     @GetMapping("/provider/pets") public List<Map<String,Object>> providerPets(@CurrentUser CurrentPrincipal p) { return db.queryForList("SELECT pt.id,pt.name,pt.species,pt.breed,pt.gender,pt.birth_date,pt.weight_kg,u.full_name customer_name,COUNT(b.id) booking_count,MAX(b.booking_start) last_booking_at FROM bookings b JOIN pets pt ON pt.id=b.pet_id JOIN user_profiles u ON u.id=pt.customer_profile_id WHERE b.provider_id=? GROUP BY pt.id,pt.name,pt.species,pt.breed,pt.gender,pt.birth_date,pt.weight_kg,u.full_name ORDER BY last_booking_at DESC", providerId(p)); }
     @GetMapping("/provider/reviews") public List<Map<String,Object>> providerReviews(@CurrentUser CurrentPrincipal p) { return db.queryForList("SELECT r.*,u.full_name customer_name,s.name service_name FROM reviews r JOIN user_profiles u ON u.id=r.customer_profile_id JOIN bookings b ON b.id=r.booking_id JOIN services s ON s.id=b.service_id WHERE r.provider_id=? ORDER BY r.created_at DESC", providerId(p)); }
-    @GetMapping("/provider/dashboard") public Map<String,Object> providerDashboard(@CurrentUser CurrentPrincipal p) { long id=providerId(p); Map<String,Object> c=one("SELECT COUNT(*) total_bookings,SUM(status='PENDING') pending_bookings,SUM(status='COMPLETED') completed_bookings,COALESCE(SUM(CASE WHEN status='COMPLETED' THEN estimated_price ELSE 0 END),0) completed_revenue FROM bookings WHERE provider_id=?",id); Map<String,Object> r=one("SELECT COUNT(*) review_count,COALESCE(AVG(rating),0) average_rating FROM reviews WHERE provider_id=? AND is_visible=1",id); Map<String,Object> x=new LinkedHashMap<>();x.putAll(c);x.putAll(r);return x; }
+    @GetMapping("/provider/dashboard") public Map<String,Object> providerDashboard(@CurrentUser CurrentPrincipal p) { long id=providerId(p); Map<String,Object> c=one("SELECT COUNT(*) total_bookings,SUM(status IN ('PENDING','PENDING_APPROVAL')) pending_bookings,SUM(status='COMPLETED') completed_bookings,COALESCE(SUM(CASE WHEN status='COMPLETED' THEN estimated_price ELSE 0 END),0) completed_revenue FROM bookings WHERE provider_id=? AND status<>'PENDING_PAYMENT'",id); Map<String,Object> r=one("SELECT COUNT(*) review_count,COALESCE(AVG(rating),0) average_rating FROM reviews WHERE provider_id=? AND is_visible=1",id); Map<String,Object> x=new LinkedHashMap<>();x.putAll(c);x.putAll(r);return x; }
     @GetMapping("/provider/revenue") public List<Map<String,Object>> providerRevenue(@CurrentUser CurrentPrincipal p) { return db.queryForList("SELECT DATE(booking_end) booking_date,COUNT(*) completed_bookings,COALESCE(SUM(estimated_price),0) revenue FROM bookings WHERE provider_id=? AND status='COMPLETED' GROUP BY DATE(booking_end) ORDER BY booking_date DESC LIMIT 30",providerId(p)); }
 
     // Booking lifecycle ------------------------------------------------------
     @GetMapping("/bookings")
     public List<Map<String,Object>> bookings(@CurrentUser CurrentPrincipal p) {
         if("CUSTOMER".equals(p.role())) return db.queryForList("SELECT b.*,pr.name provider_name,s.name service_name FROM bookings b JOIN providers pr ON pr.id=b.provider_id JOIN services s ON s.id=b.service_id WHERE b.customer_profile_id=? ORDER BY b.booking_start DESC",p.profileId());
-        if("PROVIDER".equals(p.role())) return db.queryForList("SELECT b.*,u.full_name customer_name,s.name service_name FROM bookings b JOIN providers pr ON pr.id=b.provider_id JOIN user_profiles u ON u.id=b.customer_profile_id JOIN services s ON s.id=b.service_id WHERE pr.owner_profile_id=? ORDER BY b.booking_start DESC",p.profileId());
+        if("PROVIDER".equals(p.role())) return db.queryForList("SELECT b.*,u.full_name customer_name,s.name service_name FROM bookings b JOIN providers pr ON pr.id=b.provider_id JOIN user_profiles u ON u.id=b.customer_profile_id JOIN services s ON s.id=b.service_id WHERE pr.owner_profile_id=? AND b.status<>'PENDING_PAYMENT' ORDER BY b.booking_start DESC",p.profileId());
         throw new ApiException(403,"Unsupported role");
     }
     @PostMapping("/bookings")
+    @Transactional
     public Map<String,Object> createBooking(@CurrentUser CurrentPrincipal p,@RequestBody Map<String,Object>b) {
         customer(p); long pet=number(b,"petId"),provider=number(b,"providerId"),service=number(b,"serviceId");
         own("SELECT id FROM pets WHERE id=? AND customer_profile_id=? AND is_active=1",pet,p.profileId());
@@ -148,10 +153,13 @@ public class MarketplaceController {
             Integer conflict=db.queryForObject("SELECT COUNT(*) FROM bookings WHERE staff_id=? AND status IN ('PENDING','CONFIRMED','CHECKED_IN','IN_SERVICE') AND booking_start < DATE_ADD(?,INTERVAL ? MINUTE) AND booking_end > ?",Integer.class,staff,start,s.get("duration_minutes"),start);
             if(conflict != null && conflict > 0) throw new ApiException(409,"Selected staff already has an overlapping booking");
         }
-        db.update("INSERT INTO bookings(customer_profile_id,pet_id,provider_id,service_id,staff_id,booking_start,booking_end,estimated_price,customer_note) VALUES(?,?,?,?,?,?,DATE_ADD(?,INTERVAL ? MINUTE),?,?)",p.profileId(),pet,provider,service,staff,start,start,s.get("duration_minutes"),s.get("price"),text(b,"customerNote"));
-        return Map.of("success",true,"id",lastId());
+        db.update("INSERT INTO bookings(customer_profile_id,pet_id,provider_id,service_id,staff_id,booking_start,booking_end,status,estimated_price,customer_note) VALUES(?,?,?,?,?,?,DATE_ADD(?,INTERVAL ? MINUTE),'PENDING_PAYMENT',?,?)",p.profileId(),pet,provider,service,staff,start,start,s.get("duration_minutes"),s.get("price"),text(b,"customerNote"));
+        long bookingId=lastId();
+        Map<String,Object> payment=wallets.fundBooking(p.profileId(),bookingId,(BigDecimal)s.get("price"),PaymentMethod.from(b.get("paymentMethod")));
+        Map<String,Object> result=new LinkedHashMap<>(); result.put("success",true);result.put("id",bookingId);result.put("payment",payment);return result;
     }
     @PutMapping("/bookings/{id}/status")
+    @Transactional
     public Map<String,Object> bookingStatus(@CurrentUser CurrentPrincipal p,@PathVariable long id,@RequestBody Map<String,Object>b) {
         Map<String,Object> booking=one("SELECT * FROM bookings WHERE id=?",id);if(booking==null)throw new ApiException(404,"Booking not found");
         String next=required(b,"status").toUpperCase(Locale.ROOT); String current=String.valueOf(booking.get("status"));
@@ -167,6 +175,8 @@ public class MarketplaceController {
                 "Booking #" + id + " đã được cập nhật: " + next,
                 "BOOKING_STATUS", "BOOKING", id);
         }
+        if ("REJECTED".equals(next) || "CANCELLED".equals(next)) wallets.releaseEscrowForBooking(id, "REJECTED".equals(next) ? "provider rejected booking" : "customer cancelled booking");
+        if ("COMPLETED".equals(next)) wallets.settleCompletedBooking(id);
         return Map.of("success",true,"id",id,"status",next);
     }
 
@@ -258,5 +268,11 @@ public class MarketplaceController {
     private BigDecimal decimalRequired(Map<String,Object>b,String k){BigDecimal x=decimal(b,k);if(x==null)throw new ApiException(400,k+" is required");return x;}
     private Boolean bool(Map<String,Object>b,String k){return b.get(k)==null?null:Boolean.valueOf(String.valueOf(b.get(k)));}
     private String or(String a,String b){return a==null||a.isBlank()?b:a;}
-    private boolean transition(String from,String to){return Map.of("PENDING",List.of("CONFIRMED","REJECTED","CANCELLED"),"CONFIRMED",List.of("CHECKED_IN","CANCELLED"),"CHECKED_IN",List.of("IN_SERVICE","CANCELLED"),"IN_SERVICE",List.of("COMPLETED")).getOrDefault(from,List.of()).contains(to);}
+    private boolean transition(String from,String to){return Map.of(
+        "PENDING_APPROVAL",List.of("CONFIRMED","REJECTED","CANCELLED"),
+        "PENDING",List.of("CONFIRMED","REJECTED","CANCELLED"),
+        "CONFIRMED",List.of("CHECKED_IN","CANCELLED"),
+        "CHECKED_IN",List.of("IN_SERVICE","CANCELLED"),
+        "IN_SERVICE",List.of("COMPLETED")
+    ).getOrDefault(from,List.of()).contains(to);}
 }
