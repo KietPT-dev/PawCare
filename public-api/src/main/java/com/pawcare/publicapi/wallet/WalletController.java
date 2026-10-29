@@ -24,6 +24,15 @@ public class WalletController {
         return wallets.myTransactions(principal);
     }
 
+    @GetMapping("/provider/wallet")
+    public Map<String,Object> providerWallet(@CurrentUser CurrentPrincipal principal) { return wallets.providerOverview(principal); }
+
+    @GetMapping("/provider/wallet/payouts")
+    public Object providerPayouts(@CurrentUser CurrentPrincipal principal) { return wallets.providerPayouts(principal); }
+
+    @GetMapping("/provider/wallet/withdrawals")
+    public Object providerWithdrawals(@CurrentUser CurrentPrincipal principal) { return wallets.providerWithdrawals(principal); }
+
     @PostMapping("/wallets/withdraw")
     public Map<String, Object> withdraw(@CurrentUser CurrentPrincipal principal,
                                          @RequestBody WithdrawRequest request) {

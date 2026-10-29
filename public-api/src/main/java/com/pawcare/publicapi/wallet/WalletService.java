@@ -206,6 +206,31 @@ public class WalletService {
         return db.queryForList("SELECT * FROM wallet_transactions WHERE wallet_id=? ORDER BY created_at DESC,id DESC", wallet.get("id"));
     }
 
+    /** Read-only view used by the Provider portal; balance mutations stay in this service. */
+    public Map<String, Object> providerOverview(CurrentPrincipal principal) {
+        requireProvider(principal);
+        long providerId = ownerId(principal);
+        Map<String,Object> wallet = ensureWallet(PROVIDER, providerId);
+        Map<String,Object> pending = one("SELECT COALESCE(SUM(estimated_price * 0.90),0) amount FROM bookings WHERE provider_id=? AND status IN ('PENDING_APPROVAL','CONFIRMED','CHECKED_IN','IN_SERVICE')", providerId);
+        Map<String,Object> earned = one("SELECT COALESCE(SUM(amount),0) amount FROM wallet_transactions WHERE wallet_id=? AND type='PROVIDER_PAYOUT'", wallet.get("id"));
+        Map<String,Object> result = walletView(wallet);
+        result.put("pendingRevenue", pending.get("amount"));
+        result.put("totalEarned", earned.get("amount"));
+        return result;
+    }
+
+    public List<Map<String,Object>> providerPayouts(CurrentPrincipal principal) {
+        requireProvider(principal);
+        Map<String,Object> wallet = ensureWallet(PROVIDER, ownerId(principal));
+        return db.queryForList("SELECT t.*,b.estimated_price gross_amount,u.full_name customer_name,s.name service_name FROM wallet_transactions t JOIN bookings b ON b.id=t.booking_id JOIN user_profiles u ON u.id=b.customer_profile_id JOIN services s ON s.id=b.service_id WHERE t.wallet_id=? AND t.type='PROVIDER_PAYOUT' ORDER BY t.created_at DESC,t.id DESC", wallet.get("id"));
+    }
+
+    public List<Map<String,Object>> providerWithdrawals(CurrentPrincipal principal) {
+        requireProvider(principal);
+        Map<String,Object> wallet = ensureWallet(PROVIDER, ownerId(principal));
+        return db.queryForList("SELECT * FROM withdrawal_requests WHERE wallet_id=? ORDER BY created_at DESC,id DESC", wallet.get("id"));
+    }
+
     @Transactional
     public Map<String, Object> requestWithdrawal(CurrentPrincipal principal, WithdrawRequest request) {
         validateWithdraw(request);
@@ -336,6 +361,7 @@ public class WalletService {
     private String ownerType(CurrentPrincipal p) { return "PROVIDER".equals(p.role()) ? PROVIDER : "ADMIN".equals(p.role()) ? PLATFORM : USER; }
     private long ownerId(CurrentPrincipal p) { return "PROVIDER".equals(p.role()) ? ((Number) requireOne("SELECT id FROM providers WHERE owner_profile_id=?", p.profileId()).get("id")).longValue() : "ADMIN".equals(p.role()) ? 0L : p.profileId(); }
     private void requireAdmin(CurrentPrincipal p) { if (!"ADMIN".equals(p.role())) throw new ApiException(403, "Admin account required"); }
+    private void requireProvider(CurrentPrincipal p) { if (!"PROVIDER".equals(p.role())) throw new ApiException(403, "Provider account required"); }
     private void validateWithdraw(WithdrawRequest r) { if (r == null || r.amount() == null || r.amount().signum() <= 0 || blank(r.bankName()) || blank(r.bankAccountNo()) || blank(r.bankAccountName())) throw new ApiException(400, "amount and bank information are required"); }
     private Map<String, Object> requireOne(String sql, Object... args) { Map<String, Object> x = one(sql, args); if (x == null) throw new ApiException(404, "Required record not found"); return x; }
     private Map<String, Object> one(String sql, Object... args) { List<Map<String, Object>> rows = db.queryForList(sql, args); return rows.isEmpty() ? null : rows.get(0); }
