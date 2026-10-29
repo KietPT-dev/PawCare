@@ -27,3 +27,13 @@ pawcare:
     payment-url: ${VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
     return-url: ${VNPAY_RETURN_URL:https://replace-me.example.com/api/v1/payments/vnpay/return}
     ipn-url: ${VNPAY_IPN_URL:https://replace-me.example.com/api/v1/payments/vnpay/ipn}
+  wallet:
+    # Bank webhook relays must provide this value in X-PawCare-Webhook-Token.
+    # Keep it out of source control; use PAWCARE_WALLET_WEBHOOK_TOKEN in each environment.
+    webhook-token: ${PAWCARE_WALLET_WEBHOOK_TOKEN:}
+    expiry-check-ms: ${PAWCARE_WALLET_EXPIRY_CHECK_MS:900000}
+    vietqr:
+      # A real business bank account is configured by environment, never in client code.
+      bank-code: ${PAWCARE_VIETQR_BANK_CODE:}
+      account-no: ${PAWCARE_VIETQR_ACCOUNT_NO:}
+      account-name: ${PAWCARE_VIETQR_ACCOUNT_NAME:PawCare}
