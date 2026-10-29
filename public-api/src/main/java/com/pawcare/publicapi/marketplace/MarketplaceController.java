@@ -176,7 +176,7 @@ public class MarketplaceController {
             Integer conflict=db.queryForObject("SELECT COUNT(*) FROM bookings WHERE staff_id=? AND status IN ('PENDING','CONFIRMED','CHECKED_IN','IN_SERVICE') AND booking_start < DATE_ADD(?,INTERVAL ? MINUTE) AND booking_end > ?",Integer.class,staff,start,s.get("duration_minutes"),start);
             if(conflict != null && conflict > 0) throw new ApiException(409,"Selected staff already has an overlapping booking");
         }
-        db.update("INSERT INTO bookings(customer_profile_id,pet_id,provider_id,service_id,staff_id,booking_start,booking_end,estimated_price,escrow_status,customer_note) VALUES(?,?,?,?,?,?,DATE_ADD(?,INTERVAL ? MINUTE),?,'HELD',?)",p.profileId(),pet,provider,service,staff,start,start,s.get("duration_minutes"),s.get("price"),text(b,"customerNote"));
+        db.update("INSERT INTO bookings(customer_profile_id,pet_id,provider_id,service_id,staff_id,booking_start,booking_end,estimated_price,customer_note) VALUES(?,?,?,?,?,?,DATE_ADD(?,INTERVAL ? MINUTE),?,?)",p.profileId(),pet,provider,service,staff,start,start,s.get("duration_minutes"),s.get("price"),text(b,"customerNote"));
         long id=lastId(); Map<String,Object> owner=one("SELECT owner_profile_id,name FROM providers WHERE id=?",provider);
         db.update("INSERT INTO notifications(recipient_profile_id,title,content,notification_type,reference_type,reference_id) VALUES(?,?,?,?,?,?)",owner.get("owner_profile_id"),"Booking mới","Bạn có booking #"+id+" cần xác nhận tại "+owner.get("name"),"BOOKING_CREATED","BOOKING",id);
         return Map.of("success",true,"id",id);
@@ -190,8 +190,6 @@ public class MarketplaceController {
         if(!(customer||provider)||!transition(current,next))throw new ApiException(403,"Booking status change is not allowed");
         db.update("UPDATE bookings SET status=?,cancel_reason=CASE WHEN ?='CANCELLED' THEN ? ELSE cancel_reason END,provider_note=COALESCE(?,provider_note) WHERE id=?",next,next,text(b,"cancelReason"),text(b,"providerNote"),id);
         db.update("INSERT INTO booking_status_history(booking_id,previous_status,new_status,changed_by_profile_id,note) VALUES(?,?,?,?,?)",id,current,next,p.profileId(),text(b,"note"));
-        if ("REJECTED".equals(next) || "CANCELLED".equals(next)) db.update("UPDATE bookings SET escrow_status='REFUNDED' WHERE id=? AND escrow_status='HELD'",id);
-        if ("COMPLETED".equals(next)) creditProviderWallet(booking);
         if (!customer) {
             db.update("INSERT INTO notifications(recipient_profile_id,title,content,notification_type,reference_type,reference_id) VALUES(?,?,?,?,?,?)",
                 booking.get("customer_profile_id"),
@@ -292,7 +290,6 @@ public class MarketplaceController {
     private Boolean bool(Map<String,Object>b,String k){return b.get(k)==null?null:Boolean.valueOf(String.valueOf(b.get(k)));}
     private String or(String a,String b){return a==null||a.isBlank()?b:a;}
     private String scheduleStatus(Map<String,Object>b){String status=or(text(b,"status"),"AVAILABLE").toUpperCase(Locale.ROOT);if(!List.of("AVAILABLE","BOOKED","BLOCKED").contains(status))throw new ApiException(400,"status must be AVAILABLE, BOOKED or BLOCKED");return status;}
-    private void creditProviderWallet(Map<String,Object> booking){long bookingId=((Number)booking.get("id")).longValue();Integer already=db.queryForObject("SELECT COUNT(*) FROM provider_wallet_transactions WHERE booking_id=? AND type='BOOKING_PAYOUT'",Integer.class,bookingId);if(already!=null&&already>0)return;long providerId=((Number)booking.get("provider_id")).longValue();db.update("INSERT IGNORE INTO provider_wallets(provider_id) VALUES(?)",providerId);Map<String,Object>wallet=one("SELECT * FROM provider_wallets WHERE provider_id=?",providerId);BigDecimal gross=(BigDecimal)booking.get("estimated_price"),fee=gross.multiply(new BigDecimal("0.10")),net=gross.subtract(fee);db.update("UPDATE provider_wallets SET available_balance=available_balance+?,total_earned=total_earned+? WHERE id=?",net,net,wallet.get("id"));db.update("INSERT INTO provider_wallet_transactions(wallet_id,booking_id,gross_amount,platform_fee,net_amount,type,description) VALUES(?,?,?,?,?,'BOOKING_PAYOUT',?)",wallet.get("id"),bookingId,gross,fee,net,"90% payout from completed booking #"+bookingId);db.update("UPDATE bookings SET escrow_status='SETTLED' WHERE id=?",bookingId);}
     private void validateScheduleTimes(String start,String end){try{if(!java.time.LocalDateTime.parse(end.replace(' ','T')).isAfter(java.time.LocalDateTime.parse(start.replace(' ','T'))))throw new ApiException(400,"endAt must be after startAt");}catch(ApiException e){throw e;}catch(Exception e){throw new ApiException(400,"startAt and endAt must be valid dates");}}
     private boolean transition(String from,String to){return Map.of("PENDING",List.of("CONFIRMED","REJECTED","CANCELLED"),"CONFIRMED",List.of("CHECKED_IN","CANCELLED"),"CHECKED_IN",List.of("IN_SERVICE","CANCELLED"),"IN_SERVICE",List.of("COMPLETED")).getOrDefault(from,List.of()).contains(to);}
 }
