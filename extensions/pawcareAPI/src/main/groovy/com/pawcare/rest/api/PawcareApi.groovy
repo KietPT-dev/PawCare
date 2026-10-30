@@ -64,7 +64,7 @@ class PawcareService {
                     fields: [
                             'owner_profile_id', 'provider_type', 'name',
                             'phone', 'email', 'address', 'service_area',
-                            'description', 'status', 'is_active'
+                            'description', 'status', 'rejection_reason', 'is_active'
                     ]
             ],
             categories: [
