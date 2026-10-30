@@ -130,6 +130,10 @@ class PawcareService {
             return handleComplaints(method)
         }
 
+        if (action == 'finance') {
+            return handleFinance(method)
+        }
+
         if (!RESOURCES.containsKey(action)) {
             throw new ApiException(404, "Unknown endpoint: ${action}")
         }
@@ -718,6 +722,136 @@ class PawcareService {
                 return updateComplaint(profile, requestBody())
             default:
                 throw new ApiException(405, "Method ${method} is not allowed for complaints")
+        }
+    }
+
+    /**
+     * Back-office financial operations.  This stays in the Bonita extension so
+     * the current Bonita session (and its ADMIN role) remains the authority for
+     * every operation; no browser supplied profile id is trusted.
+     */
+    private Object handleFinance(String method) {
+        Map profile = requireProfile(currentProfile(false))
+        if (!isAdmin(profile)) throw new ApiException(403, 'Admin permission is required')
+
+        switch (method) {
+            case 'GET':
+                return financeOverview(query('type'), query('status'))
+            case 'PUT':
+                return decideWithdrawal(profile, requestBody())
+            case 'POST':
+                return forceRefund(profile, requestBody())
+            default:
+                throw new ApiException(405, "Method ${method} is not allowed for finance")
+        }
+    }
+
+    private Map financeOverview(String type, String withdrawalStatus) {
+        List<String> types = ['DEPOSIT', 'ESCROW_HOLD', 'ESCROW_RELEASE', 'COMMISSION_FEE', 'PROVIDER_PAYOUT', 'WITHDRAWAL']
+        if (type && !(type.toUpperCase() in types)) throw new ApiException(400, 'Unknown ledger transaction type')
+        if (withdrawalStatus && !(withdrawalStatus.toUpperCase() in ['PENDING', 'APPROVED', 'REJECTED'])) {
+            throw new ApiException(400, 'Unknown withdrawal status')
+        }
+
+        Map summary = sql.firstRow('''
+            SELECT
+              COALESCE((SELECT SUM(pd.amount) FROM payment_deposits pd WHERE pd.status = 'ESCROW_HELD'), 0) AS escrow_held,
+              COALESCE((SELECT SUM(t.amount) FROM wallet_transactions t WHERE t.type = 'COMMISSION_FEE' AND t.amount > 0), 0) AS commission_revenue,
+              COALESCE((SELECT SUM(w.available_balance + w.locked_balance) FROM wallets w WHERE w.owner_type = 'PROVIDER'), 0) AS provider_wallets,
+              COALESCE((SELECT SUM(w.available_balance + w.locked_balance) FROM wallets w WHERE w.owner_type = 'USER'), 0) AS user_wallets
+        ''')
+        String ledgerWhere = type ? 'WHERE t.type = ?' : ''
+        List ledgerArgs = type ? [type.toUpperCase()] : []
+        List ledger = sql.rows('''
+            SELECT t.*, w.owner_type, w.owner_id,
+              COALESCE(up.full_name, pr.name, CASE WHEN w.owner_type = 'PLATFORM_ADMIN' THEN 'PawCare Platform' END) AS owner_name
+            FROM wallet_transactions t
+            JOIN wallets w ON w.id = t.wallet_id
+            LEFT JOIN user_profiles up ON w.owner_type = 'USER' AND up.id = w.owner_id
+            LEFT JOIN providers pr ON w.owner_type = 'PROVIDER' AND pr.id = w.owner_id
+        ''' + ledgerWhere + ' ORDER BY t.created_at DESC, t.id DESC LIMIT 250', ledgerArgs)
+        String withdrawalWhere = withdrawalStatus ? 'WHERE wr.status = ?' : ''
+        List withdrawalArgs = withdrawalStatus ? [withdrawalStatus.toUpperCase()] : []
+        List withdrawals = sql.rows('''
+            SELECT wr.*, w.owner_type, w.owner_id,
+              COALESCE(up.full_name, pr.name) AS owner_name,
+              COALESCE(up.email, pr.email) AS owner_email
+            FROM withdrawal_requests wr
+            JOIN wallets w ON w.id = wr.wallet_id
+            LEFT JOIN user_profiles up ON w.owner_type = 'USER' AND up.id = w.owner_id
+            LEFT JOIN providers pr ON w.owner_type = 'PROVIDER' AND pr.id = w.owner_id
+        ''' + withdrawalWhere + ' ORDER BY wr.created_at DESC, wr.id DESC LIMIT 250', withdrawalArgs)
+        List complaints = sql.rows('''
+            SELECT c.*, u.full_name AS customer_name, p.name AS provider_name, b.status AS booking_status,
+                   pd.status AS escrow_status
+            FROM complaints c
+            JOIN user_profiles u ON u.id = c.customer_profile_id
+            JOIN providers p ON p.id = c.provider_id
+            JOIN bookings b ON b.id = c.booking_id
+            LEFT JOIN payment_deposits pd ON pd.booking_id = b.id
+            WHERE c.status IN ('OPEN', 'IN_PROGRESS')
+            ORDER BY c.created_at DESC, c.id DESC LIMIT 100
+        ''')
+        return [success: true, summary: summary, ledger: ledger, withdrawals: withdrawals, disputes: complaints]
+    }
+
+    private Map decideWithdrawal(Map profile, Map body) {
+        Long id = asLong(body.id, 'id')
+        String decision = requiredText(body.decision, 'decision').toUpperCase()
+        if (!(decision in ['APPROVED', 'REJECTED'])) throw new ApiException(400, 'decision must be APPROVED or REJECTED')
+        String note = body.admin_note?.toString()?.trim()
+        return sql.withTransaction {
+            Map wr = sql.firstRow('SELECT * FROM withdrawal_requests WHERE id = ? FOR UPDATE', [id])
+            if (wr == null) throw new ApiException(404, 'Withdrawal request not found')
+            if (wr.status != 'PENDING') throw new ApiException(409, 'Withdrawal request has already been decided')
+            Map wallet = sql.firstRow('SELECT * FROM wallets WHERE id = ? FOR UPDATE', [wr.wallet_id])
+            BigDecimal amount = wr.amount as BigDecimal
+            BigDecimal available = wallet.available_balance as BigDecimal
+            BigDecimal locked = wallet.locked_balance as BigDecimal
+            if (locked < amount) throw new ApiException(409, 'Reserved withdrawal balance is inconsistent')
+            if (decision == 'APPROVED') {
+                sql.executeUpdate('UPDATE wallets SET locked_balance = locked_balance - ? WHERE id = ?', [amount, wallet.id])
+                sql.executeInsert('''INSERT INTO wallet_transactions
+                    (wallet_id, booking_id, type, amount, balance_before, balance_after, description)
+                    VALUES (?, NULL, 'WITHDRAWAL', ?, ?, ?, ?)''',
+                    [wallet.id, amount.negate(), locked, locked - amount, "Withdrawal approved and paid out, request #${id}"])
+            } else {
+                sql.executeUpdate('UPDATE wallets SET available_balance = available_balance + ?, locked_balance = locked_balance - ? WHERE id = ?', [amount, amount, wallet.id])
+                sql.executeInsert('''INSERT INTO wallet_transactions
+                    (wallet_id, booking_id, type, amount, balance_before, balance_after, description)
+                    VALUES (?, NULL, 'WITHDRAWAL', ?, ?, ?, ?)''',
+                    [wallet.id, amount, available, available + amount, "Withdrawal rejected; amount returned, request #${id}"])
+            }
+            sql.executeUpdate('''UPDATE withdrawal_requests
+                SET status = ?, admin_note = ?, reviewed_by_profile_id = ?, reviewed_at = CURRENT_TIMESTAMP
+                WHERE id = ?''', [decision, note, profile.id, id])
+            [success: true, id: id, status: decision]
+        }
+    }
+
+    private Map forceRefund(Map profile, Map body) {
+        Long complaintId = asLong(body.complaint_id, 'complaint_id')
+        String note = body.admin_note?.toString()?.trim() ?: 'Force refund approved by admin'
+        return sql.withTransaction {
+            Map complaint = sql.firstRow('SELECT * FROM complaints WHERE id = ? FOR UPDATE', [complaintId])
+            if (complaint == null) throw new ApiException(404, 'Complaint not found')
+            Map deposit = sql.firstRow("SELECT * FROM payment_deposits WHERE booking_id = ? AND status = 'ESCROW_HELD' FOR UPDATE", [complaint.booking_id])
+            if (deposit == null) throw new ApiException(409, 'This dispute has no escrow currently held')
+            Map wallet = sql.firstRow("SELECT * FROM wallets WHERE owner_type = 'USER' AND owner_id = ? FOR UPDATE", [complaint.customer_profile_id])
+            if (wallet == null) throw new ApiException(409, 'Customer wallet not found')
+            BigDecimal amount = deposit.amount as BigDecimal
+            BigDecimal locked = wallet.locked_balance as BigDecimal
+            BigDecimal available = wallet.available_balance as BigDecimal
+            if (locked < amount) throw new ApiException(409, 'Escrow balance is inconsistent')
+            sql.executeUpdate('UPDATE wallets SET available_balance = available_balance + ?, locked_balance = locked_balance - ? WHERE id = ?', [amount, amount, wallet.id])
+            sql.executeInsert('''INSERT INTO wallet_transactions
+                (wallet_id, booking_id, type, amount, balance_before, balance_after, description)
+                VALUES (?, ?, 'ESCROW_RELEASE', ?, ?, ?, ?)''',
+                [wallet.id, complaint.booking_id, amount, available, available + amount, "Force refund for complaint #${complaintId}: ${note}"])
+            sql.executeUpdate("UPDATE payment_deposits SET status = 'EXPIRED' WHERE id = ?", [deposit.id])
+            sql.executeUpdate("UPDATE complaints SET status = 'RESOLVED', admin_response = ?, resolved_at = CURRENT_TIMESTAMP WHERE id = ?", [note, complaintId])
+            notifyProfile(complaint.customer_profile_id as Long, 'Escrow refund completed', "Your complaint #${complaintId} was refunded to your wallet", 'COMPLAINT', 'COMPLAINT', complaintId)
+            [success: true, complaint_id: complaintId, amount: amount]
         }
     }
 

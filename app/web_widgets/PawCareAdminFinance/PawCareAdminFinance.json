@@ -1,0 +1,12 @@
+{
+  "id": "pawCareAdminFinance",
+  "name": "PawCareAdminFinance",
+  "type": "widget",
+  "custom": true,
+  "modelVersion": "2.6",
+  "description": "PawCare Admin finance, ledger, withdrawal and dispute widget.",
+  "template": "@pawCareAdminFinance.tpl.html",
+  "controller": "@pawCareAdminFinance.ctrl.js",
+  "properties": [], "assets": [], "requiredModules": [], "webResources": [],
+  "order": 100, "hasHelp": false
+}
