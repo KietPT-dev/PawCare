@@ -12,7 +12,13 @@ if lsof -iTCP:8081 -sTCP:LISTEN >/dev/null 2>&1; then
 fi
 
 # Optional local database/JWT values, deliberately excluded from Git.
-[ -f "$ROOT/.env.local" ] && source "$ROOT/.env.local"
+# `set -a` is important: variables read from .env.local must be exported to
+# the Maven/Java child process, not merely exist in this shell.
+if [ -f "$ROOT/.env.local" ]; then
+  set -a
+  source "$ROOT/.env.local"
+  set +a
+fi
 export PAWCARE_JWT_SECRET="${PAWCARE_JWT_SECRET:-$(openssl rand -base64 48)}"
 export PAWCARE_JWT_ISSUER="${PAWCARE_JWT_ISSUER:-pawcare-public-api}"
 export VNPAY_ENABLED="${VNPAY_ENABLED:-false}"

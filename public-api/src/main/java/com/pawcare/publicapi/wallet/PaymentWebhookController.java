@@ -13,8 +13,16 @@ public class PaymentWebhookController {
 
     @PostMapping("/webhook")
     public Map<String, Object> receive(
-            @RequestHeader(value = "X-PawCare-Webhook-Token", required = false) String token,
+            @RequestHeader(value = "X-PawCare-Webhook-Token", required = false) String internalToken,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody Map<String, Object> payload) {
+        // SePay's API-key mode sends `Authorization: Apikey <key>`. Keep the
+        // project-specific header as a convenient option for local relays/tests.
+        String token = internalToken;
+        if ((token == null || token.isBlank()) && authorization != null
+                && authorization.regionMatches(true, 0, "Apikey ", 0, 7)) {
+            token = authorization.substring(7).trim();
+        }
         return wallets.processBankWebhook(token, payload);
     }
 }

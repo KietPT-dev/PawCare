@@ -17,3 +17,7 @@ pawcare-customer-mobile/.dart_tool/
 pawcare-customer-mobile/build/
 pawcare-customer-mobile/.codex/
 .DS_Store
+
+# Local secrets and payment-gateway configuration. Never commit these.
+.env.local
+.pawcare-jwt-secret
