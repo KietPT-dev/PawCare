@@ -84,6 +84,32 @@ class PawCareApi {
     await delete('/care-notes/$id');
   }
 
+  Future<Map<String, dynamic>> wallet() async =>
+      Map<String, dynamic>.from(await get('/wallets/me') as Map);
+
+  Future<List<Map<String, dynamic>>> walletTransactions() =>
+      list('/wallets/me/transactions');
+
+  Future<Map<String, dynamic>> requestWithdrawal({
+    required num amount,
+    required String bankName,
+    required String bankAccountNo,
+    required String bankAccountName,
+  }) async =>
+      Map<String, dynamic>.from(await post('/wallets/withdraw', {
+        'amount': amount,
+        'bankName': bankName,
+        'bankAccountNo': bankAccountNo,
+        'bankAccountName': bankAccountName,
+      }) as Map);
+
+  Future<Map<String, dynamic>> createWalletTopUp(num amount) async =>
+      Map<String, dynamic>.from(
+          await post('/wallets/topups', {'amount': amount}) as Map);
+
+  Future<Map<String, dynamic>> walletTopUpStatus(int id) async =>
+      Map<String, dynamic>.from(await get('/wallets/topups/$id') as Map);
+
   Future<List<Map<String, dynamic>>> list(String path) async {
     final data = await get(path);
     if (data is List)
