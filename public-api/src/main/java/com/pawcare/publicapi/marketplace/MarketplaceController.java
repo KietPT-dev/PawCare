@@ -2,6 +2,7 @@ package com.pawcare.publicapi.marketplace;
 
 import com.pawcare.publicapi.auth.CurrentPrincipal;
 import com.pawcare.publicapi.auth.CurrentUser;
+import com.pawcare.publicapi.marketplace.dto.DisputeRequest;
 import com.pawcare.publicapi.wallet.PaymentMethod;
 import com.pawcare.publicapi.wallet.WalletService;
 import com.pawcare.publicapi.web.ApiException;
@@ -16,7 +17,12 @@ import org.springframework.web.bind.annotation.*;
 public class MarketplaceController {
     private final JdbcTemplate db;
     private final WalletService wallets;
-    public MarketplaceController(JdbcTemplate db, WalletService wallets) { this.db = db; this.wallets = wallets; }
+    private final BookingWorkflowService workflow;
+    public MarketplaceController(JdbcTemplate db, WalletService wallets, BookingWorkflowService workflow) {
+        this.db = db;
+        this.wallets = wallets;
+        this.workflow = workflow;
+    }
 
     // Public catalogue --------------------------------------------------------
     @GetMapping("/providers")
@@ -164,7 +170,13 @@ public class MarketplaceController {
         Map<String,Object> booking=one("SELECT * FROM bookings WHERE id=?",id);if(booking==null)throw new ApiException(404,"Booking not found");
         String next=required(b,"status").toUpperCase(Locale.ROOT); String current=String.valueOf(booking.get("status"));
         boolean customer="CUSTOMER".equals(p.role())&&((Number)booking.get("customer_profile_id")).longValue()==p.profileId()&&"CANCELLED".equals(next);
-        boolean provider="PROVIDER".equals(p.role())&&ownsProvider(((Number)booking.get("provider_id")).longValue(),p.profileId())&&List.of("CONFIRMED","REJECTED","CHECKED_IN","IN_SERVICE","COMPLETED").contains(next);
+        boolean provider="PROVIDER".equals(p.role())&&ownsProvider(((Number)booking.get("provider_id")).longValue(),p.profileId())&&List.of("CONFIRMED","REJECTED","CHECKED_IN","IN_SERVICE","SERVICE_DONE").contains(next);
+        // A provider may report that work is done, but never settles escrow.
+        // The dedicated customer confirmation endpoint is the only normal path
+        // that can move SERVICE_DONE to COMPLETED.
+        if (provider && "SERVICE_DONE".equals(next)) {
+            return workflow.providerMarksServiceDone(p, id, text(b,"providerNote"), text(b,"note"));
+        }
         if(!(customer||provider)||!transition(current,next))throw new ApiException(403,"Booking status change is not allowed");
         db.update("UPDATE bookings SET status=?,cancel_reason=CASE WHEN ?='CANCELLED' THEN ? ELSE cancel_reason END,provider_note=COALESCE(?,provider_note) WHERE id=?",next,next,text(b,"cancelReason"),text(b,"providerNote"),id);
         db.update("INSERT INTO booking_status_history(booking_id,previous_status,new_status,changed_by_profile_id,note) VALUES(?,?,?,?,?)",id,current,next,p.profileId(),text(b,"note"));
@@ -176,8 +188,19 @@ public class MarketplaceController {
                 "BOOKING_STATUS", "BOOKING", id);
         }
         if ("REJECTED".equals(next) || "CANCELLED".equals(next)) wallets.releaseEscrowForBooking(id, "REJECTED".equals(next) ? "provider rejected booking" : "customer cancelled booking");
-        if ("COMPLETED".equals(next)) wallets.settleCompletedBooking(id);
         return Map.of("success",true,"id",id,"status",next);
+    }
+
+    /** Customer confirmation is deliberately separate from generic status updates. */
+    @PostMapping("/bookings/{id}/confirm-completion")
+    public Map<String,Object> confirmCompletion(@CurrentUser CurrentPrincipal p,@PathVariable long id,@RequestBody(required=false) Map<String,Object> b) {
+        return workflow.customerConfirmsCompletion(p, id, b == null ? null : text(b,"note"));
+    }
+
+    /** Customer can stop payout and create the dispute in one ACID transaction. */
+    @PostMapping("/bookings/{id}/disputes")
+    public Map<String,Object> openDispute(@CurrentUser CurrentPrincipal p,@PathVariable long id,@RequestBody DisputeRequest request) {
+        return workflow.customerOpensDispute(p, id, request == null ? null : request.content());
     }
 
     @PutMapping("/bookings/{id}/reschedule")
@@ -273,6 +296,6 @@ public class MarketplaceController {
         "PENDING",List.of("CONFIRMED","REJECTED","CANCELLED"),
         "CONFIRMED",List.of("CHECKED_IN","CANCELLED"),
         "CHECKED_IN",List.of("IN_SERVICE","CANCELLED"),
-        "IN_SERVICE",List.of("COMPLETED")
+        "IN_SERVICE",List.of("SERVICE_DONE")
     ).getOrDefault(from,List.of()).contains(to);}
 }

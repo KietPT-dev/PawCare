@@ -28,9 +28,10 @@ pawcare:
     return-url: ${VNPAY_RETURN_URL:https://replace-me.example.com/api/v1/payments/vnpay/return}
     ipn-url: ${VNPAY_IPN_URL:https://replace-me.example.com/api/v1/payments/vnpay/ipn}
   wallet:
-    # Bank webhook relays must provide this value in X-PawCare-Webhook-Token.
-    # Keep it out of source control; use PAWCARE_WALLET_WEBHOOK_TOKEN in each environment.
-    webhook-token: ${PAWCARE_WALLET_WEBHOOK_TOKEN:}
+    # SePay sends Authorization: Apikey <token> (or Bearer <token>). This
+    # local fallback prevents a blank token; production must override it with
+    # PAWCARE_WALLET_WEBHOOK_TOKEN and keep that value out of source control.
+    webhook-token: ${PAWCARE_WALLET_WEBHOOK_TOKEN:pawcare_secret_2026}
     expiry-check-ms: ${PAWCARE_WALLET_EXPIRY_CHECK_MS:900000}
     vietqr:
       # A real business bank account is configured by environment, never in client code.

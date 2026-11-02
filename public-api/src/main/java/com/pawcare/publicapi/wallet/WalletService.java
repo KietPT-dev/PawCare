@@ -33,6 +33,7 @@ public class WalletService {
     private static final String PROVIDER = "PROVIDER";
     private static final String PLATFORM = "PLATFORM_ADMIN";
     private static final Pattern PAYMENT_CODE = Pattern.compile("\\bPAW(\\d+)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern AUTHORIZATION_SCHEME = Pattern.compile("^(?:apikey|bearer)\\s+(.+)$", Pattern.CASE_INSENSITIVE);
 
     private final JdbcTemplate db;
     private final String webhookToken;
@@ -224,7 +225,7 @@ public class WalletService {
         requireProvider(principal);
         long providerId = ownerId(principal);
         Map<String,Object> wallet = ensureWallet(PROVIDER, providerId);
-        Map<String,Object> pending = one("SELECT COALESCE(SUM(estimated_price * 0.90),0) amount FROM bookings WHERE provider_id=? AND status IN ('PENDING_APPROVAL','CONFIRMED','CHECKED_IN','IN_SERVICE')", providerId);
+        Map<String,Object> pending = one("SELECT COALESCE(SUM(estimated_price * 0.90),0) amount FROM bookings WHERE provider_id=? AND status IN ('PENDING_APPROVAL','CONFIRMED','CHECKED_IN','IN_SERVICE','SERVICE_DONE')", providerId);
         Map<String,Object> earned = one("SELECT COALESCE(SUM(amount),0) amount FROM wallet_transactions WHERE wallet_id=? AND type='PROVIDER_PAYOUT'", wallet.get("id"));
         Map<String,Object> result = walletView(wallet);
         result.put("pendingRevenue", pending.get("amount"));
@@ -303,6 +304,14 @@ public class WalletService {
         }
         db.update("UPDATE withdrawal_requests SET status=?,admin_note=?,reviewed_by_profile_id=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=?",
                 decision, clean(request.adminNote()), principal.profileId(), id);
+        Long ownerProfile = walletOwnerProfile(wallet);
+        if (ownerProfile != null) {
+            String message = "APPROVED".equals(decision)
+                    ? "Yêu cầu rút tiền #" + id + " đã được duyệt. Hệ thống đã ghi nhận khoản chi trả."
+                    : "Yêu cầu rút tiền #" + id + " bị từ chối; số dư đã được hoàn lại vào ví.";
+            db.update("INSERT INTO notifications(recipient_profile_id,title,content,notification_type,reference_type,reference_id) VALUES(?,?,?,?,?,?)",
+                    ownerProfile, "Cập nhật yêu cầu rút tiền", message, "WITHDRAWAL", "WITHDRAWAL", id);
+        }
         return Map.of("success", true, "id", id, "status", decision);
     }
 
@@ -345,6 +354,17 @@ public class WalletService {
     }
 
     private Map<String, Object> lockWalletById(long id) { return one("SELECT * FROM wallets WHERE id=? FOR UPDATE", id); }
+    private Long walletOwnerProfile(Map<String, Object> wallet) {
+        String type = String.valueOf(wallet.get("owner_type"));
+        long ownerId = ((Number) wallet.get("owner_id")).longValue();
+        if (USER.equals(type)) return ownerId;
+        if (PROVIDER.equals(type)) {
+            Map<String,Object> provider = one("SELECT owner_profile_id FROM providers WHERE id=?", ownerId);
+            return provider == null || provider.get("owner_profile_id") == null ? null
+                    : ((Number) provider.get("owner_profile_id")).longValue();
+        }
+        return null;
+    }
     private Map<String, Object> ensureWallet(String ownerType, long ownerId) {
         db.update("INSERT IGNORE INTO wallets(owner_type,owner_id,available_balance,locked_balance) VALUES(?,?,0,0)", ownerType, ownerId);
         return one("SELECT * FROM wallets WHERE owner_type=? AND owner_id=?", ownerType, ownerId);
@@ -395,9 +415,21 @@ public class WalletService {
     }
     private String first(Map<String, Object> data, String... keys) { for (String k : keys) if (data.get(k) != null) return String.valueOf(data.get(k)); return null; }
     private BigDecimal decimal(String value) { try { return blank(value) ? null : new BigDecimal(value.replace(",", "")); } catch (NumberFormatException e) { return null; } }
+    static String normalizeWebhookToken(String token) {
+        if (token == null) return "";
+        String cleaned = token.trim();
+        Matcher scheme = AUTHORIZATION_SCHEME.matcher(cleaned);
+        return scheme.matches() ? scheme.group(1).trim() : cleaned;
+    }
+
     private void verifyWebhookToken(String supplied) {
-        if (blank(webhookToken)) throw new ApiException(503, "Payment webhook token is not configured");
-        if (blank(supplied) || !MessageDigest.isEqual(webhookToken.getBytes(StandardCharsets.UTF_8), supplied.getBytes(StandardCharsets.UTF_8))) throw new ApiException(401, "Invalid payment webhook token");
+        String expected = normalizeWebhookToken(webhookToken);
+        String received = normalizeWebhookToken(supplied);
+        if (blank(expected)) throw new ApiException(503, "Payment webhook token is not configured");
+        if (blank(received) || !MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8), received.getBytes(StandardCharsets.UTF_8))) {
+            throw new ApiException(401, "Invalid payment webhook token");
+        }
     }
     private String ownerType(CurrentPrincipal p) { return "PROVIDER".equals(p.role()) ? PROVIDER : "ADMIN".equals(p.role()) ? PLATFORM : USER; }
     private long ownerId(CurrentPrincipal p) { return "PROVIDER".equals(p.role()) ? ((Number) requireOne("SELECT id FROM providers WHERE owner_profile_id=?", p.profileId()).get("id")).longValue() : "ADMIN".equals(p.role()) ? 0L : p.profileId(); }
