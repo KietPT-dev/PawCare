@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../../../core/network/pawcare_api.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
@@ -7,242 +6,312 @@ import '../../../core/widgets/ui.dart';
 class ActivityScreen extends StatefulWidget {
   const ActivityScreen({super.key, required this.api});
   final PawCareApi api;
-
   @override
   State<ActivityScreen> createState() => _ActivityScreenState();
 }
 
 class _ActivityScreenState extends State<ActivityScreen> {
-  int tab = 0;
-  late Future<List<Map<String, dynamic>>> _bookings;
-
+  int _tab = 0;
+  late Future<_Data> _data;
   @override
   void initState() {
     super.initState();
-    _bookings = widget.api.list('/bookings');
+    _reload();
   }
 
-  void _reload() => setState(() => _bookings = widget.api.list('/bookings'));
+  void _reload() => _data = _load();
+  Future<_Data> _load() async {
+    final x = await Future.wait([
+      widget.api.list('/bookings'),
+      widget.api.list('/reviews'),
+      widget.api.list('/complaints')
+    ]);
+    return _Data(x[0] as List<Map<String, dynamic>>,
+        x[1] as List<Map<String, dynamic>>, x[2] as List<Map<String, dynamic>>);
+  }
 
+  Future<void> _changed() async => setState(_reload);
   @override
-  Widget build(BuildContext context) => SafeArea(
+  Widget build(BuildContext c) => SafeArea(
           child: Column(children: [
         Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: Row(children: [
               Expanded(
                   child: Text('Lịch hẹn của tôi',
-                      style: Theme.of(context)
+                      style: Theme.of(c)
                           .textTheme
                           .headlineSmall
-                          ?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: Theme.of(context).colorScheme.onSurface))),
-              IconButton(onPressed: _reload, icon: const Icon(Icons.refresh)),
+                          ?.copyWith(fontWeight: FontWeight.w800))),
+              IconButton(onPressed: _changed, icon: const Icon(Icons.refresh))
             ])),
         Padding(
             padding: const EdgeInsets.all(20),
-            child: SegmentedButton<int>(
-                segments: const [
-                  ButtonSegment(value: 0, label: Text('Sắp tới')),
-                  ButtonSegment(value: 1, label: Text('Lịch sử'))
-                ],
-                selected: {
-                  tab
-                },
-                onSelectionChanged: (value) =>
-                    setState(() => tab = value.first))),
+            child: SegmentedButton<int>(segments: const [
+              ButtonSegment(value: 0, label: Text('Sắp tới')),
+              ButtonSegment(value: 1, label: Text('Lịch sử'))
+            ], selected: {
+              _tab
+            }, onSelectionChanged: (v) => setState(() => _tab = v.first))),
         Expanded(
-            child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: _bookings,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done)
+            child: FutureBuilder<_Data>(
+                future: _data,
+                builder: (c, s) {
+                  if (s.connectionState != ConnectionState.done)
                     return const Center(child: CircularProgressIndicator());
-                  if (snapshot.hasError)
+                  if (s.hasError || s.data == null)
                     return _Message(
-                        icon: Icons.cloud_off_outlined,
-                        text: snapshot.error.toString(),
-                        action: _reload);
-                  final history = {'COMPLETED', 'REJECTED', 'CANCELLED'};
-                  final rows = (snapshot.data ?? [])
-                      .where((row) => tab == 0
-                          ? !history.contains('${row['status']}')
-                          : history.contains('${row['status']}'))
+                        '${s.error ?? 'Không tải được lịch hẹn.'}', _changed);
+                  final ended = {'COMPLETED', 'REJECTED', 'CANCELLED'};
+                  final rows = s.data!.bookings
+                      .where((b) => _tab == 0
+                          ? !ended.contains('${b['status']}')
+                          : ended.contains('${b['status']}'))
                       .toList();
                   if (rows.isEmpty)
                     return _Message(
-                        icon: Icons.calendar_month_outlined,
-                        text: tab == 0
+                        _tab == 0
                             ? 'Bạn chưa có lịch hẹn sắp tới.'
                             : 'Chưa có lịch sử booking.',
-                        action: _reload);
+                        _changed);
                   return RefreshIndicator(
-                      onRefresh: () async => _reload(),
+                      onRefresh: _changed,
                       child: ListView.separated(
                           padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
                           itemCount: rows.length,
                           separatorBuilder: (_, __) =>
                               const SizedBox(height: 12),
-                          itemBuilder: (_, index) => _BookingCard(
-                              booking: rows[index],
-                              onCancel: () => _cancel(rows[index]),
-                              onReview: () => _review(rows[index]))));
+                          itemBuilder: (_, i) {
+                            final b = rows[i];
+                            Map<String, dynamic>? find(
+                                    List<Map<String, dynamic>> xs) =>
+                                xs.cast<Map<String, dynamic>?>().firstWhere(
+                                    (x) =>
+                                        '${x?['booking_id'] ?? x?['bookingId']}' ==
+                                        '${b['id']}',
+                                    orElse: () => null);
+                            return _Card(b, find(s.data!.reviews),
+                                find(s.data!.complaints), widget.api, _changed);
+                          }));
                 }))
       ]));
-
-  Future<void> _cancel(Map<String, dynamic> booking) async {
-    final reason = TextEditingController();
-    final accepted = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-              title: const Text('Hủy booking?'),
-              content: TextField(
-                  controller: reason,
-                  decoration: const InputDecoration(
-                      labelText: 'Lý do hủy (không bắt buộc)')),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(dialogContext, false),
-                    child: const Text('Quay lại')),
-                FilledButton(
-                    onPressed: () => Navigator.pop(dialogContext, true),
-                    child: const Text('Xác nhận hủy'))
-              ],
-            ));
-    if (accepted == true) {
-      try {
-        await widget.api.put('/bookings/${booking['id']}/status',
-            {'status': 'CANCELLED', 'cancelReason': reason.text.trim()});
-        _reload();
-      } catch (error) {
-        if (mounted)
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(error.toString())));
-      }
-    }
-    reason.dispose();
-  }
-
-  Future<void> _review(Map<String, dynamic> booking) async {
-    var rating = 5;
-    final comment = TextEditingController();
-    final sent = await showModalBottomSheet<bool>(
-        context: context,
-        isScrollControlled: true,
-        builder: (sheetContext) => StatefulBuilder(
-            builder: (sheetContext, setSheetState) => Padding(
-                  padding: EdgeInsets.fromLTRB(24, 24, 24,
-                      24 + MediaQuery.of(sheetContext).viewInsets.bottom),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Text('Đánh giá dịch vụ',
-                        style: Theme.of(sheetContext).textTheme.titleLarge),
-                    DropdownButton<int>(
-                        value: rating,
-                        isExpanded: true,
-                        items: [1, 2, 3, 4, 5]
-                            .map((value) => DropdownMenuItem(
-                                value: value, child: Text('$value sao')))
-                            .toList(),
-                        onChanged: (value) =>
-                            setSheetState(() => rating = value!)),
-                    TextField(
-                        controller: comment,
-                        maxLines: 3,
-                        decoration:
-                            const InputDecoration(labelText: 'Nhận xét')),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                        onPressed: () => Navigator.pop(sheetContext, true),
-                        child: const Text('Gửi đánh giá')),
-                  ]),
-                )));
-    if (sent == true) {
-      try {
-        await widget.api.post('/reviews', {
-          'bookingId': booking['id'],
-          'rating': rating,
-          'comment': comment.text.trim()
-        });
-        if (mounted)
-          ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text('Đã gửi đánh giá.')));
-      } catch (error) {
-        if (mounted)
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(error.toString())));
-      }
-    }
-    comment.dispose();
-  }
 }
 
-class _BookingCard extends StatelessWidget {
-  const _BookingCard(
-      {required this.booking, required this.onCancel, required this.onReview});
-  final Map<String, dynamic> booking;
-  final VoidCallback onCancel;
-  final VoidCallback onReview;
+class _Data {
+  const _Data(this.bookings, this.reviews, this.complaints);
+  final List<Map<String, dynamic>> bookings, reviews, complaints;
+}
+
+class _Card extends StatelessWidget {
+  const _Card(this.b, this.review, this.complaint, this.api, this.changed);
+  final Map<String, dynamic> b;
+  final Map<String, dynamic>? review, complaint;
+  final PawCareApi api;
+  final Future<void> Function() changed;
+  String get status => '${b['status'] ?? 'PENDING'}';
+  Future<void> _confirm(BuildContext c) async {
+    try {
+      await api.post('/bookings/${b['id']}/confirm-completion', {});
+      await changed();
+    } catch (e) {
+      if (c.mounted)
+        ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _dispute(BuildContext c) async {
+    final text = TextEditingController();
+    final yes = await showModalBottomSheet<bool>(
+        context: c,
+        isScrollControlled: true,
+        builder: (s) {
+          return Padding(
+              padding: EdgeInsets.fromLTRB(
+                  24, 20, 24, 24 + MediaQuery.of(s).viewInsets.bottom),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Text('Gửi khiếu nại', style: Theme.of(s).textTheme.titleLarge),
+                TextField(
+                    controller: text,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                        labelText: 'Nội dung khiếu nại *')),
+                const SizedBox(height: 12),
+                FilledButton(
+                    onPressed: () {
+                      if (text.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(s).showSnackBar(const SnackBar(
+                            content: Text('Nội dung khiếu nại là bắt buộc.')));
+                        return;
+                      }
+                      Navigator.pop(s, true);
+                    },
+                    child: const Text('Gửi khiếu nại'))
+              ]));
+        });
+    if (yes == true) {
+      try {
+        await api.post(
+            '/bookings/${b['id']}/disputes', {'content': text.text.trim()});
+        await changed();
+      } catch (e) {
+        if (c.mounted)
+          ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+    text.dispose();
+  }
+
+  Future<void> _review(BuildContext c) async {
+    var stars = 5;
+    final note = TextEditingController();
+    final yes = await showModalBottomSheet<bool>(
+        context: c,
+        isScrollControlled: true,
+        builder: (s) {
+          return StatefulBuilder(builder: (_, setS) {
+            return Padding(
+                padding: EdgeInsets.fromLTRB(
+                    24, 20, 24, 24 + MediaQuery.of(s).viewInsets.bottom),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Text('Đánh giá dịch vụ',
+                      style: Theme.of(s).textTheme.titleLarge),
+                  Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(
+                          5,
+                          (i) => IconButton(
+                              onPressed: () => setS(() => stars = i + 1),
+                              icon: Icon(
+                                  i < stars ? Icons.star : Icons.star_border,
+                                  color: Colors.amber,
+                                  size: 34)))),
+                  TextField(
+                      controller: note,
+                      maxLines: 3,
+                      decoration: const InputDecoration(labelText: 'Nhận xét')),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(s, true),
+                      child: const Text('Gửi đánh giá'))
+                ]));
+          });
+        });
+    if (yes == true) {
+      try {
+        await api.post('/reviews', {
+          'bookingId': b['id'],
+          'rating': stars,
+          'comment': note.text.trim()
+        });
+        await changed();
+      } catch (e) {
+        if (c.mounted)
+          ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+    note.dispose();
+  }
+
   @override
-  Widget build(BuildContext context) {
-    final status = '${booking['status'] ?? 'PENDING'}';
-    final cancellable = {'PENDING', 'CONFIRMED', 'CHECKED_IN'}.contains(status);
+  Widget build(BuildContext c) {
+    final canCancel = {'PENDING_APPROVAL', 'PENDING', 'CONFIRMED', 'CHECKED_IN'}
+        .contains(status);
     return InfoCard(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text('${booking['booking_start'] ?? ''}',
-            style: const TextStyle(fontWeight: FontWeight.w800)),
+        Expanded(
+            child: Text('${b['booking_start'] ?? ''}',
+                style: const TextStyle(fontWeight: FontWeight.w800))),
         StatusChip(_label(status), color: _color(status))
       ]),
-      const SizedBox(height: 10),
-      Text('${booking['service_name'] ?? 'Dịch vụ'}',
+      const SizedBox(height: 8),
+      Text('${b['service_name'] ?? 'Dịch vụ'}',
           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
       Text(
-          '${booking['provider_name'] ?? 'Provider'} · ${booking['estimated_price'] ?? 0}đ'),
-      if (cancellable || status == 'COMPLETED') ...[
-        const SizedBox(height: 8),
-        Row(children: [
-          if (cancellable)
-            TextButton(
-                onPressed: onCancel,
-                child: const Text('Hủy lịch',
-                    style: TextStyle(color: Colors.red))),
-          if (status == 'COMPLETED')
-            TextButton(onPressed: onReview, child: const Text('Đánh giá'))
-        ])
-      ]
+          '${b['provider_name'] ?? 'Provider'} · ${b['estimated_price'] ?? 0}đ'),
+      if (status == 'SERVICE_DONE') ...[
+        const Divider(),
+        const Text('Provider báo đã hoàn tất',
+            style:
+                TextStyle(fontWeight: FontWeight.w800, color: AppColors.teal)),
+        if ('${b['provider_note'] ?? ''}'.isNotEmpty)
+          Text('${b['provider_note']}'),
+        FilledButton.icon(
+            onPressed: () => _confirm(c),
+            icon: const Icon(Icons.check_circle_outline),
+            label: const Text('Xác nhận hoàn tất')),
+        TextButton.icon(
+            onPressed: () => _dispute(c),
+            icon: const Icon(Icons.report_problem_outlined),
+            label: const Text('Có vấn đề / Khiếu nại'))
+      ],
+      if (status == 'DISPUTED') ...[
+        const Divider(),
+        const Text('Đang chờ Admin xử lý tranh chấp',
+            style:
+                TextStyle(fontWeight: FontWeight.w800, color: AppColors.coral)),
+        if (complaint?['admin_response'] != null)
+          Text('Phản hồi Admin: ${complaint!['admin_response']}')
+      ],
+      if (status == 'COMPLETED') ...[
+        const Divider(),
+        if (review != null)
+          Text(
+              'Đánh giá đã gửi: ${review!['rating']}★ · ${review!['comment'] ?? 'Không có nhận xét'}')
+        else
+          TextButton(onPressed: () => _review(c), child: const Text('Đánh giá'))
+      ],
+      if (canCancel)
+        TextButton(
+            onPressed: () async {
+              try {
+                await api.put(
+                    '/bookings/${b['id']}/status', {'status': 'CANCELLED'});
+                await changed();
+              } catch (e) {
+                if (c.mounted)
+                  ScaffoldMessenger.of(c)
+                      .showSnackBar(SnackBar(content: Text('$e')));
+              }
+            },
+            child: const Text('Hủy lịch', style: TextStyle(color: Colors.red)))
     ]));
   }
 
-  String _label(String value) =>
+  String _label(String x) =>
       {
+        'PENDING_PAYMENT': 'Chờ thanh toán',
+        'PENDING_APPROVAL': 'Chờ tiệm duyệt',
         'PENDING': 'Chờ xác nhận',
         'CONFIRMED': 'Đã xác nhận',
         'CHECKED_IN': 'Đã check-in',
         'IN_SERVICE': 'Đang thực hiện',
+        'SERVICE_DONE': 'Chờ bạn xác nhận',
+        'DISPUTED': 'Đang tranh chấp',
         'COMPLETED': 'Hoàn thành',
         'CANCELLED': 'Đã hủy',
         'REJECTED': 'Bị từ chối'
-      }[value] ??
-      value;
-  Color _color(String value) => value == 'COMPLETED' || value == 'CONFIRMED'
+      }[x] ??
+      x;
+  Color _color(String x) => x == 'COMPLETED' || x == 'CONFIRMED'
       ? AppColors.teal
-      : value == 'CANCELLED' || value == 'REJECTED'
-          ? Colors.red
-          : AppColors.coral;
+      : x == 'DISPUTED' || x == 'SERVICE_DONE'
+          ? AppColors.coral
+          : x == 'CANCELLED' || x == 'REJECTED'
+              ? Colors.red
+              : AppColors.teal;
 }
 
 class _Message extends StatelessWidget {
-  const _Message(
-      {required this.icon, required this.text, required this.action});
-  final IconData icon;
+  const _Message(this.text, this.retry);
   final String text;
-  final VoidCallback action;
+  final Future<void> Function() retry;
   @override
-  Widget build(BuildContext context) => Center(
+  Widget build(BuildContext c) => Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 48),
+        const Icon(Icons.cloud_off_outlined, size: 48),
         const SizedBox(height: 10),
         Text(text, textAlign: TextAlign.center),
-        TextButton(onPressed: action, child: const Text('Tải lại'))
+        TextButton(onPressed: retry, child: const Text('Tải lại'))
       ]));
 }
