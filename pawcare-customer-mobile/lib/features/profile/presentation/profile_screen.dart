@@ -7,6 +7,7 @@ import '../../pets/presentation/pets_screen.dart';
 import 'help_center_screen.dart';
 import 'settings_screen.dart';
 import '../../wallet/presentation/wallet_screen.dart';
+import '../../notifications/presentation/notifications_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({
@@ -17,6 +18,8 @@ class ProfileScreen extends StatelessWidget {
     required this.onThemeChanged,
     required this.onProfileUpdated,
     required this.onLogout,
+    this.unreadNotifications = 0,
+    this.onNotificationsChanged,
   });
 
   final Map<String, dynamic> profile;
@@ -25,6 +28,8 @@ class ProfileScreen extends StatelessWidget {
   final ValueChanged<bool> onThemeChanged;
   final ValueChanged<Map<String, dynamic>> onProfileUpdated;
   final VoidCallback onLogout;
+  final int unreadNotifications;
+  final VoidCallback? onNotificationsChanged;
 
   String get _name {
     final value =
@@ -125,11 +130,18 @@ class ProfileScreen extends StatelessWidget {
             InfoCard(
               child: Column(children: [
                 ListTile(
-                  leading: const Icon(Icons.notifications_none),
+                  leading: Badge(
+                      isLabelVisible: unreadNotifications > 0,
+                      label: Text('$unreadNotifications'),
+                      child: const Icon(Icons.notifications_none)),
                   title: const Text('Thông báo & nhắc lịch'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _unavailable(
-                      context, 'Thông báo hiện được hiển thị ở mục Đơn lịch.'),
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => NotificationsScreen(
+                              api: api,
+                              onChanged: onNotificationsChanged ?? () {}))),
                 ),
                 const Divider(),
                 ListTile(

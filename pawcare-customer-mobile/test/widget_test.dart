@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pawcare_customer_mobile/app/pawcare_app.dart';
 import 'package:pawcare_customer_mobile/core/network/pawcare_api.dart';
 import 'package:pawcare_customer_mobile/core/theme/app_theme.dart';
@@ -14,8 +15,11 @@ import 'package:pawcare_customer_mobile/features/profile/presentation/profile_sc
 
 void main() {
   testWidgets('shows PawCare sign in screen', (tester) async {
+    SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(
         PawCareApp(api: PawCareApi(baseUrl: 'http://pawcare.test')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Đăng nhập'), findsOneWidget);
   });
 

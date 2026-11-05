@@ -28,11 +28,12 @@ class PawCareApi {
             .trim()
             .replaceFirst(RegExp(r'/+$'), ''),
         _client = client ?? http.Client();
-  final String baseUrl;
+  String baseUrl;
   final http.Client _client;
   String? _accessToken;
 
   void useToken(String? value) => _accessToken = value;
+  void useBaseUrl(String value) => baseUrl = value.trim().replaceFirst(RegExp(r'/+$'), '');
   void close() => _client.close();
 
   Future<AuthSession> login(
@@ -63,6 +64,12 @@ class PawCareApi {
     await post('/auth/logout', {'refreshToken': refreshToken},
         authenticated: false);
     _accessToken = null;
+  }
+
+  Future<AuthSession> refresh(String refreshToken) async {
+    final data = await post('/auth/refresh', {'refreshToken': refreshToken},
+        authenticated: false);
+    return _session(data);
   }
 
   Future<List<Map<String, dynamic>>> listCareNotes() => list('/care-notes');

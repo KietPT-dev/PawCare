@@ -26,6 +26,23 @@ class CustomerShell extends StatefulWidget {
 
 class _CustomerShellState extends State<CustomerShell> {
   int index = 0;
+  int _unread = 0;
+  @override
+  void initState() {
+    super.initState();
+    _loadUnread();
+  }
+
+  Future<void> _loadUnread() async {
+    try {
+      final items = await widget.api.list('/notifications');
+      if (mounted)
+        setState(() => _unread = items
+            .where((x) => x['is_read'] != true && x['is_read'] != 1)
+            .length);
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
@@ -38,6 +55,8 @@ class _CustomerShellState extends State<CustomerShell> {
           darkMode: widget.darkMode,
           onThemeChanged: widget.onThemeChanged,
           onProfileUpdated: widget.onProfileUpdated,
+          unreadNotifications: _unread,
+          onNotificationsChanged: _loadUnread,
           onLogout: widget.onLogout),
     ];
     return Scaffold(
