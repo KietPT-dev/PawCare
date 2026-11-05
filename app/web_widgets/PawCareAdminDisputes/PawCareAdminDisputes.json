@@ -1,0 +1,1 @@
+{"id":"pawCareAdminDisputes","name":"PawCareAdminDisputes","type":"widget","custom":true,"modelVersion":"2.6","description":"PawCare Admin dispute resolution widget.","template":"@pawCareAdminDisputes.tpl.html","controller":"@pawCareAdminDisputes.ctrl.js","properties":[],"assets":[],"requiredModules":[],"webResources":[],"order":100,"hasHelp":false}

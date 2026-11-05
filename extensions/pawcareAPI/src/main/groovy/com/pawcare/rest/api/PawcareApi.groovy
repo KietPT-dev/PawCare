@@ -736,44 +736,65 @@ class PawcareService {
 
         switch (method) {
             case 'GET':
-                return financeOverview(query('type'), query('status'))
+                return financeOverview(query('type'), query('status'), query('from'), query('to'))
             case 'PUT':
                 return decideWithdrawal(profile, requestBody())
             case 'POST':
-                return forceRefund(profile, requestBody())
+                return resolveDispute(profile, requestBody())
             default:
                 throw new ApiException(405, "Method ${method} is not allowed for finance")
         }
     }
 
-    private Map financeOverview(String type, String withdrawalStatus) {
+    private Map financeOverview(String type, String withdrawalStatus, String from, String to) {
         List<String> types = ['DEPOSIT', 'ESCROW_HOLD', 'ESCROW_RELEASE', 'COMMISSION_FEE', 'PROVIDER_PAYOUT', 'WITHDRAWAL']
         if (type && !(type.toUpperCase() in types)) throw new ApiException(400, 'Unknown ledger transaction type')
         if (withdrawalStatus && !(withdrawalStatus.toUpperCase() in ['PENDING', 'APPROVED', 'REJECTED'])) {
             throw new ApiException(400, 'Unknown withdrawal status')
         }
 
+        List bookingArgs = []
+        String bookingRange = dateRange('b.created_at', from, to, bookingArgs)
         Map summary = sql.firstRow('''
-            SELECT
-              COALESCE((SELECT SUM(pd.amount) FROM payment_deposits pd WHERE pd.status = 'ESCROW_HELD'), 0) AS escrow_held,
-              COALESCE((SELECT SUM(t.amount) FROM wallet_transactions t WHERE t.type = 'COMMISSION_FEE' AND t.amount > 0), 0) AS commission_revenue,
-              COALESCE((SELECT SUM(w.available_balance + w.locked_balance) FROM wallets w WHERE w.owner_type = 'PROVIDER'), 0) AS provider_wallets,
-              COALESCE((SELECT SUM(w.available_balance + w.locked_balance) FROM wallets w WHERE w.owner_type = 'USER'), 0) AS user_wallets
-        ''')
-        String ledgerWhere = type ? 'WHERE t.type = ?' : ''
+            SELECT COALESCE(SUM(CASE WHEN b.status IN ('PENDING_APPROVAL','CONFIRMED','CHECKED_IN','IN_SERVICE','SERVICE_DONE','DISPUTED','COMPLETED') THEN b.estimated_price ELSE 0 END),0) AS gmv,
+              COALESCE(SUM(b.status = 'DISPUTED'),0) AS disputed_bookings,
+              COALESCE(SUM(b.status = 'SERVICE_DONE'),0) AS waiting_customer_confirmation
+            FROM bookings b WHERE 1=1 ''' + bookingRange, bookingArgs)
+        Map balances = sql.firstRow('''SELECT
+              COALESCE((SELECT SUM(pd.amount) FROM payment_deposits pd WHERE pd.status = 'ESCROW_HELD'),0) AS escrow_held,
+              COALESCE((SELECT SUM(available_balance + locked_balance) FROM wallets WHERE owner_type = 'USER'),0) AS user_wallets,
+              COALESCE((SELECT SUM(available_balance + locked_balance) FROM wallets WHERE owner_type = 'PROVIDER'),0) AS provider_wallets,
+              COALESCE((SELECT SUM(available_balance) FROM wallets WHERE owner_type = 'PLATFORM_ADMIN'),0) AS platform_wallets''')
+        List transactionArgs = []
+        String transactionRange = dateRange('t.created_at', from, to, transactionArgs)
+        Map flows = sql.firstRow('''SELECT
+              COALESCE(SUM(CASE WHEN t.type = 'COMMISSION_FEE' AND t.amount > 0 THEN t.amount ELSE 0 END),0) AS commission_revenue,
+              COALESCE(SUM(CASE WHEN t.type = 'PROVIDER_PAYOUT' AND t.amount > 0 THEN t.amount ELSE 0 END),0) AS provider_payout
+            FROM wallet_transactions t WHERE 1=1 ''' + transactionRange, transactionArgs)
+        List withdrawalSummaryArgs = []
+        String withdrawalRange = dateRange('wr.created_at', from, to, withdrawalSummaryArgs)
+        Map withdrawalsSummary = sql.firstRow('''SELECT COALESCE(SUM(status = 'PENDING'),0) AS pending_count,
+              COALESCE(SUM(CASE WHEN status = 'PENDING' THEN amount ELSE 0 END),0) AS pending_amount,
+              COALESCE(SUM(CASE WHEN status = 'APPROVED' THEN amount ELSE 0 END),0) AS approved_amount
+            FROM withdrawal_requests wr WHERE 1=1 ''' + withdrawalRange, withdrawalSummaryArgs)
+        String ledgerWhere = 'WHERE 1=1' + (type ? ' AND t.type = ?' : '') + transactionRange
         List ledgerArgs = type ? [type.toUpperCase()] : []
+        ledgerArgs.addAll(transactionArgs)
         List ledger = sql.rows('''
-            SELECT t.*, w.owner_type, w.owner_id,
+            SELECT DATE_FORMAT(t.created_at, '%d/%m/%Y %H:%i') AS created_at, t.id,t.booking_id,t.type,t.amount,t.balance_before,t.balance_after,t.description, w.owner_type, w.owner_id,
               COALESCE(up.full_name, pr.name, CASE WHEN w.owner_type = 'PLATFORM_ADMIN' THEN 'PawCare Platform' END) AS owner_name
             FROM wallet_transactions t
             JOIN wallets w ON w.id = t.wallet_id
             LEFT JOIN user_profiles up ON w.owner_type = 'USER' AND up.id = w.owner_id
             LEFT JOIN providers pr ON w.owner_type = 'PROVIDER' AND pr.id = w.owner_id
         ''' + ledgerWhere + ' ORDER BY t.created_at DESC, t.id DESC LIMIT 250', ledgerArgs)
-        String withdrawalWhere = withdrawalStatus ? 'WHERE wr.status = ?' : ''
+        String withdrawalWhere = 'WHERE 1=1' + (withdrawalStatus ? ' AND wr.status = ?' : '') + withdrawalRange
         List withdrawalArgs = withdrawalStatus ? [withdrawalStatus.toUpperCase()] : []
+        withdrawalArgs.addAll(withdrawalSummaryArgs)
         List withdrawals = sql.rows('''
-            SELECT wr.*, w.owner_type, w.owner_id,
+            SELECT wr.id,wr.wallet_id,wr.amount,wr.bank_name,wr.bank_account_no,wr.bank_account_name,wr.bonita_case_id,wr.status,wr.admin_note,
+              DATE_FORMAT(wr.created_at, '%d/%m/%Y %H:%i') AS created_at, DATE_FORMAT(wr.reviewed_at, '%d/%m/%Y %H:%i') AS reviewed_at,
+              w.owner_type, w.owner_id,
               COALESCE(up.full_name, pr.name) AS owner_name,
               COALESCE(up.email, pr.email) AS owner_email
             FROM withdrawal_requests wr
@@ -781,18 +802,24 @@ class PawcareService {
             LEFT JOIN user_profiles up ON w.owner_type = 'USER' AND up.id = w.owner_id
             LEFT JOIN providers pr ON w.owner_type = 'PROVIDER' AND pr.id = w.owner_id
         ''' + withdrawalWhere + ' ORDER BY wr.created_at DESC, wr.id DESC LIMIT 250', withdrawalArgs)
-        List complaints = sql.rows('''
-            SELECT c.*, u.full_name AS customer_name, p.name AS provider_name, b.status AS booking_status,
-                   pd.status AS escrow_status
+        List disputes = sql.rows('''
+            SELECT c.id AS complaint_id,c.status AS complaint_status,c.content,c.admin_response,DATE_FORMAT(c.created_at, '%d/%m/%Y %H:%i') AS created_at,
+                   b.id AS booking_id,b.status AS booking_status,b.estimated_price,u.full_name AS customer_name,p.name AS provider_name,
+                   COALESCE(pd.amount, 0) AS escrow_amount,pd.status AS escrow_status
             FROM complaints c
             JOIN user_profiles u ON u.id = c.customer_profile_id
             JOIN providers p ON p.id = c.provider_id
             JOIN bookings b ON b.id = c.booking_id
             LEFT JOIN payment_deposits pd ON pd.booking_id = b.id
-            WHERE c.status IN ('OPEN', 'IN_PROGRESS')
+            WHERE b.status = 'DISPUTED' OR c.status IN ('OPEN', 'IN_PROGRESS')
             ORDER BY c.created_at DESC, c.id DESC LIMIT 100
         ''')
-        return [success: true, summary: summary, ledger: ledger, withdrawals: withdrawals, disputes: complaints]
+        List histories = sql.rows('''SELECT h.booking_id,h.previous_status,h.new_status,h.note,DATE_FORMAT(h.changed_at, '%d/%m/%Y %H:%i') AS changed_at,
+              u.full_name AS actor_name FROM booking_status_history h LEFT JOIN user_profiles u ON u.id=h.changed_by_profile_id
+              WHERE h.booking_id IN (SELECT booking_id FROM complaints WHERE status IN ('OPEN','IN_PROGRESS')) ORDER BY h.changed_at DESC''')
+        return [success: true, from: from ?: '', to: to ?: '', summary: summary + balances + flows + withdrawalsSummary,
+                ledger: ledger, withdrawals: withdrawals, disputes: disputes, histories: histories,
+                bookingStatuses: sql.rows('SELECT b.status,COUNT(*) AS booking_count,COALESCE(SUM(b.estimated_price),0) AS gross_amount FROM bookings b WHERE 1=1 ' + bookingRange + ' GROUP BY b.status ORDER BY b.status', bookingArgs)]
     }
 
     private Map decideWithdrawal(Map profile, Map body) {
@@ -829,12 +856,19 @@ class PawcareService {
         }
     }
 
-    private Map forceRefund(Map profile, Map body) {
+    private Map resolveDispute(Map profile, Map body) {
         Long complaintId = asLong(body.complaint_id, 'complaint_id')
+        String action = requiredText(body.action ?: 'REFUND_TO_CUSTOMER', 'action').toUpperCase()
+        if (!(action in ['REFUND_TO_CUSTOMER', 'RELEASE_TO_PROVIDER'])) {
+            throw new ApiException(400, 'action must be REFUND_TO_CUSTOMER or RELEASE_TO_PROVIDER')
+        }
         String note = body.admin_note?.toString()?.trim() ?: 'Force refund approved by admin'
         return sql.withTransaction {
             Map complaint = sql.firstRow('SELECT * FROM complaints WHERE id = ? FOR UPDATE', [complaintId])
             if (complaint == null) throw new ApiException(404, 'Complaint not found')
+            Map booking = sql.firstRow("SELECT * FROM bookings WHERE id = ? FOR UPDATE", [complaint.booking_id])
+            if (booking == null) throw new ApiException(404, 'Booking not found')
+            if (booking.status != 'DISPUTED') throw new ApiException(409, 'Only a DISPUTED booking can be resolved')
             Map deposit = sql.firstRow("SELECT * FROM payment_deposits WHERE booking_id = ? AND status = 'ESCROW_HELD' FOR UPDATE", [complaint.booking_id])
             if (deposit == null) throw new ApiException(409, 'This dispute has no escrow currently held')
             Map wallet = sql.firstRow("SELECT * FROM wallets WHERE owner_type = 'USER' AND owner_id = ? FOR UPDATE", [complaint.customer_profile_id])
@@ -843,16 +877,47 @@ class PawcareService {
             BigDecimal locked = wallet.locked_balance as BigDecimal
             BigDecimal available = wallet.available_balance as BigDecimal
             if (locked < amount) throw new ApiException(409, 'Escrow balance is inconsistent')
-            sql.executeUpdate('UPDATE wallets SET available_balance = available_balance + ?, locked_balance = locked_balance - ? WHERE id = ?', [amount, amount, wallet.id])
-            sql.executeInsert('''INSERT INTO wallet_transactions
-                (wallet_id, booking_id, type, amount, balance_before, balance_after, description)
-                VALUES (?, ?, 'ESCROW_RELEASE', ?, ?, ?, ?)''',
-                [wallet.id, complaint.booking_id, amount, available, available + amount, "Force refund for complaint #${complaintId}: ${note}"])
+            if (action == 'REFUND_TO_CUSTOMER') {
+                sql.executeUpdate('UPDATE wallets SET available_balance = available_balance + ?, locked_balance = locked_balance - ? WHERE id = ?', [amount, amount, wallet.id])
+                sql.executeInsert('''INSERT INTO wallet_transactions
+                    (wallet_id, booking_id, type, amount, balance_before, balance_after, description)
+                    VALUES (?, ?, 'ESCROW_RELEASE', ?, ?, ?, ?)''',
+                    [wallet.id, complaint.booking_id, amount, available, available + amount, "Admin dispute refund #${complaintId}: ${note}"])
+                sql.executeUpdate("UPDATE bookings SET status = 'CANCELLED', cancel_reason = ? WHERE id = ?", ['Admin dispute refund', booking.id])
+            } else {
+                Map provider = sql.firstRow("SELECT * FROM wallets WHERE owner_type = 'PROVIDER' AND owner_id = ? FOR UPDATE", [booking.provider_id])
+                if (provider == null) throw new ApiException(409, 'Provider wallet not found')
+                Map platform = sql.firstRow("SELECT * FROM wallets WHERE owner_type = 'PLATFORM_ADMIN' AND owner_id = 0 FOR UPDATE")
+                if (platform == null) throw new ApiException(409, 'Platform wallet not found')
+                BigDecimal fee = amount.multiply(new BigDecimal('0.10')).setScale(2, java.math.RoundingMode.HALF_UP)
+                BigDecimal payout = amount.subtract(fee)
+                BigDecimal providerAvailable = provider.available_balance as BigDecimal
+                BigDecimal platformAvailable = platform.available_balance as BigDecimal
+                sql.executeUpdate('UPDATE wallets SET locked_balance = locked_balance - ? WHERE id = ?', [amount, wallet.id])
+                sql.executeInsert("INSERT INTO wallet_transactions (wallet_id,booking_id,type,amount,balance_before,balance_after,description) VALUES (?,?, 'ESCROW_RELEASE', ?,?,?,?)", [wallet.id, booking.id, amount.negate(), locked, locked - amount, "Escrow settled after dispute #${complaintId}"])
+                sql.executeUpdate('UPDATE wallets SET available_balance = available_balance + ? WHERE id = ?', [payout, provider.id])
+                sql.executeInsert("INSERT INTO wallet_transactions (wallet_id,booking_id,type,amount,balance_before,balance_after,description) VALUES (?,?, 'PROVIDER_PAYOUT', ?,?,?,?)", [provider.id, booking.id, payout, providerAvailable, providerAvailable + payout, "Provider payout after dispute #${complaintId}"])
+                sql.executeUpdate('UPDATE wallets SET available_balance = available_balance + ? WHERE id = ?', [fee, platform.id])
+                sql.executeInsert("INSERT INTO wallet_transactions (wallet_id,booking_id,type,amount,balance_before,balance_after,description) VALUES (?,?, 'COMMISSION_FEE', ?,?,?,?)", [platform.id, booking.id, fee, platformAvailable, platformAvailable + fee, "Platform commission after dispute #${complaintId}"])
+                sql.executeUpdate("UPDATE bookings SET status = 'COMPLETED' WHERE id = ?", [booking.id])
+            }
             sql.executeUpdate("UPDATE payment_deposits SET status = 'EXPIRED' WHERE id = ?", [deposit.id])
             sql.executeUpdate("UPDATE complaints SET status = 'RESOLVED', admin_response = ?, resolved_at = CURRENT_TIMESTAMP WHERE id = ?", [note, complaintId])
-            notifyProfile(complaint.customer_profile_id as Long, 'Escrow refund completed', "Your complaint #${complaintId} was refunded to your wallet", 'COMPLAINT', 'COMPLAINT', complaintId)
-            [success: true, complaint_id: complaintId, amount: amount]
+            String finalStatus = action == 'REFUND_TO_CUSTOMER' ? 'CANCELLED' : 'COMPLETED'
+            addBookingHistory(booking.id as Long, 'DISPUTED', finalStatus, profile.id as Long, note)
+            notifyProfile(complaint.customer_profile_id as Long, 'Tranh chấp đã xử lý', action == 'REFUND_TO_CUSTOMER' ? "Escrow Booking #${booking.id} đã hoàn về ví." : "Escrow Booking #${booking.id} đã giải ngân cho Provider.", 'COMPLAINT', 'COMPLAINT', complaintId)
+            [success: true, complaint_id: complaintId, booking_id: booking.id, status: finalStatus, action: action, amount: amount]
         }
+    }
+
+    private String dateRange(String column, String from, String to, List args) {
+        if (from && !(from ==~ /\\d{4}-\\d{2}-\\d{2}/)) throw new ApiException(400, 'from must use yyyy-MM-dd')
+        if (to && !(to ==~ /\\d{4}-\\d{2}-\\d{2}/)) throw new ApiException(400, 'to must use yyyy-MM-dd')
+        if (from && to && from > to) throw new ApiException(400, 'from cannot be after to')
+        String result = ''
+        if (from) { result += " AND ${column} >= ?"; args << from + ' 00:00:00' }
+        if (to) { result += " AND ${column} < DATE_ADD(?, INTERVAL 1 DAY)"; args << to + ' 00:00:00' }
+        return result
     }
 
     private Map createComplaint(Map profile, Map body) {

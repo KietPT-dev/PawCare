@@ -11,6 +11,7 @@
             <applicationPage customPage="custompage_AdminPawCareBookings" token="bookings"/>
             <applicationPage customPage="custompage_AdminPawCareComplaints" token="complaints"/>
             <applicationPage customPage="custompage_AdminPawCareFinance" token="finance"/>
+            <applicationPage customPage="custompage_AdminPawCareDisputes" token="disputes"/>
         </applicationPages>
         <applicationMenus>
             <applicationMenu applicationPage="dashboard"><displayName>Tổng quan</displayName></applicationMenu>
@@ -20,6 +21,7 @@
             <applicationMenu applicationPage="bookings"><displayName>Booking</displayName></applicationMenu>
             <applicationMenu applicationPage="complaints"><displayName>Khiếu nại</displayName></applicationMenu>
             <applicationMenu applicationPage="finance"><displayName>Tài chính sàn</displayName></applicationMenu>
+            <applicationMenu applicationPage="disputes"><displayName>Tranh chấp</displayName></applicationMenu>
         </applicationMenus>
     </application>
 </applications>
