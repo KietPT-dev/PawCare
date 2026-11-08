@@ -33,7 +33,8 @@ class PawCareApi {
   String? _accessToken;
 
   void useToken(String? value) => _accessToken = value;
-  void useBaseUrl(String value) => baseUrl = value.trim().replaceFirst(RegExp(r'/+$'), '');
+  void useBaseUrl(String value) =>
+      baseUrl = value.trim().replaceFirst(RegExp(r'/+$'), '');
   void close() => _client.close();
 
   Future<AuthSession> login(

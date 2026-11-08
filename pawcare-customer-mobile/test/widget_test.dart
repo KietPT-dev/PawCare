@@ -49,12 +49,14 @@ void main() {
       home: AuthScreen(onAuthenticated: (_, __) async {}),
     ));
 
-    final emailField = find.byType(TextFormField).first;
+    final emailField = find.byKey(const ValueKey('auth-email'));
     await tester.tap(emailField);
-    await tester.enterText(emailField, 'hello@pawcare.vn');
+    tester.testTextInput.enterText('k');
+    await tester.pump();
+    tester.testTextInput.enterText('kien@pawcare.vn');
     await tester.pump();
 
-    expect(find.text('hello@pawcare.vn'), findsOneWidget);
+    expect(find.text('kien@pawcare.vn'), findsOneWidget);
   });
 
   testWidgets('booking renders its form after services and pets load',

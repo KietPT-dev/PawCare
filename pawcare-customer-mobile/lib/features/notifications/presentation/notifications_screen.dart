@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/network/pawcare_api.dart';
-import '../../activity/presentation/activity_screen.dart';
+import '../../activity/presentation/booking_detail_screen.dart';
+import '../../../core/utils/app_formatters.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen(
@@ -65,19 +66,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             ? Icons.notifications_active
                             : Icons.notifications_none),
                         title: Text('${item['title'] ?? 'Thông báo'}'),
-                        subtitle: Text('${item['content'] ?? ''}'),
+                        subtitle: Text(
+                            '${item['content'] ?? ''}\n${AppFormatters.relativeTime(item['created_at'] ?? item['createdAt'])}'),
+                        isThreeLine: true,
                         onTap: () async {
                           if (unread)
                             await widget.api
                                 .put('/notifications/${item['id']}/read', {});
                           widget.onChanged();
                           if (!context.mounted) return;
-                          if ('${item['reference_type']}' == 'BOOKING') {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) =>
-                                        ActivityScreen(api: widget.api)));
+                          final bookingId =
+                              int.tryParse('${item['reference_id']}');
+                          if ('${item['reference_type']}' == 'BOOKING' &&
+                              bookingId != null) {
+                            await Navigator.of(context).push(MaterialPageRoute(
+                                builder: (_) => BookingDetailScreen(
+                                    api: widget.api, bookingId: bookingId)));
+                            if (mounted) _refresh();
                           } else {
                             _refresh();
                           }
