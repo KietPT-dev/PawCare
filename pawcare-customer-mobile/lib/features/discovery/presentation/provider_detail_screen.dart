@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-
 import '../../../core/network/pawcare_api.dart';
-import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/app_formatters.dart';
 import '../../../core/widgets/ui.dart';
 import '../../booking/presentation/booking_screen.dart';
 
@@ -10,148 +9,135 @@ class ProviderDetailScreen extends StatefulWidget {
       {super.key, required this.provider, required this.api});
   final Map<String, String> provider;
   final PawCareApi api;
-
   @override
   State<ProviderDetailScreen> createState() => _ProviderDetailScreenState();
 }
 
 class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
-  late Future<List<dynamic>> _data;
-  int get _providerId => int.tryParse(widget.provider['id'] ?? '') ?? 0;
+  late Future<List<Map<String, dynamic>>> _services;
+  Map<String, dynamic>? selected;
+  int get id => int.tryParse(widget.provider['id'] ?? '') ?? 0;
   @override
   void initState() {
     super.initState();
-    _reload();
+    _services = widget.api.list('/services?providerId=$id');
   }
-
-  void _reload() => _data = Future.wait([
-        widget.api.list('/services?providerId=$_providerId'),
-        widget.api.list('/reviews?providerId=$_providerId')
-      ]);
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(),
-        body: FutureBuilder<List<dynamic>>(
-          future: _data,
+      appBar: AppBar(),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+          future: _services,
           builder: (context, snapshot) {
-            final services = snapshot.hasData
-                ? snapshot.data![0] as List<Map<String, dynamic>>
-                : <Map<String, dynamic>>[];
-            final reviews = snapshot.hasData
-                ? snapshot.data![1] as List<Map<String, dynamic>>
-                : <Map<String, dynamic>>[];
-            final average = reviews.isEmpty
-                ? null
-                : reviews.fold<num>(
-                        0,
-                        (sum, row) =>
-                            sum + (num.tryParse('${row['rating']}') ?? 0)) /
-                    reviews.length;
-            return RefreshIndicator(
-                onRefresh: () async => setState(_reload),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                            child: Container(
-                                width: 96,
-                                height: 96,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                    color: AppColors.mint,
-                                    borderRadius: BorderRadius.circular(28)),
-                                child: const Icon(Icons.storefront_outlined,
-                                    color: AppColors.teal, size: 52))),
-                        const SizedBox(height: 16),
-                        Text(
-                            widget.provider['name']?.isNotEmpty == true
-                                ? widget.provider['name']!
-                                : 'Đối tác PawCare',
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineSmall
-                                ?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface)),
-                        Text(widget.provider['service_area']?.isNotEmpty == true
-                            ? widget.provider['service_area']!
-                            : (widget.provider['address'] ??
-                                'Đang cập nhật khu vực')),
-                        const SizedBox(height: 10),
+            if (snapshot.connectionState != ConnectionState.done)
+              return const Center(child: CircularProgressIndicator());
+            final services = snapshot.data ?? [];
+            return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                children: [
+                  LiquidGlassCard(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                         Row(children: [
-                          const Icon(Icons.star, color: Colors.amber),
-                          Text(
-                              ' ${average == null ? 'Mới' : average.toStringAsFixed(1)} · ${reviews.length} đánh giá')
+                          Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                  color: const Color(0xFFF0FDFA),
+                                  borderRadius: BorderRadius.circular(16)),
+                              child: const Icon(Icons.storefront_rounded,
+                                  color: Color(0xFF0D9488))),
+                          const SizedBox(width: 14),
+                          Expanded(
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                Text(
+                                    widget.provider['name'] ??
+                                        'Đối tác PawCare',
+                                    style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w700)),
+                                Text(
+                                    '📍 ${widget.provider['address'] ?? widget.provider['service_area'] ?? 'Đang cập nhật'}')
+                              ]))
                         ]),
-                        const SectionTitle('Giới thiệu'),
-                        Text(widget.provider['description']?.isNotEmpty == true
-                            ? widget.provider['description']!
-                            : 'Đối tác chăm sóc thú cưng thuộc hệ thống PawCare.'),
-                        const SectionTitle('Dịch vụ'),
-                        if (snapshot.connectionState != ConnectionState.done)
-                          const Center(
-                              child: Padding(
-                                  padding: EdgeInsets.all(16),
-                                  child: CircularProgressIndicator())),
-                        if (snapshot.hasError) Text(snapshot.error.toString()),
-                        if (snapshot.hasData && services.isEmpty)
-                          const InfoCard(
-                              child:
-                                  Text('Provider chưa có dịch vụ khả dụng.')),
-                        ...services.map((service) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: InfoCard(
-                                child: Row(children: [
-                              const Icon(Icons.pets, color: AppColors.teal),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                  child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                    Text('${service['name']}',
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.w800)),
-                                    Text(
-                                        '${service['duration_minutes']} phút · ${service['price']}đ')
-                                  ])),
-                            ])))),
-                        const SectionTitle('Đánh giá'),
-                        if (reviews.isEmpty && snapshot.hasData)
-                          const InfoCard(child: Text('Chưa có đánh giá nào.')),
-                        ...reviews.take(3).map((review) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: InfoCard(
-                                child: Text(
-                                    '⭐ ${review['rating']} · ${review['comment'] ?? 'Không có nhận xét'}')))),
-                        const SizedBox(height: 22),
-                        SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: FilledButton(
-                              style: FilledButton.styleFrom(
-                                  backgroundColor: AppColors.coral),
-                              onPressed: services.isEmpty
-                                  ? null
-                                  : () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (_) => BookingScreen(
-                                              api: widget.api,
-                                              providerId: _providerId,
-                                              providerName:
-                                                  widget.provider['name'] ??
-                                                      'Đối tác PawCare'))),
-                              child: const Text('Đặt lịch ngay'),
-                            )),
-                      ]),
-                ));
-          },
-        ),
-      );
+                        const Divider(height: 28),
+                        const Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _Metric('★ 5.0', 'Đánh giá'),
+                              _Metric('100%', 'Bảo vệ Escrow')
+                            ])
+                      ])),
+                  const SectionTitle('Dịch vụ'),
+                  ...services.map(_service)
+                ]);
+          }),
+      bottomNavigationBar: SafeArea(
+          top: false,
+          child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              child: SizedBox(
+                  height: 52,
+                  child: FilledButton(
+                      onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => BookingScreen(
+                                  api: widget.api,
+                                  providerId: id,
+                                  providerName: widget.provider['name'] ??
+                                      'Đối tác PawCare'))),
+                      child: const Text('Đặt lịch ngay'))))));
+  Widget _service(Map<String, dynamic> x) => Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+          onTap: () => setState(() => selected = x),
+          child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                      color: selected == x
+                          ? const Color(0xFF0D9488)
+                          : const Color(0xFFE2E8F0),
+                      width: selected == x ? 1.5 : 1)),
+              child: Row(children: [
+                Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDFA),
+                        borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.pets_rounded,
+                        color: Color(0xFF0D9488))),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text('${x['name']}',
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w600)),
+                      Text('⏱ ${x['duration_minutes']} phút',
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFF64748B)))
+                    ])),
+                Text(AppFormatters.money(x['price']),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, color: Color(0xFF0D9488)))
+              ]))));
+}
+
+class _Metric extends StatelessWidget {
+  const _Metric(this.a, this.b);
+  final String a, b;
+  @override
+  Widget build(BuildContext c) => Column(children: [
+        Text(a, style: const TextStyle(fontWeight: FontWeight.w700)),
+        Text(b, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))
+      ]);
 }
