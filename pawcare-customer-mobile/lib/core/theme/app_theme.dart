@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // PawCare design system — calm, accessible cyan + health green.
-  static const navy = Color(0xFF123B55);
-  static const teal = Color(0xFF0891B2);
-  static const cyan = Color(0xFF22D3EE);
-  static const mint = Color(0xFFDDF8F4);
+  static const navy = Color(0xFF163832);
+  static const teal = Color(0xFF2A7B6F);
+  static const cyan = Color(0xFF78B9AD);
+  static const mint = Color(0xFFDEF0E9);
   static const success = Color(0xFF059669);
-  static const coral = Color(0xFFFF6B3D);
-  static const canvas = Color(0xFFF2FAFC);
+  static const coral = Color(0xFFF0805A);
+  static const canvas = Color(0xFFF8F9F7);
   static const darkCanvas = Color(0xFF081C24);
   static const darkSurface = Color(0xFF102A34);
 }

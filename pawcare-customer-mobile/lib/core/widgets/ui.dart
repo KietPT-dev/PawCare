@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_formatters.dart';
@@ -30,14 +31,50 @@ class InfoCard extends StatelessWidget {
   final Widget child;
   final VoidCallback? onTap;
   @override
-  Widget build(BuildContext c) => Card(
-      child: Semantics(
-          button: onTap != null,
-          child: InkWell(
-              borderRadius: BorderRadius.circular(24),
+  Widget build(BuildContext c) => Semantics(
+      button: onTap != null,
+      child: LiquidGlassCard(onTap: onTap, child: child));
+}
+
+class LiquidGlassCard extends StatelessWidget {
+  const LiquidGlassCard(
+      {super.key,
+      required this.child,
+      this.onTap,
+      this.padding = const EdgeInsets.all(18),
+      this.radius = 24});
+  final Widget child;
+  final VoidCallback? onTap;
+  final EdgeInsetsGeometry padding;
+  final double radius;
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Material(
+            color: Colors.white.withValues(alpha: .78),
+            child: InkWell(
               onTap: onTap,
-              child:
-                  Padding(padding: const EdgeInsets.all(18), child: child))));
+              borderRadius: BorderRadius.circular(radius),
+              child: Container(
+                padding: padding,
+                decoration: BoxDecoration(
+                    border: Border.all(
+                        color: Colors.white.withValues(alpha: .9), width: 1.2),
+                    borderRadius: BorderRadius.circular(radius),
+                    boxShadow: [
+                      BoxShadow(
+                          color: const Color(0xFF1F4E43).withValues(alpha: .06),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8))
+                    ]),
+                child: child,
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 class StatusChip extends StatelessWidget {
