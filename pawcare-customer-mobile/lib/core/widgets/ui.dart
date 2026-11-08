@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_formatters.dart';
 
 class SectionTitle extends StatelessWidget {
   const SectionTitle(this.title, {super.key, this.action, this.onAction});
@@ -52,4 +53,42 @@ class StatusChip extends StatelessWidget {
       child: Text(label,
           style: TextStyle(
               color: color, fontWeight: FontWeight.w700, fontSize: 12)));
+}
+
+class BookingStatusChip extends StatelessWidget {
+  const BookingStatusChip(this.status, {super.key});
+  final String status;
+  @override
+  Widget build(BuildContext context) {
+    final visual = AppFormatters.status(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+          color: visual.color.withValues(alpha: .10),
+          border: Border.all(color: visual.color.withValues(alpha: .28)),
+          borderRadius: BorderRadius.circular(99)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(visual.icon, size: 14, color: visual.color),
+        const SizedBox(width: 5),
+        Text(visual.label,
+            style: TextStyle(
+                color: visual.color, fontWeight: FontWeight.w700, fontSize: 12))
+      ]),
+    );
+  }
+}
+
+class FadeSlideIn extends StatelessWidget {
+  const FadeSlideIn({super.key, required this.index, required this.child});
+  final int index;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+      duration: Duration(milliseconds: 260 + (index.clamp(0, 6) * 55)),
+      tween: Tween(begin: 0, end: 1),
+      builder: (_, value, child) => Opacity(
+          opacity: value,
+          child: Transform.translate(
+              offset: Offset(0, 18 * (1 - value)), child: child)),
+      child: child);
 }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../core/network/pawcare_api.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
+import '../../../core/utils/app_formatters.dart';
+import 'booking_detail_screen.dart';
 
 class ActivityScreen extends StatefulWidget {
   const ActivityScreen({super.key, required this.api});
@@ -26,11 +28,15 @@ class _ActivityScreenState extends State<ActivityScreen> {
       widget.api.list('/reviews'),
       widget.api.list('/complaints')
     ]);
-    return _Data(x[0] as List<Map<String, dynamic>>,
-        x[1] as List<Map<String, dynamic>>, x[2] as List<Map<String, dynamic>>);
+    return _Data(x[0], x[1], x[2]);
   }
 
-  Future<void> _changed() async => setState(_reload);
+  Future<void> _changed() async {
+    if (!mounted) return;
+    setState(_reload);
+    await _data;
+  }
+
   @override
   Widget build(BuildContext c) => SafeArea(
           child: Column(children: [
@@ -90,8 +96,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
                                         '${x?['booking_id'] ?? x?['bookingId']}' ==
                                         '${b['id']}',
                                     orElse: () => null);
-                            return _Card(b, find(s.data!.reviews),
-                                find(s.data!.complaints), widget.api, _changed);
+                            return FadeSlideIn(
+                                index: i,
+                                child: _Card(
+                                    b,
+                                    find(s.data!.reviews),
+                                    find(s.data!.complaints),
+                                    widget.api,
+                                    _changed));
                           }));
                 }))
       ]));
@@ -217,89 +229,72 @@ class _Card extends StatelessWidget {
     final canCancel = {'PENDING_APPROVAL', 'PENDING', 'CONFIRMED', 'CHECKED_IN'}
         .contains(status);
     return InfoCard(
+        onTap: () => Navigator.of(c).push(MaterialPageRoute(
+            builder: (_) => BookingDetailScreen(
+                api: api, bookingId: int.tryParse('${b['id']}') ?? 0))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Expanded(
-            child: Text('${b['booking_start'] ?? ''}',
-                style: const TextStyle(fontWeight: FontWeight.w800))),
-        StatusChip(_label(status), color: _color(status))
-      ]),
-      const SizedBox(height: 8),
-      Text('${b['service_name'] ?? 'Dịch vụ'}',
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-      Text(
-          '${b['provider_name'] ?? 'Provider'} · ${b['estimated_price'] ?? 0}đ'),
-      if (status == 'SERVICE_DONE') ...[
-        const Divider(),
-        const Text('Provider báo đã hoàn tất',
-            style:
-                TextStyle(fontWeight: FontWeight.w800, color: AppColors.teal)),
-        if ('${b['provider_note'] ?? ''}'.isNotEmpty)
-          Text('${b['provider_note']}'),
-        FilledButton.icon(
-            onPressed: () => _confirm(c),
-            icon: const Icon(Icons.check_circle_outline),
-            label: const Text('Xác nhận hoàn tất')),
-        TextButton.icon(
-            onPressed: () => _dispute(c),
-            icon: const Icon(Icons.report_problem_outlined),
-            label: const Text('Có vấn đề / Khiếu nại'))
-      ],
-      if (status == 'DISPUTED') ...[
-        const Divider(),
-        const Text('Đang chờ Admin xử lý tranh chấp',
-            style:
-                TextStyle(fontWeight: FontWeight.w800, color: AppColors.coral)),
-        if (complaint?['admin_response'] != null)
-          Text('Phản hồi Admin: ${complaint!['admin_response']}')
-      ],
-      if (status == 'COMPLETED') ...[
-        const Divider(),
-        if (review != null)
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Expanded(
+                child: Text(AppFormatters.dateTime(b['booking_start']),
+                    style: const TextStyle(fontWeight: FontWeight.w800))),
+            BookingStatusChip(status)
+          ]),
+          const SizedBox(height: 8),
+          Text('${b['service_name'] ?? 'Dịch vụ'}',
+              style:
+                  const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
           Text(
-              'Đánh giá đã gửi: ${review!['rating']}★ · ${review!['comment'] ?? 'Không có nhận xét'}')
-        else
-          TextButton(onPressed: () => _review(c), child: const Text('Đánh giá'))
-      ],
-      if (canCancel)
-        TextButton(
-            onPressed: () async {
-              try {
-                await api.put(
-                    '/bookings/${b['id']}/status', {'status': 'CANCELLED'});
-                await changed();
-              } catch (e) {
-                if (c.mounted)
-                  ScaffoldMessenger.of(c)
-                      .showSnackBar(SnackBar(content: Text('$e')));
-              }
-            },
-            child: const Text('Hủy lịch', style: TextStyle(color: Colors.red)))
-    ]));
+              '${b['provider_name'] ?? 'Provider'} · ${AppFormatters.money(b['estimated_price'])}'),
+          if (status == 'SERVICE_DONE') ...[
+            const Divider(),
+            const Text('Provider báo đã hoàn tất',
+                style: TextStyle(
+                    fontWeight: FontWeight.w800, color: AppColors.teal)),
+            if ('${b['provider_note'] ?? ''}'.isNotEmpty)
+              Text('${b['provider_note']}'),
+            FilledButton.icon(
+                onPressed: () => _confirm(c),
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text('Xác nhận hoàn tất')),
+            TextButton.icon(
+                onPressed: () => _dispute(c),
+                icon: const Icon(Icons.report_problem_outlined),
+                label: const Text('Có vấn đề / Khiếu nại'))
+          ],
+          if (status == 'DISPUTED') ...[
+            const Divider(),
+            const Text('Đang chờ Admin xử lý tranh chấp',
+                style: TextStyle(
+                    fontWeight: FontWeight.w800, color: AppColors.coral)),
+            if (complaint?['admin_response'] != null)
+              Text('Phản hồi Admin: ${complaint!['admin_response']}')
+          ],
+          if (status == 'COMPLETED') ...[
+            const Divider(),
+            if (review != null)
+              Text(
+                  'Đánh giá đã gửi: ${review!['rating']}★ · ${review!['comment'] ?? 'Không có nhận xét'}')
+            else
+              TextButton(
+                  onPressed: () => _review(c), child: const Text('Đánh giá'))
+          ],
+          if (canCancel)
+            TextButton(
+                onPressed: () async {
+                  try {
+                    await api.put(
+                        '/bookings/${b['id']}/status', {'status': 'CANCELLED'});
+                    await changed();
+                  } catch (e) {
+                    if (c.mounted)
+                      ScaffoldMessenger.of(c)
+                          .showSnackBar(SnackBar(content: Text('$e')));
+                  }
+                },
+                child:
+                    const Text('Hủy lịch', style: TextStyle(color: Colors.red)))
+        ]));
   }
-
-  String _label(String x) =>
-      {
-        'PENDING_PAYMENT': 'Chờ thanh toán',
-        'PENDING_APPROVAL': 'Chờ tiệm duyệt',
-        'PENDING': 'Chờ xác nhận',
-        'CONFIRMED': 'Đã xác nhận',
-        'CHECKED_IN': 'Đã check-in',
-        'IN_SERVICE': 'Đang thực hiện',
-        'SERVICE_DONE': 'Chờ bạn xác nhận',
-        'DISPUTED': 'Đang tranh chấp',
-        'COMPLETED': 'Hoàn thành',
-        'CANCELLED': 'Đã hủy',
-        'REJECTED': 'Bị từ chối'
-      }[x] ??
-      x;
-  Color _color(String x) => x == 'COMPLETED' || x == 'CONFIRMED'
-      ? AppColors.teal
-      : x == 'DISPUTED' || x == 'SERVICE_DONE'
-          ? AppColors.coral
-          : x == 'CANCELLED' || x == 'REJECTED'
-              ? Colors.red
-              : AppColors.teal;
 }
 
 class _Message extends StatelessWidget {
