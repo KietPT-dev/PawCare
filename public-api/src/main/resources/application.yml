@@ -38,3 +38,13 @@ pawcare:
       bank-code: ${PAWCARE_VIETQR_BANK_CODE:}
       account-no: ${PAWCARE_VIETQR_ACCOUNT_NO:}
       account-name: ${PAWCARE_VIETQR_ACCOUNT_NAME:PawCare}
+  bonita:
+    workflow:
+      # Keep false until BookingService v2 is deployed and the technical
+      # PawCare workflow account has been mapped to its actors in Bonita.
+      enabled: ${PAWCARE_BONITA_WORKFLOW_ENABLED:false}
+      base-url: ${PAWCARE_BONITA_URL:http://127.0.0.1:62666/bonita}
+      username: ${PAWCARE_BONITA_USERNAME:}
+      password: ${PAWCARE_BONITA_PASSWORD:}
+      process-name: ${PAWCARE_BONITA_BOOKING_PROCESS:BookingService}
+      retry-delay-ms: ${PAWCARE_BONITA_WORKFLOW_RETRY_MS:15000}

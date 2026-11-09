@@ -1,6 +1,8 @@
 package com.pawcare.publicapi.wallet;
 
 import com.pawcare.publicapi.auth.CurrentPrincipal;
+import com.pawcare.publicapi.bonita.BookingWorkflowEvent;
+import com.pawcare.publicapi.bonita.BookingWorkflowOutbox;
 import com.pawcare.publicapi.wallet.dto.TopUpRequest;
 import com.pawcare.publicapi.wallet.dto.WithdrawRequest;
 import com.pawcare.publicapi.wallet.dto.WithdrawalDecisionRequest;
@@ -36,17 +38,19 @@ public class WalletService {
     private static final Pattern AUTHORIZATION_SCHEME = Pattern.compile("^(?:apikey|bearer)\\s+(.+)$", Pattern.CASE_INSENSITIVE);
 
     private final JdbcTemplate db;
+    private final BookingWorkflowOutbox workflowOutbox;
     private final String webhookToken;
     private final String qrBank;
     private final String qrAccount;
     private final String qrAccountName;
 
-    public WalletService(JdbcTemplate db,
+    public WalletService(JdbcTemplate db, BookingWorkflowOutbox workflowOutbox,
             @Value("${pawcare.wallet.webhook-token:}") String webhookToken,
             @Value("${pawcare.wallet.vietqr.bank-code:}") String qrBank,
             @Value("${pawcare.wallet.vietqr.account-no:}") String qrAccount,
             @Value("${pawcare.wallet.vietqr.account-name:PawCare}") String qrAccountName) {
         this.db = db;
+        this.workflowOutbox = workflowOutbox;
         this.webhookToken = webhookToken;
         this.qrBank = qrBank;
         this.qrAccount = qrAccount;
@@ -335,6 +339,7 @@ public class WalletService {
         releaseEscrowForBooking(bookingId, "booking expired before provider approval");
         db.update("UPDATE bookings SET status='CANCELLED',cancel_reason='Expired before provider approval' WHERE id=?", bookingId);
         db.update("INSERT INTO booking_status_history(booking_id,previous_status,new_status,note) VALUES(?,?,?,?)", bookingId, "PENDING_APPROVAL", "CANCELLED", "Escrow released automatically after expiry");
+        workflowOutbox.enqueue(bookingId, BookingWorkflowEvent.EXPIRED, Map.of("reason", "approval deadline expired"));
     }
 
     private void markBookingAwaitingApproval(long bookingId, long customerId, String note) {
@@ -346,6 +351,7 @@ public class WalletService {
             db.update("INSERT INTO notifications(recipient_profile_id,title,content,notification_type,reference_type,reference_id) VALUES(?,?,?,?,?,?)",
                     provider.get("owner_profile_id"), "Booking chờ duyệt", "Booking #" + bookingId + " đã thanh toán và chờ bạn duyệt.", "BOOKING_STATUS", "BOOKING", bookingId);
         }
+        workflowOutbox.enqueue(bookingId, BookingWorkflowEvent.START, Map.of("bookingId", bookingId));
     }
 
     private Map<String, Object> lockWallet(String ownerType, long ownerId) {

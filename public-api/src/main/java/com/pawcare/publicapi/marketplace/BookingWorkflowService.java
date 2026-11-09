@@ -1,6 +1,8 @@
 package com.pawcare.publicapi.marketplace;
 
 import com.pawcare.publicapi.auth.CurrentPrincipal;
+import com.pawcare.publicapi.bonita.BookingWorkflowEvent;
+import com.pawcare.publicapi.bonita.BookingWorkflowOutbox;
 import com.pawcare.publicapi.wallet.WalletService;
 import com.pawcare.publicapi.web.ApiException;
 import java.util.List;
@@ -17,10 +19,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class BookingWorkflowService {
     private final JdbcTemplate db;
     private final WalletService wallets;
+    private final BookingWorkflowOutbox workflowOutbox;
 
-    public BookingWorkflowService(JdbcTemplate db, WalletService wallets) {
+    public BookingWorkflowService(JdbcTemplate db, WalletService wallets, BookingWorkflowOutbox workflowOutbox) {
         this.db = db;
         this.wallets = wallets;
+        this.workflowOutbox = workflowOutbox;
     }
 
     @Transactional
@@ -35,6 +39,7 @@ public class BookingWorkflowService {
         notifyProfile(longValue(booking, "customer_profile_id"), "Xác nhận hoàn tất dịch vụ",
                 "Provider đã báo hoàn tất Booking #" + bookingId + ". Hãy xác nhận hoặc gửi khiếu nại.",
                 "BOOKING_COMPLETION", bookingId);
+        workflowOutbox.enqueue(bookingId, BookingWorkflowEvent.PROVIDER_SERVICE_DONE, Map.of("providerProfileId", principal.profileId()));
         return Map.of("success", true, "id", bookingId, "status", "SERVICE_DONE");
     }
 
@@ -52,6 +57,7 @@ public class BookingWorkflowService {
                     "Booking #" + bookingId + " đã hoàn tất. Doanh thu 90% đã được cộng vào ví của bạn.",
                     "BOOKING_COMPLETION", bookingId);
         }
+        workflowOutbox.enqueue(bookingId, BookingWorkflowEvent.CUSTOMER_CONFIRMED, Map.of("customerProfileId", principal.profileId()));
         return Map.of("success", true, "id", bookingId, "status", "COMPLETED");
     }
 
@@ -74,6 +80,7 @@ public class BookingWorkflowService {
                     "Khách hàng đã mở tranh chấp cho Booking #" + bookingId + ". Tiền tiếp tục được giữ trong escrow.",
                     "BOOKING_DISPUTE", bookingId);
         }
+        workflowOutbox.enqueue(bookingId, BookingWorkflowEvent.CUSTOMER_DISPUTED, Map.of("customerProfileId", principal.profileId(), "complaintId", complaintId));
         return Map.of("success", true, "id", bookingId, "status", "DISPUTED", "complaintId", complaintId);
     }
 
@@ -111,6 +118,9 @@ public class BookingWorkflowService {
             notifyProfile(providerProfileId, "Tranh chấp đã được xử lý",
                     "Booking #" + bookingId + ": " + outcome, "BOOKING_DISPUTE", bookingId);
         }
+        workflowOutbox.enqueue(bookingId,
+                "REFUND_TO_CUSTOMER".equals(decision) ? BookingWorkflowEvent.ADMIN_REFUND_TO_CUSTOMER : BookingWorkflowEvent.ADMIN_RELEASE_TO_PROVIDER,
+                Map.of("adminProfileId", principal.profileId(), "decision", decision));
         return Map.of("success", true, "id", bookingId, "status", finalStatus, "action", decision);
     }
 

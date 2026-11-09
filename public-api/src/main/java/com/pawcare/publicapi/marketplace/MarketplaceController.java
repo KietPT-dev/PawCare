@@ -2,6 +2,8 @@ package com.pawcare.publicapi.marketplace;
 
 import com.pawcare.publicapi.auth.CurrentPrincipal;
 import com.pawcare.publicapi.auth.CurrentUser;
+import com.pawcare.publicapi.bonita.BookingWorkflowEvent;
+import com.pawcare.publicapi.bonita.BookingWorkflowOutbox;
 import com.pawcare.publicapi.marketplace.dto.DisputeRequest;
 import com.pawcare.publicapi.wallet.PaymentMethod;
 import com.pawcare.publicapi.wallet.WalletService;
@@ -18,10 +20,12 @@ public class MarketplaceController {
     private final JdbcTemplate db;
     private final WalletService wallets;
     private final BookingWorkflowService workflow;
-    public MarketplaceController(JdbcTemplate db, WalletService wallets, BookingWorkflowService workflow) {
+    private final BookingWorkflowOutbox workflowOutbox;
+    public MarketplaceController(JdbcTemplate db, WalletService wallets, BookingWorkflowService workflow, BookingWorkflowOutbox workflowOutbox) {
         this.db = db;
         this.wallets = wallets;
         this.workflow = workflow;
+        this.workflowOutbox = workflowOutbox;
     }
 
     // Public catalogue --------------------------------------------------------
@@ -188,6 +192,9 @@ public class MarketplaceController {
                 "BOOKING_STATUS", "BOOKING", id);
         }
         if ("REJECTED".equals(next) || "CANCELLED".equals(next)) wallets.releaseEscrowForBooking(id, "REJECTED".equals(next) ? "provider rejected booking" : "customer cancelled booking");
+        if ("CONFIRMED".equals(next)) workflowOutbox.enqueue(id, BookingWorkflowEvent.PROVIDER_APPROVED, Map.of("providerProfileId", p.profileId()));
+        if ("REJECTED".equals(next)) workflowOutbox.enqueue(id, BookingWorkflowEvent.PROVIDER_REJECTED, Map.of("providerProfileId", p.profileId()));
+        if ("CANCELLED".equals(next)) workflowOutbox.enqueue(id, BookingWorkflowEvent.CANCELLED, Map.of("customerProfileId", p.profileId()));
         return Map.of("success",true,"id",id,"status",next);
     }
 

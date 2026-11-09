@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 import com.pawcare.publicapi.auth.CurrentPrincipal;
+import com.pawcare.publicapi.bonita.BookingWorkflowOutbox;
 import com.pawcare.publicapi.wallet.WalletService;
 import com.pawcare.publicapi.web.ApiException;
 import java.util.LinkedHashMap;
@@ -19,13 +20,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class BookingWorkflowServiceTest {
     private JdbcTemplate db;
     private WalletService wallets;
+    private BookingWorkflowOutbox outbox;
     private BookingWorkflowService workflow;
 
     @BeforeEach
     void setUp() {
         db = mock(JdbcTemplate.class);
         wallets = mock(WalletService.class);
-        workflow = new BookingWorkflowService(db, wallets);
+        outbox = mock(BookingWorkflowOutbox.class);
+        workflow = new BookingWorkflowService(db, wallets, outbox);
     }
 
     @Test
@@ -36,6 +39,7 @@ class BookingWorkflowServiceTest {
 
         assertEquals("SERVICE_DONE", result.get("status"));
         verify(wallets, never()).settleCompletedBooking(anyLong());
+        verify(outbox).enqueue(eq(77L), any(), any());
         verify(db, atLeast(3)).update(anyString(), any(Object[].class));
     }
 
@@ -51,6 +55,7 @@ class BookingWorkflowServiceTest {
 
         assertEquals("COMPLETED", result.get("status"));
         verify(wallets).settleCompletedBooking(77L);
+        verify(outbox).enqueue(eq(77L), any(), any());
         verify(wallets, never()).releaseEscrowForBooking(anyLong(), anyString());
     }
 
