@@ -56,6 +56,7 @@ public class RestBonitaBookingGateway implements BonitaBookingGateway {
             caseId = id(created, "caseId", "id");
             db.update("UPDATE bookings SET bonita_case_id=?,bonita_process_definition_id=? WHERE id=?", caseId, processId, bookingId);
         }
+        putVariable(session, caseId, "bookingId", Long.toString(bookingId));
         // In the v2 process this is a technical bootstrap task. The external
         // customer has already created the booking in PawCare, so they never
         // need a Bonita login or a Bonita form.

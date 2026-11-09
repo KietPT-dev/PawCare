@@ -33,8 +33,9 @@ task và biến dưới đây (không đổi tên tùy ý):
 | Customer xác nhận/khiếu nại | Human task, actor `Customer` kỹ thuật | `Xác nhận hoàn tất` | `CUSTOMER_CONFIRMED` / `CUSTOMER_DISPUTED` |
 | Admin xử lý khiếu nại | Human task, actor `Admin` | `Xử lý tranh chấp` | `ADMIN_RELEASE_TO_PROVIDER` / `ADMIN_REFUND_TO_CUSTOMER` |
 
-Tạo các process data Boolean/Text:
+Tạo các process data sau:
 
+* `bookingId` (Long, mặc định `0`) — mã booking thật trong MySQL/PawCare.
 * `bookingAccepted` (Boolean, mặc định `false`) — gateway sau `Xác nhận lịch`.
 * `customerDecision` (Text) — `CONFIRM` hoặc `DISPUTE`.
 * `disputeDecision` (Text) — `RELEASE_TO_PROVIDER` hoặc `REFUND_TO_CUSTOMER`.
