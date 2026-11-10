@@ -1,8 +1,7 @@
 # PawCare Customer Mobile
 
-Flutter client for the PawCare Customer role. During local development it
-always calls the Public API at `http://127.0.0.1:8081/api/v1` (the iOS
-Simulator's loopback address to this Mac).
+Flutter client for the PawCare Customer role. It uses one `AppConfig` endpoint;
+the saved URL is restored with the customer's session.
 
 ## Structure
 
@@ -13,9 +12,8 @@ Simulator's loopback address to this Mac).
 
 ## API endpoint
 
-No customer configuration screen is shown. The local API port is fixed at
-`8081`, so start the backend once and then run the app normally. For a deployed
-environment, a build-time value replaces the local endpoint:
+No customer configuration screen is shown. For a deployed environment, provide
+the endpoint as a build-time value:
 
 ```bash
 flutter run --dart-define=PAWCARE_API_URL=https://api.example.com/api/v1

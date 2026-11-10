@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import '../../../core/network/pawcare_api.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
-import '../../../core/utils/app_formatters.dart';
 import '../../../core/network/api_messages.dart';
 
 class WalletScreen extends StatefulWidget {
