@@ -6,6 +6,7 @@ import com.pawcare.publicapi.bonita.BookingWorkflowEvent;
 import com.pawcare.publicapi.bonita.BookingWorkflowOutbox;
 import com.pawcare.publicapi.marketplace.dto.BookingStatusRequest;
 import com.pawcare.publicapi.marketplace.dto.DisputeRequest;
+import com.pawcare.publicapi.marketplace.dto.ReviewReplyRequest;
 import com.pawcare.publicapi.wallet.PaymentMethod;
 import com.pawcare.publicapi.wallet.WalletService;
 import com.pawcare.publicapi.web.ApiException;
@@ -143,6 +144,17 @@ public class MarketplaceController {
     @GetMapping("/provider/customers") public List<Map<String,Object>> providerCustomers(@CurrentUser CurrentPrincipal p) { return db.queryForList("SELECT u.id,u.full_name,u.email,u.phone,COUNT(b.id) booking_count,MAX(b.booking_start) last_booking_at FROM bookings b JOIN user_profiles u ON u.id=b.customer_profile_id WHERE b.provider_id=? GROUP BY u.id,u.full_name,u.email,u.phone ORDER BY last_booking_at DESC", providerId(p)); }
     @GetMapping("/provider/pets") public List<Map<String,Object>> providerPets(@CurrentUser CurrentPrincipal p) { return db.queryForList("SELECT pt.id,pt.name,pt.species,pt.breed,pt.gender,pt.birth_date,pt.weight_kg,u.full_name customer_name,COUNT(b.id) booking_count,MAX(b.booking_start) last_booking_at FROM bookings b JOIN pets pt ON pt.id=b.pet_id JOIN user_profiles u ON u.id=pt.customer_profile_id WHERE b.provider_id=? GROUP BY pt.id,pt.name,pt.species,pt.breed,pt.gender,pt.birth_date,pt.weight_kg,u.full_name ORDER BY last_booking_at DESC", providerId(p)); }
     @GetMapping("/provider/reviews") public List<Map<String,Object>> providerReviews(@CurrentUser CurrentPrincipal p) { return db.queryForList("SELECT r.*,u.full_name customer_name,s.name service_name FROM reviews r JOIN user_profiles u ON u.id=r.customer_profile_id JOIN bookings b ON b.id=r.booking_id JOIN services s ON s.id=b.service_id WHERE r.provider_id=? ORDER BY r.created_at DESC", providerId(p)); }
+    @PostMapping("/provider/reviews/{reviewId}/reply")
+    @Transactional
+    public Map<String,Object> replyToReview(@CurrentUser CurrentPrincipal p, @PathVariable long reviewId,
+                                             @Valid @RequestBody ReviewReplyRequest request) {
+        long providerId = providerId(p);
+        Map<String,Object> review = one("SELECT id,customer_profile_id FROM reviews WHERE id=? AND provider_id=?", reviewId, providerId);
+        if (review == null) throw new ApiException(404, "Review not found for this provider");
+        db.update("UPDATE reviews SET provider_reply=?,provider_replied_at=CURRENT_TIMESTAMP,provider_replied_by_profile_id=? WHERE id=?",
+                request.content().trim(), p.profileId(), reviewId);
+        return one("SELECT id,provider_reply,provider_replied_at,provider_replied_by_profile_id FROM reviews WHERE id=?", reviewId);
+    }
     @GetMapping("/provider/dashboard") public Map<String,Object> providerDashboard(@CurrentUser CurrentPrincipal p) { long id=providerId(p); Map<String,Object> c=one("SELECT COUNT(*) total_bookings,SUM(status IN ('PENDING','PENDING_APPROVAL')) pending_bookings,SUM(status='COMPLETED') completed_bookings,COALESCE(SUM(CASE WHEN status='COMPLETED' THEN estimated_price ELSE 0 END),0) completed_revenue FROM bookings WHERE provider_id=? AND status<>'PENDING_PAYMENT'",id); Map<String,Object> r=one("SELECT COUNT(*) review_count,COALESCE(AVG(rating),0) average_rating FROM reviews WHERE provider_id=? AND is_visible=1",id); Map<String,Object> x=new LinkedHashMap<>();x.putAll(c);x.putAll(r);return x; }
     @GetMapping("/provider/revenue") public List<Map<String,Object>> providerRevenue(@CurrentUser CurrentPrincipal p) { return db.queryForList("SELECT DATE(booking_end) booking_date,COUNT(*) completed_bookings,COALESCE(SUM(estimated_price),0) revenue FROM bookings WHERE provider_id=? AND status='COMPLETED' GROUP BY DATE(booking_end) ORDER BY booking_date DESC LIMIT 30",providerId(p)); }
 
@@ -251,6 +263,12 @@ public class MarketplaceController {
     public List<Map<String,Object>> notifications(@CurrentUser CurrentPrincipal p) { return db.queryForList("SELECT * FROM notifications WHERE recipient_profile_id=? ORDER BY created_at DESC",p.profileId()); }
     @PutMapping("/notifications/{id}/read")
     public Map<String,Object> read(@CurrentUser CurrentPrincipal p,@PathVariable long id) { db.update("UPDATE notifications SET is_read=1,read_at=CURRENT_TIMESTAMP WHERE id=? AND recipient_profile_id=?",id,p.profileId());return Map.of("success",true,"id",id); }
+    @PutMapping("/notifications/read-all")
+    @Transactional
+    public Map<String,Object> readAll(@CurrentUser CurrentPrincipal p) {
+        int updated = db.update("UPDATE notifications SET is_read=1,read_at=CURRENT_TIMESTAMP WHERE recipient_profile_id=? AND is_read=0", p.profileId());
+        return Map.of("success", true, "updated", updated);
+    }
 
     // Customer care notes ---------------------------------------------------
     @GetMapping("/care-notes")

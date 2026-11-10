@@ -45,5 +45,14 @@ return it.
 
 - **Mobile customer:** call booking confirmation/dispute only for the logged-in owner.
 - **Provider web:** never show or call a direct completed transition; use service-done.
+
+## Reviews and notifications
+
+- `POST /api/v1/provider/reviews/{reviewId}/reply` lets the authenticated owner
+  of a provider post or replace a response to a review. Body:
+  `{ "content": "..." }` (1–5000 characters). The API verifies that the
+  review belongs to that provider.
+- `PUT /api/v1/notifications/read-all` marks the current authenticated user's
+  unread notifications as read and returns `{ "success": true, "updated": n }`.
 - **Bonita admin:** use admin dispute/withdrawal endpoints and show server error text.
 - All clients should render the standard error payload: `status`, `error`, `timestamp`.
