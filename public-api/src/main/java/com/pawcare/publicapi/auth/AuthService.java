@@ -9,6 +9,7 @@ import java.util.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
@@ -29,6 +30,7 @@ public class AuthService {
         this.refreshDays = refreshDays;
     }
 
+    @Transactional
     public Map<String, Object> register(Map<String, Object> body) {
         String name = req(body, "fullName");
         String email = normalizeEmail(req(body, "email"));
@@ -116,6 +118,7 @@ public class AuthService {
         return tokenResponse(p);
     }
 
+    @Transactional
     public Map<String, Object> refresh(Map<String, Object> body) {
         String raw = req(body, "refreshToken");
 
@@ -139,6 +142,7 @@ public class AuthService {
         return tokenResponse(profile(((Number) row.get("profile_id")).longValue()));
     }
 
+    @Transactional
     public void logout(Map<String, Object> body) {
         db.update(
                 "UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE token_hash = ?",
@@ -150,6 +154,7 @@ public class AuthService {
         return publicProfile(profile(principal.profileId()));
     }
 
+    @Transactional
     public Map<String, Object> updateProfile(CurrentPrincipal principal, Map<String, Object> body) {
         Map<String, Object> current = profile(principal.profileId());
         String email = text(body, "email");
@@ -165,6 +170,7 @@ public class AuthService {
         return publicProfile(profile(principal.profileId()));
     }
 
+    @Transactional
     public Map<String, Object> changePassword(CurrentPrincipal principal, Map<String, Object> body) {
         String oldPassword = req(body, "currentPassword");
         String newPassword = req(body, "newPassword");

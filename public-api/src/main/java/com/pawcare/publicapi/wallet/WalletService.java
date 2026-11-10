@@ -308,6 +308,9 @@ public class WalletService {
         }
         db.update("UPDATE withdrawal_requests SET status=?,admin_note=?,reviewed_by_profile_id=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=?",
                 decision, clean(request.adminNote()), principal.profileId(), id);
+        db.update("INSERT INTO audit_logs(actor_profile_id,action_type,entity_type,entity_id,details_json) VALUES(?,?,?, ?,CAST(? AS JSON))",
+                principal.profileId(), "WITHDRAWAL_" + decision, "WITHDRAWAL", id,
+                "{\"amount\":\"" + amount.toPlainString() + "\",\"decision\":\"" + decision + "\"}");
         Long ownerProfile = walletOwnerProfile(wallet);
         if (ownerProfile != null) {
             String message = "APPROVED".equals(decision)
