@@ -41,7 +41,11 @@ public class RestBonitaBookingGateway implements BonitaBookingGateway {
         }
         Long caseId = db.query("SELECT bonita_case_id FROM bookings WHERE id=?", rs -> rs.next() ? rs.getObject(1, Long.class) : null, bookingId);
         if (caseId == null) throw new IllegalStateException("Booking #" + bookingId + " has no Bonita case yet; START must be synchronized first");
-        synchronizeExistingCase(session, caseId, event);
+        try {
+            synchronizeExistingCase(session, caseId, event);
+        } catch (Exception error) {
+            throw new IllegalStateException("Booking #" + bookingId + " workflow event " + event + " failed: " + error.getMessage(), error);
+        }
     }
 
     private void startCase(Session session, long bookingId) throws Exception {
@@ -90,11 +94,9 @@ public class RestBonitaBookingGateway implements BonitaBookingGateway {
                 putVariable(session, caseId, "disputeDecision", "REFUND_TO_CUSTOMER");
                 completeNamedTask(session, caseId, "Xử lý tranh chấp", true);
             }
-            // Cancellation and expiry are terminal events in PawCare. A v2
-            // diagram should include a boundary/message event if visual close
-            // out of those cases is required; they are kept as audited outbox
-            // records even when no human task needs completion.
-            case CANCELLED, EXPIRED -> { }
+            // PawCare is canonical.  A cancellation/expiry never changes the
+            // booking again from Bonita; it only closes the corresponding case.
+            case CANCELLED, EXPIRED -> cancelCase(session, caseId);
             default -> throw new IllegalArgumentException("Unsupported workflow event " + event);
         }
     }
@@ -128,6 +130,13 @@ public class RestBonitaBookingGateway implements BonitaBookingGateway {
 
     private void putVariable(Session session, long caseId, String name, String value) throws Exception {
         call(session, "PUT", "/API/bpm/caseVariable/" + caseId + "/" + encode(name), json.writeValueAsString(Map.of("value", value)));
+    }
+
+    private void cancelCase(Session session, long caseId) throws Exception {
+        JsonNode current = call(session, "GET", "/API/bpm/case/" + caseId, null);
+        String state = text(current, "state");
+        if ("completed".equalsIgnoreCase(state) || "cancelled".equalsIgnoreCase(state) || "aborted".equalsIgnoreCase(state)) return;
+        call(session, "PUT", "/API/bpm/case/" + caseId, "{\"state\":\"cancelled\"}");
     }
 
     private Session login() throws Exception {

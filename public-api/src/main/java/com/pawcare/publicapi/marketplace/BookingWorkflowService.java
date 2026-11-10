@@ -1,8 +1,10 @@
 package com.pawcare.publicapi.marketplace;
 
 import com.pawcare.publicapi.auth.CurrentPrincipal;
+import com.pawcare.publicapi.audit.AuditService;
 import com.pawcare.publicapi.bonita.BookingWorkflowEvent;
 import com.pawcare.publicapi.bonita.BookingWorkflowOutbox;
+import com.pawcare.publicapi.notification.NotificationService;
 import com.pawcare.publicapi.wallet.WalletService;
 import com.pawcare.publicapi.web.ApiException;
 import java.util.List;
@@ -20,11 +22,16 @@ public class BookingWorkflowService {
     private final JdbcTemplate db;
     private final WalletService wallets;
     private final BookingWorkflowOutbox workflowOutbox;
+    private final NotificationService notifications;
+    private final AuditService audit;
 
-    public BookingWorkflowService(JdbcTemplate db, WalletService wallets, BookingWorkflowOutbox workflowOutbox) {
+    public BookingWorkflowService(JdbcTemplate db, WalletService wallets, BookingWorkflowOutbox workflowOutbox,
+                                  NotificationService notifications, AuditService audit) {
         this.db = db;
         this.wallets = wallets;
         this.workflowOutbox = workflowOutbox;
+        this.notifications = notifications;
+        this.audit = audit;
     }
 
     @Transactional
@@ -108,6 +115,8 @@ public class BookingWorkflowService {
         } else {
             wallets.settleCompletedBooking(bookingId);
         }
+        audit.record(principal.profileId(), "DISPUTE_" + decision, "BOOKING", bookingId,
+                Map.of("decision", decision, "finalStatus", finalStatus));
         String outcome = "REFUND_TO_CUSTOMER".equals(decision)
                 ? "Admin đã hoàn tiền escrow cho bạn."
                 : "Admin đã xác nhận hoàn tất và giải ngân tiền escrow.";
@@ -132,8 +141,8 @@ public class BookingWorkflowService {
                 bookingId, before, after, profileId, note);
     }
     private void notifyProfile(long profileId, String title, String content, String type, long bookingId) {
-        db.update("INSERT INTO notifications(recipient_profile_id,title,content,notification_type,reference_type,reference_id) VALUES(?,?,?,?,?,?)",
-                profileId, title, content, type, "BOOKING", bookingId);
+        notifications.notifyOnce(profileId, title, content, type, "BOOKING", bookingId,
+                type + ":" + bookingId + ":" + profileId);
     }
     private Long providerOwner(long providerId) {
         Map<String, Object> provider = one("SELECT owner_profile_id FROM providers WHERE id=?", providerId);

@@ -7,7 +7,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 import com.pawcare.publicapi.auth.CurrentPrincipal;
+import com.pawcare.publicapi.audit.AuditService;
 import com.pawcare.publicapi.bonita.BookingWorkflowOutbox;
+import com.pawcare.publicapi.notification.NotificationService;
 import com.pawcare.publicapi.wallet.WalletService;
 import com.pawcare.publicapi.web.ApiException;
 import java.util.LinkedHashMap;
@@ -21,6 +23,8 @@ class BookingWorkflowServiceTest {
     private JdbcTemplate db;
     private WalletService wallets;
     private BookingWorkflowOutbox outbox;
+    private NotificationService notifications;
+    private AuditService audit;
     private BookingWorkflowService workflow;
 
     @BeforeEach
@@ -28,7 +32,9 @@ class BookingWorkflowServiceTest {
         db = mock(JdbcTemplate.class);
         wallets = mock(WalletService.class);
         outbox = mock(BookingWorkflowOutbox.class);
-        workflow = new BookingWorkflowService(db, wallets, outbox);
+        notifications = mock(NotificationService.class);
+        audit = mock(AuditService.class);
+        workflow = new BookingWorkflowService(db, wallets, outbox, notifications, audit);
     }
 
     @Test
@@ -40,7 +46,9 @@ class BookingWorkflowServiceTest {
         assertEquals("SERVICE_DONE", result.get("status"));
         verify(wallets, never()).settleCompletedBooking(anyLong());
         verify(outbox).enqueue(eq(77L), any(), any());
-        verify(db, atLeast(3)).update(anyString(), any(Object[].class));
+        verify(db, times(2)).update(anyString(), any(Object[].class));
+        verify(notifications).notifyOnce(eq(11L), anyString(), anyString(), eq("BOOKING_COMPLETION"),
+                eq("BOOKING"), eq(77L), anyString());
     }
 
     @Test
