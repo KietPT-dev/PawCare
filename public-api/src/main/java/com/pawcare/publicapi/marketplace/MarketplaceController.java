@@ -4,12 +4,14 @@ import com.pawcare.publicapi.auth.CurrentPrincipal;
 import com.pawcare.publicapi.auth.CurrentUser;
 import com.pawcare.publicapi.bonita.BookingWorkflowEvent;
 import com.pawcare.publicapi.bonita.BookingWorkflowOutbox;
+import com.pawcare.publicapi.marketplace.dto.BookingStatusRequest;
 import com.pawcare.publicapi.marketplace.dto.DisputeRequest;
 import com.pawcare.publicapi.wallet.PaymentMethod;
 import com.pawcare.publicapi.wallet.WalletService;
 import com.pawcare.publicapi.web.ApiException;
 import java.math.BigDecimal;
 import java.util.*;
+import jakarta.validation.Valid;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -170,20 +172,20 @@ public class MarketplaceController {
     }
     @PutMapping("/bookings/{id}/status")
     @Transactional
-    public Map<String,Object> bookingStatus(@CurrentUser CurrentPrincipal p,@PathVariable long id,@RequestBody Map<String,Object>b) {
+    public Map<String,Object> bookingStatus(@CurrentUser CurrentPrincipal p,@PathVariable long id,@Valid @RequestBody BookingStatusRequest request) {
         Map<String,Object> booking=one("SELECT * FROM bookings WHERE id=?",id);if(booking==null)throw new ApiException(404,"Booking not found");
-        String next=required(b,"status").toUpperCase(Locale.ROOT); String current=String.valueOf(booking.get("status"));
+        String next=request.status().trim().toUpperCase(Locale.ROOT); String current=String.valueOf(booking.get("status"));
         boolean customer="CUSTOMER".equals(p.role())&&((Number)booking.get("customer_profile_id")).longValue()==p.profileId()&&"CANCELLED".equals(next);
         boolean provider="PROVIDER".equals(p.role())&&ownsProvider(((Number)booking.get("provider_id")).longValue(),p.profileId())&&List.of("CONFIRMED","REJECTED","CHECKED_IN","IN_SERVICE","SERVICE_DONE").contains(next);
         // A provider may report that work is done, but never settles escrow.
         // The dedicated customer confirmation endpoint is the only normal path
         // that can move SERVICE_DONE to COMPLETED.
         if (provider && "SERVICE_DONE".equals(next)) {
-            return workflow.providerMarksServiceDone(p, id, text(b,"providerNote"), text(b,"note"));
+            return workflow.providerMarksServiceDone(p, id, request.providerNote(), request.note());
         }
         if(!(customer||provider)||!transition(current,next))throw new ApiException(403,"Booking status change is not allowed");
-        db.update("UPDATE bookings SET status=?,cancel_reason=CASE WHEN ?='CANCELLED' THEN ? ELSE cancel_reason END,provider_note=COALESCE(?,provider_note) WHERE id=?",next,next,text(b,"cancelReason"),text(b,"providerNote"),id);
-        db.update("INSERT INTO booking_status_history(booking_id,previous_status,new_status,changed_by_profile_id,note) VALUES(?,?,?,?,?)",id,current,next,p.profileId(),text(b,"note"));
+        db.update("UPDATE bookings SET status=?,cancel_reason=CASE WHEN ?='CANCELLED' THEN ? ELSE cancel_reason END,provider_note=COALESCE(?,provider_note) WHERE id=?",next,next,request.cancelReason(),request.providerNote(),id);
+        db.update("INSERT INTO booking_status_history(booking_id,previous_status,new_status,changed_by_profile_id,note) VALUES(?,?,?,?,?)",id,current,next,p.profileId(),request.note());
         if (!customer) {
             db.update("INSERT INTO notifications(recipient_profile_id,title,content,notification_type,reference_type,reference_id) VALUES(?,?,?,?,?,?)",
                 booking.get("customer_profile_id"),

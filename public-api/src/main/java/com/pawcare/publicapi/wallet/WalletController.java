@@ -5,6 +5,7 @@ import com.pawcare.publicapi.auth.CurrentUser;
 import com.pawcare.publicapi.wallet.dto.WithdrawRequest;
 import com.pawcare.publicapi.wallet.dto.WithdrawalDecisionRequest;
 import com.pawcare.publicapi.wallet.dto.TopUpRequest;
+import jakarta.validation.Valid;
 import java.util.Map;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,7 +27,7 @@ public class WalletController {
     }
 
     @PostMapping("/wallets/topups")
-    public Map<String, Object> topUp(@CurrentUser CurrentPrincipal principal, @RequestBody TopUpRequest request) {
+    public Map<String, Object> topUp(@CurrentUser CurrentPrincipal principal, @Valid @RequestBody TopUpRequest request) {
         return wallets.createTopUp(principal, request);
     }
 
@@ -46,7 +47,7 @@ public class WalletController {
 
     @PostMapping("/wallets/withdraw")
     public Map<String, Object> withdraw(@CurrentUser CurrentPrincipal principal,
-                                         @RequestBody WithdrawRequest request) {
+                                         @Valid @RequestBody WithdrawRequest request) {
         return wallets.requestWithdrawal(principal, request);
     }
 
@@ -59,7 +60,7 @@ public class WalletController {
     @PutMapping("/admin/withdrawals/{id}")
     public Map<String, Object> decide(@CurrentUser CurrentPrincipal principal,
                                       @PathVariable long id,
-                                      @RequestBody WithdrawalDecisionRequest request) {
+                                      @Valid @RequestBody WithdrawalDecisionRequest request) {
         return wallets.decideWithdrawal(principal, id, request);
     }
 }

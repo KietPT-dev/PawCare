@@ -6,8 +6,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class ApiErrorHandler {
@@ -23,6 +25,11 @@ public class ApiErrorHandler {
                 .map(error -> error.getField() + " " + error.getDefaultMessage()).orElse("Invalid request");
         return ResponseEntity.badRequest().body(Map.of(
                 "status", 400, "error", message, "timestamp", Instant.now().toString()));
+    }
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
+    ResponseEntity<Map<String, Object>> malformed(Exception e) {
+        return ResponseEntity.badRequest().body(Map.of(
+                "status", 400, "error", "Malformed or invalid request", "timestamp", Instant.now().toString()));
     }
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
