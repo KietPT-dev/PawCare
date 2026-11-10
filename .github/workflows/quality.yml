@@ -32,7 +32,10 @@ jobs:
         with: { channel: stable, cache: true }
       - run: flutter pub get
         working-directory: pawcare-customer-mobile
-      - run: flutter analyze
+      # Keep errors and warnings blocking, but do not fail the pipeline for
+      # non-breaking style/deprecation information while the app is being
+      # progressively refactored.
+      - run: flutter analyze --no-fatal-infos
         working-directory: pawcare-customer-mobile
       - run: flutter test
         working-directory: pawcare-customer-mobile
