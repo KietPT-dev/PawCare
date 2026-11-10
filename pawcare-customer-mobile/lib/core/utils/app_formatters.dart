@@ -13,6 +13,33 @@ class AppFormatters {
     return '${number < 0 ? '-' : ''}${parts.join('.')} ₫';
   }
 
+  static String formatVnd(num? amount) => money(amount);
+
+  static String formatBookingStatusVi(String status) => switch (status) {
+        'PENDING' || 'PENDING_PAYMENT' => 'Chờ thanh toán',
+        'PENDING_APPROVAL' => 'Chờ xác nhận',
+        'CONFIRMED' => 'Đã xác nhận',
+        'CHECKED_IN' => 'Đã tiếp nhận bé',
+        'IN_SERVICE' || 'IN_PROGRESS' => 'Đang chăm sóc',
+        'COMPLETED' => 'Hoàn thành',
+        'CANCELLED' => 'Đã hủy',
+        _ => status,
+      };
+
+  static String replaceRawStatusInNotification(String text) {
+    var result = text;
+    for (final value in [
+      'IN_SERVICE',
+      'CHECKED_IN',
+      'CONFIRMED',
+      'COMPLETED',
+      'CANCELLED'
+    ]) {
+      result = result.replaceAll(value, formatBookingStatusVi(value));
+    }
+    return result;
+  }
+
   static DateTime? date(dynamic value) =>
       value == null ? null : DateTime.tryParse('$value'.replaceFirst(' ', 'T'));
   static String dateTime(dynamic value) {

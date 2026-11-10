@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/network/pawcare_api.dart';
 import '../../activity/presentation/booking_detail_screen.dart';
 import '../../../core/utils/app_formatters.dart';
+import '../../../core/network/api_messages.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen(
@@ -38,8 +39,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 return const Center(child: CircularProgressIndicator());
               if (snapshot.hasError)
                 return Center(
-                    child: TextButton(
-                        onPressed: _refresh, child: Text('${snapshot.error}')));
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.cloud_off_outlined, size: 44),
+                  const SizedBox(height: 10),
+                  Text(ApiMessages.friendly(snapshot.error)),
+                  TextButton(onPressed: _refresh, child: const Text('Thử lại'))
+                ]));
               final items = snapshot.data ?? [];
               if (items.isEmpty)
                 return RefreshIndicator(
@@ -67,7 +72,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             : Icons.notifications_none),
                         title: Text('${item['title'] ?? 'Thông báo'}'),
                         subtitle: Text(
-                            '${item['content'] ?? ''}\n${AppFormatters.relativeTime(item['created_at'] ?? item['createdAt'])}'),
+                            '${AppFormatters.replaceRawStatusInNotification('${item['content'] ?? ''}')}\n${AppFormatters.relativeTime(item['created_at'] ?? item['createdAt'])}'),
                         isThreeLine: true,
                         onTap: () async {
                           if (unread)

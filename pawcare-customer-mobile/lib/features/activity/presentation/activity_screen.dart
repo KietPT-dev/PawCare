@@ -3,6 +3,7 @@ import '../../../core/network/pawcare_api.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
 import '../../../core/utils/app_formatters.dart';
+import '../../../core/network/api_messages.dart';
 import 'booking_detail_screen.dart';
 
 class ActivityScreen extends StatefulWidget {
@@ -127,7 +128,8 @@ class _Card extends StatelessWidget {
       await changed();
     } catch (e) {
       if (c.mounted)
-        ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(c)
+            .showSnackBar(SnackBar(content: Text(ApiMessages.friendly(e))));
     }
   }
 
@@ -167,7 +169,8 @@ class _Card extends StatelessWidget {
         await changed();
       } catch (e) {
         if (c.mounted)
-          ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('$e')));
+          ScaffoldMessenger.of(c)
+              .showSnackBar(SnackBar(content: Text(ApiMessages.friendly(e))));
       }
     }
     text.dispose();
@@ -218,7 +221,8 @@ class _Card extends StatelessWidget {
         await changed();
       } catch (e) {
         if (c.mounted)
-          ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('$e')));
+          ScaffoldMessenger.of(c)
+              .showSnackBar(SnackBar(content: Text(ApiMessages.friendly(e))));
       }
     }
     note.dispose();
@@ -287,8 +291,8 @@ class _Card extends StatelessWidget {
                     await changed();
                   } catch (e) {
                     if (c.mounted)
-                      ScaffoldMessenger.of(c)
-                          .showSnackBar(SnackBar(content: Text('$e')));
+                      ScaffoldMessenger.of(c).showSnackBar(
+                          SnackBar(content: Text(ApiMessages.friendly(e))));
                   }
                 },
                 child:

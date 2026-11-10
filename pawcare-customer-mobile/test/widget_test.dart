@@ -7,13 +7,30 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pawcare_customer_mobile/app/pawcare_app.dart';
 import 'package:pawcare_customer_mobile/core/network/pawcare_api.dart';
+import 'package:pawcare_customer_mobile/core/storage/session_store.dart';
 import 'package:pawcare_customer_mobile/core/theme/app_theme.dart';
 import 'package:pawcare_customer_mobile/features/auth/presentation/auth_screen.dart';
 import 'package:pawcare_customer_mobile/features/booking/presentation/booking_screen.dart';
+import 'package:pawcare_customer_mobile/features/activity/presentation/activity_screen.dart';
 import 'package:pawcare_customer_mobile/features/home/presentation/home_screen.dart';
 import 'package:pawcare_customer_mobile/features/profile/presentation/profile_screen.dart';
 
 void main() {
+  test('persists dark mode and customer session', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = SessionStore();
+    await store.saveDarkMode(true);
+    await store.saveSession(
+        const AuthSession(
+            accessToken: 'access',
+            refreshToken: 'refresh',
+            profile: {'fullName': 'An'}),
+        'https://api.pawcare.test/api/v1');
+    expect(await store.readDarkMode(), isTrue);
+    expect((await store.readSession())?.profile['fullName'], 'An');
+    expect(await store.readApiUrl(), 'https://api.pawcare.test/api/v1');
+  });
+
   testWidgets('shows PawCare sign in screen', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(
@@ -92,6 +109,35 @@ void main() {
     expect(find.text('Chọn dịch vụ'), findsOneWidget);
     expect(find.text('Tắm & vệ sinh'), findsOneWidget);
     expect(find.text('Bé Mây'), findsOneWidget);
+  });
+
+  testWidgets('SERVICE_DONE booking exposes confirm and dispute',
+      (tester) async {
+    final api = PawCareApi(
+        baseUrl: 'http://pawcare.test/api/v1',
+        client: MockClient((request) async {
+          if (request.url.path.endsWith('/bookings'))
+            return _jsonResponse([
+              {
+                'id': 7,
+                'status': 'SERVICE_DONE',
+                'booking_start': '2026-11-10T09:00:00',
+                'service_name': 'Tắm bé',
+                'provider_name': 'Paw Spa',
+                'estimated_price': 100000
+              }
+            ]);
+          if (request.url.path.endsWith('/reviews') ||
+              request.url.path.endsWith('/complaints'))
+            return _jsonResponse([]);
+          return _jsonResponse({'error': 'Not found'}, 404);
+        }));
+    addTearDown(api.close);
+    await tester.pumpWidget(
+        MaterialApp(theme: buildTheme(), home: ActivityScreen(api: api)));
+    await tester.pumpAndSettle();
+    expect(find.text('Xác nhận hoàn tất'), findsOneWidget);
+    expect(find.text('Có vấn đề / Khiếu nại'), findsOneWidget);
   });
 
   testWidgets('saves a care note without disposing active text fields',

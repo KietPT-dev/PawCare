@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../../core/network/pawcare_api.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
+import '../../../core/network/api_messages.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key, required this.api});
@@ -17,6 +18,7 @@ class WalletScreen extends StatefulWidget {
 
 class _WalletScreenState extends State<WalletScreen> {
   late Future<_WalletData> _data;
+  String _filter = 'Tất cả';
 
   @override
   void initState() {
@@ -79,21 +81,46 @@ class _WalletScreenState extends State<WalletScreen> {
                         label: const Text('Rút tiền'),
                       )),
                     ]),
-                    const SectionTitle('Lịch sử biến động'),
-                    if (data.transactions.isEmpty)
+                    SectionTitle('Lịch sử biến động',
+                        action: _filter,
+                        onAction: () => _chooseFilter(context)),
+                    if (_filtered(data.transactions).isEmpty)
                       const InfoCard(
                           child: Padding(
                         padding: EdgeInsets.symmetric(vertical: 18),
                         child: Center(child: Text('Chưa có giao dịch nào.')),
                       ))
                     else
-                      ...data.transactions
+                      ..._filtered(data.transactions)
                           .map((item) => _TransactionRow(item: item)),
                   ]),
             );
           },
         ),
       );
+
+  List<Map<String, dynamic>> _filtered(List<Map<String, dynamic>> items) =>
+      _filter == 'Tất cả'
+          ? items
+          : items.where((x) => '${x['type']}' == _filter).toList();
+  Future<void> _chooseFilter(BuildContext context) async {
+    final value = await showModalBottomSheet<String>(
+        context: context,
+        builder: (_) => ListView(
+            shrinkWrap: true,
+            children: [
+              'Tất cả',
+              'DEPOSIT',
+              'ESCROW_HOLD',
+              'ESCROW_RELEASE',
+              'WITHDRAWAL'
+            ]
+                .map((x) => ListTile(
+                    title: Text(x == 'Tất cả' ? x : x.replaceAll('_', ' ')),
+                    onTap: () => Navigator.pop(context, x)))
+                .toList()));
+    if (value != null && mounted) setState(() => _filter = value);
+  }
 
   Future<void> _showTopUp(BuildContext context) async {
     final completed = await showModalBottomSheet<bool>(
@@ -168,7 +195,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 } catch (error) {
                   if (sheetContext.mounted)
                     ScaffoldMessenger.of(sheetContext).showSnackBar(
-                        SnackBar(content: Text(error.toString())));
+                        SnackBar(content: Text(ApiMessages.friendly(error))));
                 }
               },
               child: const Text('Gửi yêu cầu')),
@@ -284,8 +311,7 @@ class _WalletError extends StatelessWidget {
             const Text('Chưa thể tải Ví PawCare',
                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19)),
             const SizedBox(height: 8),
-            Text('${error ?? 'Hãy kiểm tra kết nối và thử lại.'}',
-                textAlign: TextAlign.center),
+            Text(ApiMessages.friendly(error), textAlign: TextAlign.center),
             const SizedBox(height: 16),
             FilledButton(onPressed: onRetry, child: const Text('Thử lại')),
           ])));
