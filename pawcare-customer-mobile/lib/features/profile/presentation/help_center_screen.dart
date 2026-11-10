@@ -43,8 +43,8 @@ class HelpCenterScreen extends StatelessWidget {
             _Faq('Khi nào Provider xác nhận đơn?',
                 'Provider sẽ nhận yêu cầu và cập nhật trạng thái. Khi có thay đổi, lịch hẹn hiển thị trạng thái mới trong Đơn lịch.'),
             Divider(),
-            _Faq('Thanh toán VNPAY Sandbox là gì?',
-                'Đây là môi trường mô phỏng để kiểm thử giao dịch, không phát sinh tiền thật.'),
+            _Faq('Thanh toán VietQR và Escrow hoạt động thế nào?',
+                'Bạn quét VietQR để thanh toán. Tiền được giữ an toàn trong Escrow và chỉ giải ngân khi dịch vụ hoàn tất hoặc hoàn lại theo kết quả xử lý.'),
           ])),
           const SectionTitle('Vẫn cần hỗ trợ?'),
           InfoCard(

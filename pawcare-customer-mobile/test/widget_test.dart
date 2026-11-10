@@ -10,6 +10,7 @@ import 'package:pawcare_customer_mobile/core/network/pawcare_api.dart';
 import 'package:pawcare_customer_mobile/core/theme/app_theme.dart';
 import 'package:pawcare_customer_mobile/features/auth/presentation/auth_screen.dart';
 import 'package:pawcare_customer_mobile/features/booking/presentation/booking_screen.dart';
+import 'package:pawcare_customer_mobile/features/activity/presentation/activity_screen.dart';
 import 'package:pawcare_customer_mobile/features/home/presentation/home_screen.dart';
 import 'package:pawcare_customer_mobile/features/profile/presentation/profile_screen.dart';
 
@@ -92,6 +93,35 @@ void main() {
     expect(find.text('Chọn dịch vụ'), findsOneWidget);
     expect(find.text('Tắm & vệ sinh'), findsOneWidget);
     expect(find.text('Bé Mây'), findsOneWidget);
+  });
+
+  testWidgets('SERVICE_DONE booking exposes confirm and dispute',
+      (tester) async {
+    final api = PawCareApi(
+        baseUrl: 'http://pawcare.test/api/v1',
+        client: MockClient((request) async {
+          if (request.url.path.endsWith('/bookings'))
+            return _jsonResponse([
+              {
+                'id': 7,
+                'status': 'SERVICE_DONE',
+                'booking_start': '2026-11-10T09:00:00',
+                'service_name': 'Tắm bé',
+                'provider_name': 'Paw Spa',
+                'estimated_price': 100000
+              }
+            ]);
+          if (request.url.path.endsWith('/reviews') ||
+              request.url.path.endsWith('/complaints'))
+            return _jsonResponse([]);
+          return _jsonResponse({'error': 'Not found'}, 404);
+        }));
+    addTearDown(api.close);
+    await tester.pumpWidget(
+        MaterialApp(theme: buildTheme(), home: ActivityScreen(api: api)));
+    await tester.pumpAndSettle();
+    expect(find.text('Xác nhận hoàn tất'), findsOneWidget);
+    expect(find.text('Có vấn đề / Khiếu nại'), findsOneWidget);
   });
 
   testWidgets('saves a care note without disposing active text fields',
