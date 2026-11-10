@@ -103,7 +103,14 @@ public class RestBonitaBookingGateway implements BonitaBookingGateway {
         String filter = encode("name=" + settings.getProcessName());
         JsonNode rows = call(session, "GET", "/API/bpm/process?c=100&f=" + filter, null);
         if (!rows.isArray() || rows.isEmpty()) throw new IllegalStateException("Deployed Bonita process '" + settings.getProcessName() + "' was not found");
-        return id(rows.get(0), "id");
+        // Bonita keeps older deployed versions in the same response. Never
+        // instantiate the first match blindly: it may be a disabled version.
+        for (JsonNode row : rows) {
+            if ("ENABLED".equalsIgnoreCase(text(row, "activationState"))) {
+                return id(row, "id");
+            }
+        }
+        throw new IllegalStateException("No ENABLED Bonita process named '" + settings.getProcessName() + "' was found");
     }
 
     private void completeNamedTask(Session session, long caseId, String taskName, boolean required) throws Exception {

@@ -571,6 +571,14 @@
       <password encrypted="false">123</password>
       <customUserInfoValues/>
     </user>
+    <user userName="pawcare.workflow">
+      <firstName>PawCare</firstName>
+      <lastName>WorkFlow</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">123</password>
+      <customUserInfoValues/>
+    </user>
   </users>
   <roles>
     <role name="member">
@@ -796,6 +804,11 @@
       <roleName>Customer</roleName>
       <groupName>Customers</groupName>
       <groupParentPath>/PawCare</groupParentPath>
+    </membership>
+    <membership>
+      <userName>pawcare.workflow</userName>
+      <roleName>member</roleName>
+      <groupName>acme</groupName>
     </membership>
   </memberships>
 </organization:Organization>
