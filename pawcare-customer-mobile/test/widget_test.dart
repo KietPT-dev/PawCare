@@ -7,6 +7,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pawcare_customer_mobile/app/pawcare_app.dart';
 import 'package:pawcare_customer_mobile/core/network/pawcare_api.dart';
+import 'package:pawcare_customer_mobile/core/storage/session_store.dart';
 import 'package:pawcare_customer_mobile/core/theme/app_theme.dart';
 import 'package:pawcare_customer_mobile/features/auth/presentation/auth_screen.dart';
 import 'package:pawcare_customer_mobile/features/booking/presentation/booking_screen.dart';
@@ -15,6 +16,21 @@ import 'package:pawcare_customer_mobile/features/home/presentation/home_screen.d
 import 'package:pawcare_customer_mobile/features/profile/presentation/profile_screen.dart';
 
 void main() {
+  test('persists dark mode and customer session', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = SessionStore();
+    await store.saveDarkMode(true);
+    await store.saveSession(
+        const AuthSession(
+            accessToken: 'access',
+            refreshToken: 'refresh',
+            profile: {'fullName': 'An'}),
+        'https://api.pawcare.test/api/v1');
+    expect(await store.readDarkMode(), isTrue);
+    expect((await store.readSession())?.profile['fullName'], 'An');
+    expect(await store.readApiUrl(), 'https://api.pawcare.test/api/v1');
+  });
+
   testWidgets('shows PawCare sign in screen', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(
