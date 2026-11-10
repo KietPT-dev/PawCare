@@ -45,7 +45,7 @@ public class BookingWorkflowOutbox {
     public void synchronizePending() {
         if (!properties.isEnabled()) return;
         List<Map<String, Object>> events = db.queryForList(
-                "SELECT id,booking_id,event_type FROM booking_workflow_outbox WHERE status IN ('PENDING','FAILED') AND attempts<20 ORDER BY id LIMIT 25");
+                "SELECT id,booking_id,event_type FROM booking_workflow_outbox WHERE (status IN ('PENDING','FAILED') OR (status='PROCESSING' AND locked_at<DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 5 MINUTE))) AND attempts<20 ORDER BY id LIMIT 25");
         for (Map<String, Object> event : events) synchronizeOne(event);
     }
 
@@ -63,12 +63,15 @@ public class BookingWorkflowOutbox {
         long id = ((Number) event.get("id")).longValue();
         long bookingId = ((Number) event.get("booking_id")).longValue();
         BookingWorkflowEvent type = BookingWorkflowEvent.valueOf(String.valueOf(event.get("event_type")));
+        int claimed = db.update("UPDATE booking_workflow_outbox SET status='PROCESSING',attempts=attempts+1,locked_at=CURRENT_TIMESTAMP "
+                        + "WHERE id=? AND (status IN ('PENDING','FAILED') OR (status='PROCESSING' AND locked_at<DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 5 MINUTE)))", id);
+        if (claimed != 1) return;
         try {
             gateway.synchronize(bookingId, type);
-            db.update("UPDATE booking_workflow_outbox SET status='SENT',attempts=attempts+1,last_error=NULL,processed_at=CURRENT_TIMESTAMP WHERE id=?", id);
+            db.update("UPDATE booking_workflow_outbox SET status='SENT',last_error=NULL,processed_at=CURRENT_TIMESTAMP,locked_at=NULL WHERE id=?", id);
         } catch (Exception error) {
             String message = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
-            db.update("UPDATE booking_workflow_outbox SET status='FAILED',attempts=attempts+1,last_error=? WHERE id=?", abbreviate(message), id);
+            db.update("UPDATE booking_workflow_outbox SET status='FAILED',last_error=?,locked_at=NULL WHERE id=?", abbreviate(message), id);
             log.warn("Bonita workflow sync failed for booking {} event {}: {}", bookingId, type, message);
         }
     }
