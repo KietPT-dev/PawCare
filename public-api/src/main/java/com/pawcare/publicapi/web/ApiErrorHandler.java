@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
 @RestControllerAdvice
@@ -15,6 +16,13 @@ public class ApiErrorHandler {
     ResponseEntity<Map<String, Object>> known(ApiException e) {
         return ResponseEntity.status(e.status()).body(Map.of(
                 "status", e.status(), "error", e.getMessage(), "timestamp", Instant.now().toString()));
+    }
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    ResponseEntity<Map<String, Object>> invalid(MethodArgumentNotValidException e) {
+        String message = e.getBindingResult().getFieldErrors().stream().findFirst()
+                .map(error -> error.getField() + " " + error.getDefaultMessage()).orElse("Invalid request");
+        return ResponseEntity.badRequest().body(Map.of(
+                "status", 400, "error", message, "timestamp", Instant.now().toString()));
     }
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)

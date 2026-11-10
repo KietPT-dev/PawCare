@@ -1,4 +1,8 @@
 package com.pawcare.publicapi.auth;
+import com.pawcare.publicapi.auth.dto.ActionTokenRequest;
+import com.pawcare.publicapi.auth.dto.EmailRequest;
+import com.pawcare.publicapi.auth.dto.PasswordResetRequest;
+import jakarta.validation.Valid;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -12,4 +16,8 @@ public class AuthController {
  @GetMapping("/me") Map<String,Object> me(@CurrentUser CurrentPrincipal p){return auth.me(p);}
  @PutMapping("/me") Map<String,Object> updateMe(@CurrentUser CurrentPrincipal p,@RequestBody Map<String,Object>b){return auth.updateProfile(p,b);}
  @PutMapping("/password") Map<String,Object> changePassword(@CurrentUser CurrentPrincipal p,@RequestBody Map<String,Object>b){return auth.changePassword(p,b);}
+ @PostMapping("/password-reset/request") @ResponseStatus(HttpStatus.ACCEPTED) Map<String,Object> requestPasswordReset(@Valid @RequestBody EmailRequest b){return auth.requestPasswordReset(b.email());}
+ @PostMapping("/password-reset/confirm") Map<String,Object> resetPassword(@Valid @RequestBody PasswordResetRequest b){return auth.resetPassword(b.token(),b.newPassword());}
+ @PostMapping("/email-verification/request") @ResponseStatus(HttpStatus.ACCEPTED) Map<String,Object> requestEmailVerification(@CurrentUser CurrentPrincipal p){return auth.requestEmailVerification(p);}
+ @PostMapping("/email-verification/confirm") Map<String,Object> verifyEmail(@Valid @RequestBody ActionTokenRequest b){return auth.verifyEmail(b.token());}
 }

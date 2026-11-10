@@ -103,6 +103,7 @@ public class AuthService {
     public Map<String, Object> login(Map<String, Object> body) {
         String email = normalizeEmail(req(body, "email"));
         String password = req(body, "password");
+        requireNotRateLimited("LOGIN", email);
 
         Map<String, Object> p = one(
                 "SELECT * FROM user_profiles WHERE email = ? AND is_active = 1",
@@ -112,9 +113,10 @@ public class AuthService {
         if (p == null
                 || p.get("password_hash") == null
                 || !passwords.matches(password, p.get("password_hash").toString())) {
+            recordFailedAttempt("LOGIN", email);
             throw new ApiException(401, "Email or password is incorrect");
         }
-
+        clearAttempts("LOGIN", email);
         return tokenResponse(p);
     }
 
@@ -180,6 +182,40 @@ public class AuthService {
         validatePassword(newPassword);
         db.update("UPDATE user_profiles SET password_hash=?,password_updated_at=CURRENT_TIMESTAMP WHERE id=?", passwords.hash(newPassword), principal.profileId());
         db.update("UPDATE refresh_tokens SET revoked_at=CURRENT_TIMESTAMP WHERE profile_id=? AND revoked_at IS NULL", principal.profileId());
+        return Map.of("success", true);
+    }
+
+    /** Creates a hashed, expiring token. Delivery is delegated to deployment email infrastructure. */
+    @Transactional
+    public Map<String, Object> requestPasswordReset(String rawEmail) {
+        String email = normalizeEmail(rawEmail);
+        requireNotRateLimited("PASSWORD_RESET", email);
+        Map<String, Object> account = one("SELECT id FROM user_profiles WHERE email=? AND is_active=1", email);
+        if (account != null) issueActionToken(((Number) account.get("id")).longValue(), "PASSWORD_RESET");
+        recordAttempt("PASSWORD_RESET", email);
+        // Do not disclose whether an account exists, or return/log the raw token.
+        return Map.of("accepted", true, "message", "If the account exists, reset instructions will be sent.");
+    }
+
+    @Transactional
+    public Map<String, Object> resetPassword(String rawToken, String newPassword) {
+        validatePassword(newPassword);
+        long profileId = consumeActionToken(rawToken, "PASSWORD_RESET");
+        db.update("UPDATE user_profiles SET password_hash=?,password_updated_at=CURRENT_TIMESTAMP WHERE id=?", passwords.hash(newPassword), profileId);
+        db.update("UPDATE refresh_tokens SET revoked_at=CURRENT_TIMESTAMP WHERE profile_id=? AND revoked_at IS NULL", profileId);
+        return Map.of("success", true);
+    }
+
+    @Transactional
+    public Map<String, Object> requestEmailVerification(CurrentPrincipal principal) {
+        issueActionToken(principal.profileId(), "EMAIL_VERIFY");
+        return Map.of("accepted", true, "message", "Verification instructions will be sent.");
+    }
+
+    @Transactional
+    public Map<String, Object> verifyEmail(String rawToken) {
+        long profileId = consumeActionToken(rawToken, "EMAIL_VERIFY");
+        db.update("UPDATE user_profiles SET email_verified=1 WHERE id=?", profileId);
         return Map.of("success", true);
     }
 
@@ -297,5 +333,45 @@ public class AuthService {
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    private void issueActionToken(long profileId, String purpose) {
+        db.update("UPDATE auth_action_tokens SET revoked_at=CURRENT_TIMESTAMP WHERE profile_id=? AND purpose=? AND used_at IS NULL AND revoked_at IS NULL",
+                profileId, purpose);
+        String token = randomToken();
+        db.update("INSERT INTO auth_action_tokens(profile_id,purpose,token_hash,expires_at) VALUES(?,?,?,DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 30 MINUTE))",
+                profileId, purpose, hash(token));
+        // A mail provider must receive `token` here in a production profile.
+        // It is intentionally neither logged nor returned by the HTTP API.
+    }
+
+    private long consumeActionToken(String rawToken, String purpose) {
+        Map<String, Object> row = one("SELECT id,profile_id FROM auth_action_tokens WHERE token_hash=? AND purpose=? AND used_at IS NULL AND revoked_at IS NULL AND expires_at>CURRENT_TIMESTAMP FOR UPDATE",
+                hash(rawToken), purpose);
+        if (row == null) throw new ApiException(400, "Token is invalid or expired");
+        db.update("UPDATE auth_action_tokens SET used_at=CURRENT_TIMESTAMP WHERE id=?", row.get("id"));
+        return ((Number) row.get("profile_id")).longValue();
+    }
+
+    private void requireNotRateLimited(String action, String subject) {
+        Map<String, Object> row = one("SELECT blocked_until FROM auth_rate_limits WHERE action_type=? AND subject_hash=?", action, hash(subject));
+        if (row != null && row.get("blocked_until") instanceof Timestamp blocked && blocked.toInstant().isAfter(Instant.now())) {
+            throw new ApiException(429, "Too many attempts. Try again later.");
+        }
+    }
+
+    private void recordFailedAttempt(String action, String subject) { recordAttempt(action, subject); }
+
+    private void recordAttempt(String action, String subject) {
+        String subjectHash = hash(subject);
+        db.update("INSERT INTO auth_rate_limits(action_type,subject_hash,window_started_at,attempt_count) VALUES(?,?,CURRENT_TIMESTAMP,1) "
+                        + "ON DUPLICATE KEY UPDATE attempt_count=IF(window_started_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 15 MINUTE),1,attempt_count+1),"
+                        + "window_started_at=IF(window_started_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 15 MINUTE),CURRENT_TIMESTAMP,window_started_at),"
+                        + "blocked_until=IF(attempt_count+1>=5,DATE_ADD(CURRENT_TIMESTAMP,INTERVAL 15 MINUTE),blocked_until)",
+                action, subjectHash);
+    }
+
+    private void clearAttempts(String action, String subject) {
+        db.update("DELETE FROM auth_rate_limits WHERE action_type=? AND subject_hash=?", action, hash(subject));
     }
 }

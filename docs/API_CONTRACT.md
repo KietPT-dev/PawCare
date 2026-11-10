@@ -29,6 +29,18 @@ release and payout transactions.
 recognises `PAW<depositId>` inside `content`/`transferContent`; `bank_tran_id`
 is the idempotency key. Never put the token or bank account in client code.
 
+## Account recovery and verification
+
+`POST /api/v1/auth/password-reset/request` accepts `{ "email": "..." }` and
+always returns an accepted response so an attacker cannot enumerate accounts.
+`POST /api/v1/auth/password-reset/confirm` accepts `{ "token": "...",
+"newPassword": "..." }`. Email verification follows the equivalent
+`/email-verification/request` and `/email-verification/confirm` endpoints.
+Tokens are stored only as hashes, expire after 30 minutes, are single-use and
+revoke prior tokens of the same purpose. The deployment still needs an actual
+mail sender to deliver the raw token; PawCare deliberately does not log or
+return it.
+
 ## Frontend responsibilities
 
 - **Mobile customer:** call booking confirmation/dispute only for the logged-in owner.
