@@ -17,7 +17,7 @@
           <cardinalityExpression xmi:type="expression:Expression" xmi:id="_zApIicSAEfGN7ObkAWR64Q" name="" content="" returnType="java.lang.Integer" returnTypeFixed="true"/>
           <iteratorExpression xmi:type="expression:Expression" xmi:id="_zApIisSAEfGN7ObkAWR64Q" name="multiInstanceIterator" content="multiInstanceIterator" type="MULTIINSTANCE_ITERATOR_TYPE" returnType="java.lang.Object" returnTypeFixed="true"/>
           <completionCondition xmi:type="expression:Expression" xmi:id="_zApIi8SAEfGN7ObkAWR64Q" name="" content="" returnType="java.lang.Boolean" returnTypeFixed="true"/>
-          <formMapping xmi:type="process:FormMapping" xmi:id="_zApIjMSAEfGN7ObkAWR64Q">
+          <formMapping xmi:type="process:FormMapping" xmi:id="_zApIjMSAEfGN7ObkAWR64Q" type="NONE">
             <targetForm xmi:type="expression:Expression" xmi:id="_zApIjcSAEfGN7ObkAWR64Q" name="" content="" type="FORM_REFERENCE_TYPE" returnTypeFixed="true"/>
           </formMapping>
           <contract xmi:type="process:Contract" xmi:id="_zApIjsSAEfGN7ObkAWR64Q"/>
@@ -86,7 +86,7 @@
           <cardinalityExpression xmi:type="expression:Expression" xmi:id="_XE2Wk8SBEfGN7ObkAWR64Q" name="" content="" returnType="java.lang.Integer" returnTypeFixed="true"/>
           <iteratorExpression xmi:type="expression:Expression" xmi:id="_XE2WlcSBEfGN7ObkAWR64Q" name="multiInstanceIterator" content="multiInstanceIterator" type="MULTIINSTANCE_ITERATOR_TYPE" returnType="java.lang.Object" returnTypeFixed="true"/>
           <completionCondition xmi:type="expression:Expression" xmi:id="_XE2WlMSBEfGN7ObkAWR64Q" name="" content="" returnType="java.lang.Boolean" returnTypeFixed="true"/>
-          <formMapping xmi:type="process:FormMapping" xmi:id="_gC2zacSBEfGN7ObkAWR64Q">
+          <formMapping xmi:type="process:FormMapping" xmi:id="_gC2zacSBEfGN7ObkAWR64Q" type="NONE">
             <targetForm xmi:type="expression:Expression" xmi:id="_gC2zasSBEfGN7ObkAWR64Q" name="" content="" type="FORM_REFERENCE_TYPE" returnTypeFixed="true"/>
           </formMapping>
           <contract xmi:type="process:Contract" xmi:id="_gC2zaMSBEfGN7ObkAWR64Q"/>
@@ -96,10 +96,10 @@
       <data xmi:type="process:Data" xmi:id="_k7wiIMUoEfGNpPfnnY1kDA" name="approvalDecision" dataType="_zApIrcSAEfGN7ObkAWR64Q">
         <defaultValue xmi:type="expression:Expression" xmi:id="_k7xJMMUoEfGNpPfnnY1kDA" name="PENDING" content="PENDING"/>
       </data>
-      <formMapping xmi:type="process:FormMapping" xmi:id="_zApIkMSAEfGN7ObkAWR64Q">
+      <formMapping xmi:type="process:FormMapping" xmi:id="_zApIkMSAEfGN7ObkAWR64Q" type="NONE">
         <targetForm xmi:type="expression:Expression" xmi:id="_zApIkcSAEfGN7ObkAWR64Q" name="" content="" type="FORM_REFERENCE_TYPE" returnTypeFixed="true"/>
       </formMapping>
-      <overviewFormMapping xmi:type="process:FormMapping" xmi:id="_zApIksSAEfGN7ObkAWR64Q">
+      <overviewFormMapping xmi:type="process:FormMapping" xmi:id="_zApIksSAEfGN7ObkAWR64Q" type="NONE">
         <targetForm xmi:type="expression:Expression" xmi:id="_zApIk8SAEfGN7ObkAWR64Q" name="" content="" type="FORM_REFERENCE_TYPE" returnTypeFixed="true"/>
       </overviewFormMapping>
       <connections xmi:type="process:SequenceFlow" xmi:id="_zApIlMSAEfGN7ObkAWR64Q" target="_zApIg8SAEfGN7ObkAWR64Q" source="_zAohccSAEfGN7ObkAWR64Q">
