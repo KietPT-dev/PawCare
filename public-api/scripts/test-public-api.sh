@@ -58,4 +58,4 @@ print "Customer email: $EMAIL"
 print "Customer password: $PASSWORD"
 print "Pet ID: $PET_ID"
 print "Access token: $TOKEN"
-print 'Continue with docs/DEMO_TEST.md section 3 to test booking, MT6 availability and VNPAY.'
+print 'Continue with docs/DEMO_TEST.md to test booking, availability, wallet escrow and SePay webhook handling.'

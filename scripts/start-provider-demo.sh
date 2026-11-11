@@ -17,7 +17,6 @@ if [ -z "${PAWCARE_JWT_SECRET:-}" ]; then
   export PAWCARE_JWT_SECRET="$(tr -d '\n' < "$SECRET_FILE")"
 fi
 export PAWCARE_JWT_ISSUER="${PAWCARE_JWT_ISSUER:-pawcare-public-api}"
-export VNPAY_ENABLED="${VNPAY_ENABLED:-false}"
 
 if [ ! -f "$JAR" ] || find "$API_DIR/src" -type f -newer "$JAR" -print -quit | grep -q .; then
   echo 'Building Public API...'

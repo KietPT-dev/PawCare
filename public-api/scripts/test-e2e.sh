@@ -1,9 +1,11 @@
 #!/usr/bin/env zsh
-# Requires: Public API running, mysql CLI, PAWCARE_DB_USERNAME/PASSWORD.
+# Requires: Public API running, mysql CLI, PAWCARE_DB_USERNAME/PASSWORD and
+# PAWCARE_WALLET_WEBHOOK_TOKEN. Creates demo records only.
 # Creates demo records prefixed AUTO-E2E and does not touch Bonita records.
 set -euo pipefail
 : "${PAWCARE_DB_USERNAME:?Set database username}"
 : "${PAWCARE_DB_PASSWORD:?Set database password}"
+: "${PAWCARE_WALLET_WEBHOOK_TOKEN:?Set the local webhook token}"
 [[ "${PAWCARE_E2E_ALLOW_DB_SETUP:-}" == true ]] || { print -u2 'Set PAWCARE_E2E_ALLOW_DB_SETUP=true'; exit 2; }
 BASE="${PAWCARE_API_URL:-http://localhost:8081/api/v1}"; STAMP="$(date +%s)"; PASS='AutoE2Epass123'
 CEMAIL="auto-e2e-customer-${STAMP}@pawcare.test"; PEMAIL="auto-e2e-provider-${STAMP}@pawcare.test"
@@ -31,11 +33,17 @@ BEFORE=$(call 200 "$BASE/availability/providers/$PID?serviceId=$SID&bookingStart
 call 200 "$BASE/recommendations?petId=$PETID&bookingStart=$TIME" -H "Authorization: Bearer $CT" >/dev/null
 ok 'Customer JWT, pet and MT6 recommendation/availability'
 
-B=$(call 200 -X POST "$BASE/bookings" -H "Authorization: Bearer $CT" -H 'Content-Type: application/json' -d "{\"petId\":$PETID,\"providerId\":$PID,\"serviceId\":$SID,\"staffId\":$TID,\"bookingStart\":\"$TIME\"}")
+B=$(call 200 -X POST "$BASE/bookings" -H "Authorization: Bearer $CT" -H 'Content-Type: application/json' -d "{\"petId\":$PETID,\"providerId\":$PID,\"serviceId\":$SID,\"staffId\":$TID,\"bookingStart\":\"$TIME\",\"paymentMethod\":\"VIETQR\"}")
 BID=$(print -r -- "$B"|field "['id']"); AFTER=$(call 200 "$BASE/availability/providers/$PID?serviceId=$SID&bookingStart=$TIME"); [[ $(print -r -- "$AFTER"|field "['available']") == False ]] || { print -u2 'Booked staff must be unavailable'; exit 1; }
-ok 'Booking and overlap prevention'
-for X in CONFIRMED CHECKED_IN IN_SERVICE COMPLETED; do call 200 -X PUT "$BASE/bookings/$BID/status" -H "Authorization: Bearer $PT" -H 'Content-Type: application/json' -d "{\"status\":\"$X\"}" >/dev/null; done
+PCODE=$(print -r -- "$B"|field "['payment']['paymentCode']")
+TX="AUTO-E2E-$STAMP"
+call 200 -X POST "$BASE/payments/webhook" -H "Authorization: Apikey $PAWCARE_WALLET_WEBHOOK_TOKEN" -H 'Content-Type: application/json' -d "{\"referenceCode\":\"$TX\",\"transferAmount\":150000,\"content\":\"$PCODE\"}" >/dev/null
+# Duplicate delivery must not create a second deposit/hold.
+call 200 -X POST "$BASE/payments/webhook" -H "Authorization: Bearer $PAWCARE_WALLET_WEBHOOK_TOKEN" -H 'Content-Type: application/json' -d "{\"referenceCode\":\"$TX\",\"transferAmount\":150000,\"content\":\"$PCODE\"}" >/dev/null
+ok 'VietQR webhook escrow hold and duplicate protection'
+for X in CONFIRMED CHECKED_IN IN_SERVICE; do call 200 -X PUT "$BASE/bookings/$BID/status" -H "Authorization: Bearer $PT" -H 'Content-Type: application/json' -d "{\"status\":\"$X\"}" >/dev/null; done
+call 200 -X PUT "$BASE/bookings/$BID/status" -H "Authorization: Bearer $PT" -H 'Content-Type: application/json' -d '{"status":"SERVICE_DONE","providerNote":"AUTO-E2E service done"}' >/dev/null
+call 200 -X POST "$BASE/bookings/$BID/confirm-completion" -H "Authorization: Bearer $CT" -H 'Content-Type: application/json' -d '{"note":"AUTO-E2E confirmed"}' >/dev/null
 call 200 -X POST "$BASE/reviews" -H "Authorization: Bearer $CT" -H 'Content-Type: application/json' -d "{\"bookingId\":$BID,\"rating\":5,\"comment\":\"AUTO-E2E\"}" >/dev/null
-call 503 -X POST "$BASE/payments/vnpay/create" -H "Authorization: Bearer $CT" -H 'Content-Type: application/json' -d "{\"bookingId\":$BID}" >/dev/null
-ok 'Booking lifecycle, review, and safe VNPAY-disabled behavior'
-print 'E2E PASS — all public API tests excluding real VNPAY callback and Bonita UI approval.'
+ok 'Two-party booking completion, payout and review'
+print 'E2E PASS — Public API wallet/escrow flow. Bonita UI approval remains a manual check.'

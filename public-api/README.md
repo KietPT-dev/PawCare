@@ -1,19 +1,39 @@
 # PawCare Public API
 
-This service is the public API for Customer and Provider accounts. Bonita remains the Admin/BPMN back-office.
+Spring Boot API used by the PawCare mobile customer app, Provider portal and Bonita Admin portal.
 
-## First run
+## Start locally
 
-1. Execute `../database/003_public_auth_and_vnpay.sql` in DBeaver.
-2. Set the values in `.env.example` in your shell environment. Never put real secrets in Git.
-3. Start with `mvn spring-boot:run`.
-4. Register with `POST /api/v1/auth/register`:
-   `{ "fullName":"Nguyen Van A", "email":"a@example.test", "password":"Password123", "role":"CUSTOMER" }`
-5. Login with `POST /api/v1/auth/login` and send `Authorization: Bearer <accessToken>` to create a payment:
-   `POST /api/v1/payments/vnpay/create` with `{ "bookingId": 1 }`.
+1. Apply only **new, unapplied** SQL files from `../database/` in numeric order. Do not modify or blindly rerun historical migrations that have already changed a shared database.
+2. Configure MySQL and secrets outside Git. At minimum set database credentials, `PAWCARE_JWT_SECRET`, `PAWCARE_WALLET_WEBHOOK_TOKEN` and the VietQR receiving-account configuration.
+3. Start from the workspace root:
 
-## VNPAY Sandbox
+   ```sh
+   ./scripts/start-public-api.sh
+   ```
 
-The app refuses payment creation until VNPAY settings are configured. `/ipn` is public by design, but verifies HMAC-SHA512 signature, transaction reference, amount, and idempotent final state before updating MySQL.
+   The API listens on `http://127.0.0.1:8081` by default. Confirm it with:
 
-For local testing, expose port 8081 using a temporary HTTPS tunnel and register that public URL as VNPAY Return/IPN URL. Do not use localhost for IPN.
+   ```sh
+   curl http://127.0.0.1:8081/api/v1/health
+   ```
+
+4. Run the backend tests with:
+
+   ```sh
+   mvn -f public-api/pom.xml test
+   ```
+
+## Payments
+
+PawCare uses the internal wallet/escrow ledger, VietQR deposit records and a SePay-compatible webhook. VNPAY is no longer part of the active integration.
+
+The webhook accepts `Authorization: Apikey <token>` or `Authorization: Bearer <token>` (or the legacy internal token header), matches a payment code such as `PAW123`, and deduplicates on the bank transaction identifier. Never commit a webhook token or real bank details.
+
+## API references
+
+- [API contract](../docs/API_CONTRACT.md)
+- [Wallet and escrow flow](docs/WALLET_ESCROW.md)
+- [Bonita booking orchestration](docs/BONITA_BOOKING_ORCHESTRATION.md)
+- [Automated test notes](docs/AUTOMATED_TESTING.md)
+

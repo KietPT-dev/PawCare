@@ -20,13 +20,6 @@ pawcare:
     secret: ${PAWCARE_JWT_SECRET:CHANGE_ME_GENERATE_A_RANDOM_BASE64_SECRET_AT_LEAST_32_BYTES}
     access-token-minutes: ${PAWCARE_ACCESS_TOKEN_MINUTES:15}
     refresh-token-days: ${PAWCARE_REFRESH_TOKEN_DAYS:30}
-  vnpay:
-    enabled: ${VNPAY_ENABLED:false}
-    tmn-code: ${VNPAY_TMN_CODE:}
-    hash-secret: ${VNPAY_HASH_SECRET:}
-    payment-url: ${VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-    return-url: ${VNPAY_RETURN_URL:https://replace-me.example.com/api/v1/payments/vnpay/return}
-    ipn-url: ${VNPAY_IPN_URL:https://replace-me.example.com/api/v1/payments/vnpay/ipn}
   wallet:
     # SePay sends Authorization: Apikey <token> (or Bearer <token>). This
     # local fallback prevents a blank token; production must override it with

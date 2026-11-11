@@ -28,7 +28,6 @@ if [ -z "${PAWCARE_JWT_SECRET:-}" ]; then
   export PAWCARE_JWT_SECRET="$(tr -d '\n' < "$SECRET_FILE")"
 fi
 export PAWCARE_JWT_ISSUER="${PAWCARE_JWT_ISSUER:-pawcare-public-api}"
-export VNPAY_ENABLED="${VNPAY_ENABLED:-false}"
 
 echo 'Starting PawCare Public API at http://127.0.0.1:8081/api/v1 ...'
 cd "$API_DIR"

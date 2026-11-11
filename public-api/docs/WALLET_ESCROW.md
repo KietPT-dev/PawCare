@@ -2,8 +2,8 @@
 
 ## Run order
 
-Run `database/005_wallet_escrow_ledger.sql` then `database/006_wallet_topups.sql`
-once after migrations `001` to `004`.
+Apply only the next unapplied migration from `database/` in numeric order. Do not
+edit or rerun an earlier migration merely because it appears in this document.
 All balance writes use InnoDB row locks and Spring transactions. Never edit a
 wallet balance directly; use the public API/service so an immutable
 `wallet_transactions` record is written with the change.
@@ -41,17 +41,21 @@ generated VietQR image URL but never receives the webhook secret.
   and leaves booking in `PENDING_PAYMENT` until the webhook succeeds.
 
 Provider booking lists exclude unpaid `PENDING_PAYMENT` rows. Once escrow is
-held, a provider can use the normal lifecycle:
-`PENDING_APPROVAL -> CONFIRMED -> CHECKED_IN -> IN_SERVICE -> COMPLETED`.
+held, the lifecycle is:
+`PENDING_APPROVAL -> CONFIRMED -> CHECKED_IN -> IN_SERVICE -> SERVICE_DONE`.
+Only the Customer can then choose `SERVICE_DONE -> COMPLETED` (settlement) or
+`SERVICE_DONE -> DISPUTED` (Admin resolution).
 
-Reject/cancel releases escrow. Completion pays 90% to provider and credits 10%
-to the platform wallet. The scheduled expiry task cancels/release funded bookings
-whose appointment has passed while still awaiting provider approval.
+Reject/cancel releases escrow. Customer-confirmed completion pays 90% to provider
+and credits 10% to the platform wallet. The scheduled expiry task cancels/releases
+funded bookings whose appointment has passed while still awaiting provider approval.
 
 ## Webhook
 
 `POST /api/payments/webhook` (also available at `/api/v1/payments/webhook`)
-requires `X-PawCare-Webhook-Token`. The normaliser accepts common SePay/PayOS
+accepts `Authorization: Apikey <token>` or `Authorization: Bearer <token>`;
+the legacy `X-PawCare-Webhook-Token` header remains available for trusted internal
+relays. The normaliser accepts common SePay/PayOS
 names: transaction id (`id`, `transaction_id`, `referenceCode`), transfer
 content (`content`, `description`, `orderCode`) and amount (`amount`,
 `transferAmount`). The content must include `PAW{id}`.
