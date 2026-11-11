@@ -82,7 +82,7 @@ public class RestBonitaBookingGateway implements BonitaBookingGateway {
                 putVariable(session, caseId, "customerDecision", "CONFIRM");
                 completeNamedTask(session, caseId, "Xác nhận hoàn tất", true);
             }
-            case CUSTOMER_DISPUTED -> {
+            case CUSTOMER_DISPUTED, SYSTEM_REVIEW -> {
                 putVariable(session, caseId, "customerDecision", "DISPUTE");
                 completeNamedTask(session, caseId, "Xác nhận hoàn tất", true);
             }

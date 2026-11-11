@@ -45,7 +45,7 @@ public class BookingWorkflowOutbox {
     public void synchronizePending() {
         if (!properties.isEnabled()) return;
         List<Map<String, Object>> events = db.queryForList(
-                "SELECT id,booking_id,event_type FROM booking_workflow_outbox WHERE (status IN ('PENDING','FAILED') OR (status='PROCESSING' AND locked_at<DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 5 MINUTE))) AND attempts<20 ORDER BY id LIMIT 25");
+                "SELECT o.id,o.booking_id,o.event_type,b.bonita_case_id FROM booking_workflow_outbox o LEFT JOIN bookings b ON b.id=o.booking_id WHERE (o.status IN ('PENDING','FAILED') OR (o.status='PROCESSING' AND o.locked_at<DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 5 MINUTE))) AND o.attempts<20 ORDER BY o.id LIMIT 25");
         for (Map<String, Object> event : events) synchronizeOne(event);
     }
 
@@ -53,7 +53,7 @@ public class BookingWorkflowOutbox {
     public void synchronizeNow(long bookingId) {
         if (!properties.isEnabled()) return;
         for (Map<String, Object> event : db.queryForList(
-                "SELECT id,booking_id,event_type FROM booking_workflow_outbox WHERE booking_id=? AND status IN ('PENDING','FAILED') ORDER BY id", bookingId)) {
+                "SELECT o.id,o.booking_id,o.event_type,b.bonita_case_id FROM booking_workflow_outbox o LEFT JOIN bookings b ON b.id=o.booking_id WHERE o.booking_id=? AND o.status IN ('PENDING','FAILED') ORDER BY o.id", bookingId)) {
             synchronizeOne(event);
         }
     }
@@ -62,6 +62,7 @@ public class BookingWorkflowOutbox {
     protected void synchronizeOne(Map<String, Object> event) {
         long id = ((Number) event.get("id")).longValue();
         long bookingId = ((Number) event.get("booking_id")).longValue();
+        Object caseId = event.get("bonita_case_id");
         BookingWorkflowEvent type = BookingWorkflowEvent.valueOf(String.valueOf(event.get("event_type")));
         int claimed = db.update("UPDATE booking_workflow_outbox SET status='PROCESSING',attempts=attempts+1,locked_at=CURRENT_TIMESTAMP "
                         + "WHERE id=? AND (status IN ('PENDING','FAILED') OR (status='PROCESSING' AND locked_at<DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 5 MINUTE)))", id);
@@ -69,10 +70,11 @@ public class BookingWorkflowOutbox {
         try {
             gateway.synchronize(bookingId, type);
             db.update("UPDATE booking_workflow_outbox SET status='SENT',last_error=NULL,processed_at=CURRENT_TIMESTAMP,locked_at=NULL WHERE id=?", id);
+            log.info("Bonita workflow sync sent bookingId={} event={} caseId={}", bookingId, type, caseId);
         } catch (Exception error) {
             String message = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
             db.update("UPDATE booking_workflow_outbox SET status='FAILED',last_error=?,locked_at=NULL WHERE id=?", abbreviate(message), id);
-            log.warn("Bonita workflow sync failed for booking {} event {}: {}", bookingId, type, message);
+            log.warn("Bonita workflow sync failed bookingId={} event={} caseId={}: {}", bookingId, type, caseId, message);
         }
     }
 

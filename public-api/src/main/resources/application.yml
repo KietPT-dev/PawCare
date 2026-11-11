@@ -31,6 +31,12 @@ pawcare:
       bank-code: ${PAWCARE_VIETQR_BANK_CODE:}
       account-no: ${PAWCARE_VIETQR_ACCOUNT_NO:}
       account-name: ${PAWCARE_VIETQR_ACCOUNT_NAME:PawCare}
+  booking:
+    # A provider can only report SERVICE_DONE. Funds remain locked until the
+    # customer confirms, or the SLA hands the case to an administrator.
+    service-done-confirmation-hours: ${PAWCARE_SERVICE_DONE_CONFIRMATION_HOURS:72}
+    service-done-reminder-hours-before: ${PAWCARE_SERVICE_DONE_REMINDER_HOURS_BEFORE:24}
+    service-done-check-ms: ${PAWCARE_SERVICE_DONE_CHECK_MS:900000}
   bonita:
     workflow:
       # Keep false until BookingService v2 is deployed and the technical

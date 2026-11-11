@@ -126,6 +126,26 @@ class BookingWorkflowServiceTest {
         verifyNoInteractions(wallets);
     }
 
+    @Test
+    void serviceDoneTimeoutMovesToSystemReviewWithoutPayout() {
+        when(db.queryForList(anyString(), any(Object[].class))).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0, String.class);
+            if (sql.startsWith("SELECT * FROM bookings")) return List.of(booking("SERVICE_DONE"));
+            if (sql.startsWith("SELECT owner_profile_id FROM providers")) return List.of(Map.of("owner_profile_id", 22L));
+            if (sql.startsWith("SELECT id FROM user_profiles")) return List.of(Map.of("id", 3L));
+            return List.of();
+        });
+
+        workflow.moveToSystemReview(77L);
+
+        verify(db).update(startsWith("UPDATE bookings SET status='SYSTEM_REVIEW'"), any(Object[].class));
+        verify(wallets, never()).settleCompletedBooking(anyLong());
+        verify(wallets, never()).releaseEscrowForBooking(anyLong(), anyString());
+        verify(outbox).enqueue(eq(77L), eq(com.pawcare.publicapi.bonita.BookingWorkflowEvent.SYSTEM_REVIEW), any());
+        verify(notifications, times(3)).notifyOnce(anyLong(), anyString(), anyString(), eq("BOOKING_SYSTEM_REVIEW"),
+                eq("BOOKING"), eq(77L), anyString());
+    }
+
     private static CurrentPrincipal provider() { return new CurrentPrincipal(22L, "PROVIDER", "provider@pawcare.test"); }
     private static CurrentPrincipal customer() { return new CurrentPrincipal(11L, "CUSTOMER", "customer@pawcare.test"); }
     private static CurrentPrincipal admin() { return new CurrentPrincipal(3L, "ADMIN", "admin@pawcare.test"); }
