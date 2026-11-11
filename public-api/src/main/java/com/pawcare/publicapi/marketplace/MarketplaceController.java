@@ -198,6 +198,12 @@ public class MarketplaceController {
         if(!(customer||provider)||!transition(current,next))throw new ApiException(403,"Booking status change is not allowed");
         db.update("UPDATE bookings SET status=?,cancel_reason=CASE WHEN ?='CANCELLED' THEN ? ELSE cancel_reason END,provider_note=COALESCE(?,provider_note) WHERE id=?",next,next,request.cancelReason(),request.providerNote(),id);
         db.update("INSERT INTO booking_status_history(booking_id,previous_status,new_status,changed_by_profile_id,note) VALUES(?,?,?,?,?)",id,current,next,p.profileId(),request.note());
+        // A cancelled, unpaid booking must not remain an open payment target.
+        // This also makes a delayed bank webhook harmless and auditable: the
+        // webhook will see a cancelled deposit/booking and cannot create escrow.
+        if ("CANCELLED".equals(next) && "PENDING_PAYMENT".equals(current)) {
+            db.update("UPDATE payment_deposits SET status='CANCELLED' WHERE booking_id=? AND status='CREATED'", id);
+        }
         if (!customer) {
             db.update("INSERT INTO notifications(recipient_profile_id,title,content,notification_type,reference_type,reference_id) VALUES(?,?,?,?,?,?)",
                 booking.get("customer_profile_id"),
@@ -319,6 +325,7 @@ public class MarketplaceController {
     private Boolean bool(Map<String,Object>b,String k){return b.get(k)==null?null:Boolean.valueOf(String.valueOf(b.get(k)));}
     private String or(String a,String b){return a==null||a.isBlank()?b:a;}
     private boolean transition(String from,String to){return Map.of(
+        "PENDING_PAYMENT",List.of("CANCELLED"),
         "PENDING_APPROVAL",List.of("CONFIRMED","REJECTED","CANCELLED"),
         "PENDING",List.of("CONFIRMED","REJECTED","CANCELLED"),
         "CONFIRMED",List.of("CHECKED_IN","CANCELLED"),
