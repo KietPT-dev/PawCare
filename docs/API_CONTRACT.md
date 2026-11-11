@@ -22,6 +22,42 @@ Provider rejection, customer cancellation and expiry call the same escrow releas
 operation. Repeated requests are safe because the ledger checks existing hold,
 release and payout transactions.
 
+### SERVICE_DONE confirmation SLA
+
+`SERVICE_DONE` is never paid automatically. The configured confirmation window
+is `PAWCARE_SERVICE_DONE_CONFIRMATION_HOURS` (default: `72`). A scheduler sends
+one deduplicated reminder during the final
+`PAWCARE_SERVICE_DONE_REMINDER_HOURS_BEFORE` hours (default: `24`). At expiry,
+the booking becomes `SYSTEM_REVIEW`; escrow remains locked and an Admin must
+choose the existing refund or provider-release decision. Every timeout writes a
+status-history row, audit event, notifications, and a Bonita outbox event.
+
+## Wallet withdrawal lifecycle
+
+| Transition | Effect on provider wallet |
+| --- | --- |
+| `PENDING -> APPROVED` | Administrative approval only; amount stays locked. |
+| `APPROVED -> PROCESSING` | Creates a local/manual payout reference; no bank call is made. |
+| `PROCESSING -> PAID` | Decreases locked balance and records `WITHDRAWAL`. |
+| `PENDING -> REJECTED` or `PROCESSING -> FAILED` | Returns the locked amount to available balance. |
+
+Use `PUT /api/v1/admin/withdrawals/{id}` with a validated body such as
+`{ "status": "APPROVED", "adminNote": "..." }`. `PAID` must be used only
+after a real-world payout reconciliation. The bundled payout adapter is local
+and deliberately cannot contact a bank.
+
+## Reporting
+
+- `GET /api/v1/provider/reports?from=YYYY-MM-DD&to=YYYY-MM-DD&timezone=Asia/Ho_Chi_Minh&granularity=DAY&page=0&size=50`
+- `GET /api/v1/admin/reports/finance` with the same filters returns GMV, fee,
+  escrow, payout/withdrawal totals, booking status counts, ledger page, and a
+  `series` suitable for charts.
+- `GET /api/v1/admin/reports/finance.csv` exports the filtered Admin booking
+  summary. All API timestamps are formatted strings, never Java date objects.
+
+The deployment database is configured in `Asia/Ho_Chi_Minh`; clients must send
+an IANA timezone name so the requested reporting context is explicit.
+
 ## Payments
 
 `POST /api/v1/payments/webhook` accepts SePay/PayOS-shaped JSON. Send

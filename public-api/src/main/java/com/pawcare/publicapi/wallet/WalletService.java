@@ -6,6 +6,8 @@ import com.pawcare.publicapi.bonita.BookingWorkflowOutbox;
 import com.pawcare.publicapi.wallet.dto.TopUpRequest;
 import com.pawcare.publicapi.wallet.dto.WithdrawRequest;
 import com.pawcare.publicapi.wallet.dto.WithdrawalDecisionRequest;
+import com.pawcare.publicapi.wallet.payout.LocalManualPayoutProvider;
+import com.pawcare.publicapi.wallet.payout.PayoutProvider;
 import com.pawcare.publicapi.web.ApiException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -16,6 +18,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -43,8 +46,10 @@ public class WalletService {
     private final String qrBank;
     private final String qrAccount;
     private final String qrAccountName;
+    private final PayoutProvider payoutProvider;
 
-    public WalletService(JdbcTemplate db, BookingWorkflowOutbox workflowOutbox,
+    @Autowired
+    public WalletService(JdbcTemplate db, BookingWorkflowOutbox workflowOutbox, PayoutProvider payoutProvider,
             @Value("${pawcare.wallet.webhook-token:}") String webhookToken,
             @Value("${pawcare.wallet.vietqr.bank-code:}") String qrBank,
             @Value("${pawcare.wallet.vietqr.account-no:}") String qrAccount,
@@ -55,6 +60,16 @@ public class WalletService {
         this.qrBank = qrBank;
         this.qrAccount = qrAccount;
         this.qrAccountName = qrAccountName;
+        this.payoutProvider = payoutProvider;
+    }
+
+    /**
+     * Kept for focused unit tests and local integrations that do not bootstrap
+     * Spring. Production always injects the explicit payout adapter above.
+     */
+    public WalletService(JdbcTemplate db, BookingWorkflowOutbox workflowOutbox,
+            String webhookToken, String qrBank, String qrAccount, String qrAccountName) {
+        this(db, workflowOutbox, new LocalManualPayoutProvider(), webhookToken, qrBank, qrAccount, qrAccountName);
     }
 
     /** Called inside booking creation's transaction. */
@@ -267,6 +282,7 @@ public class WalletService {
 
     @Transactional
     public Map<String, Object> requestWithdrawal(CurrentPrincipal principal, WithdrawRequest request) {
+        requireProvider(principal);
         validateWithdraw(request);
         Map<String, Object> wallet = lockWallet(ownerType(principal), ownerId(principal));
         BigDecimal amount = money(request.amount());
@@ -290,36 +306,60 @@ public class WalletService {
     public Map<String, Object> decideWithdrawal(CurrentPrincipal principal, long id, WithdrawalDecisionRequest request) {
         requireAdmin(principal);
         String decision = clean(request.status()).toUpperCase(Locale.ROOT);
-        if (!List.of("APPROVED", "REJECTED").contains(decision)) throw new ApiException(400, "status must be APPROVED or REJECTED");
+        if (!List.of("APPROVED", "REJECTED", "PROCESSING", "PAID", "FAILED").contains(decision)) throw new ApiException(400, "Unsupported withdrawal status");
         Map<String, Object> withdrawal = one("SELECT * FROM withdrawal_requests WHERE id=? FOR UPDATE", id);
         if (withdrawal == null) throw new ApiException(404, "Withdrawal request not found");
-        if (!"PENDING".equals(withdrawal.get("status"))) throw new ApiException(409, "Withdrawal request has already been decided");
+        String current = String.valueOf(withdrawal.get("status"));
         Map<String, Object> wallet = lockWalletById(((Number) withdrawal.get("wallet_id")).longValue());
         BigDecimal amount = money((BigDecimal) withdrawal.get("amount"));
         BigDecimal locked = money((BigDecimal) wallet.get("locked_balance"));
         if (locked.compareTo(amount) < 0) throw new IllegalStateException("Withdrawal ledger is inconsistent for request " + id);
-        if ("APPROVED".equals(decision)) {
-            db.update("UPDATE wallets SET locked_balance=? WHERE id=?", locked.subtract(amount), wallet.get("id"));
-            transaction(wallet, null, "WITHDRAWAL", amount.negate(), locked, locked.subtract(amount), "Withdrawal approved and paid out, request #" + id);
-        } else {
+        if ("APPROVED".equals(decision) && "PENDING".equals(current)) {
+            db.update("UPDATE withdrawal_requests SET status='APPROVED',admin_note=?,reviewed_by_profile_id=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=?", clean(request.adminNote()), principal.profileId(), id);
+            auditWithdrawal(principal.profileId(), id, amount, decision);
+            notifyWithdrawal(wallet, id, "Yêu cầu rút tiền #" + id + " đã được duyệt và đang chờ xử lý thủ công.");
+        } else if ("REJECTED".equals(decision) && "PENDING".equals(current)) {
             BigDecimal available = money((BigDecimal) wallet.get("available_balance"));
             db.update("UPDATE wallets SET locked_balance=?,available_balance=? WHERE id=?", locked.subtract(amount), available.add(amount), wallet.get("id"));
             transaction(wallet, null, "WITHDRAWAL", amount, available, available.add(amount), "Withdrawal rejected; amount returned, request #" + id);
+            db.update("UPDATE withdrawal_requests SET status='REJECTED',admin_note=?,reviewed_by_profile_id=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=?", clean(request.adminNote()), principal.profileId(), id);
+            auditWithdrawal(principal.profileId(), id, amount, decision);
+            notifyWithdrawal(wallet, id, "Yêu cầu rút tiền #" + id + " bị từ chối; số dư đã được hoàn lại vào ví.");
+        } else if ("PROCESSING".equals(decision) && "APPROVED".equals(current)) {
+            PayoutProvider.PayoutSubmission submitted = payoutProvider.submit(new PayoutProvider.PayoutInstruction(id, amount));
+            db.update("UPDATE withdrawal_requests SET status='PROCESSING',payout_reference=?,processing_at=CURRENT_TIMESTAMP,admin_note=COALESCE(?,admin_note) WHERE id=?", submitted.reference(), clean(request.adminNote()), id);
+            auditWithdrawal(principal.profileId(), id, amount, decision);
+            notifyWithdrawal(wallet, id, "Yêu cầu rút tiền #" + id + " đang chờ đối soát thủ công.");
+        } else if ("PAID".equals(decision) && "PROCESSING".equals(current)) {
+            db.update("UPDATE wallets SET locked_balance=? WHERE id=?", locked.subtract(amount), wallet.get("id"));
+            transaction(wallet, null, "WITHDRAWAL", amount.negate(), locked, locked.subtract(amount), "Withdrawal marked paid after manual reconciliation, request #" + id);
+            db.update("UPDATE withdrawal_requests SET status='PAID',payout_reference=COALESCE(?,payout_reference),paid_at=CURRENT_TIMESTAMP WHERE id=?", clean(request.payoutReference()), id);
+            auditWithdrawal(principal.profileId(), id, amount, decision);
+            notifyWithdrawal(wallet, id, "Yêu cầu rút tiền #" + id + " đã được đánh dấu đã chi trả.");
+        } else if ("FAILED".equals(decision) && "PROCESSING".equals(current)) {
+            BigDecimal available = money((BigDecimal) wallet.get("available_balance"));
+            db.update("UPDATE wallets SET locked_balance=?,available_balance=? WHERE id=?", locked.subtract(amount), available.add(amount), wallet.get("id"));
+            transaction(wallet, null, "WITHDRAWAL", amount, available, available.add(amount), "Withdrawal failed; amount returned, request #" + id);
+            db.update("UPDATE withdrawal_requests SET status='FAILED',payout_reference=COALESCE(?,payout_reference),failed_at=CURRENT_TIMESTAMP,admin_note=COALESCE(?,admin_note) WHERE id=?", clean(request.payoutReference()), clean(request.adminNote()), id);
+            auditWithdrawal(principal.profileId(), id, amount, decision);
+            notifyWithdrawal(wallet, id, "Yêu cầu rút tiền #" + id + " không thành công; số dư đã được hoàn lại vào ví.");
+        } else {
+            throw new ApiException(409, "Invalid withdrawal transition from " + current + " to " + decision);
         }
-        db.update("UPDATE withdrawal_requests SET status=?,admin_note=?,reviewed_by_profile_id=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=?",
-                decision, clean(request.adminNote()), principal.profileId(), id);
+        return Map.of("success", true, "id", id, "status", decision);
+    }
+
+    private void auditWithdrawal(long actor, long id, BigDecimal amount, String decision) {
         db.update("INSERT INTO audit_logs(actor_profile_id,action_type,entity_type,entity_id,details_json) VALUES(?,?,?, ?,CAST(? AS JSON))",
-                principal.profileId(), "WITHDRAWAL_" + decision, "WITHDRAWAL", id,
+                actor, "WITHDRAWAL_" + decision, "WITHDRAWAL", id,
                 "{\"amount\":\"" + amount.toPlainString() + "\",\"decision\":\"" + decision + "\"}");
+    }
+    private void notifyWithdrawal(Map<String,Object> wallet, long id, String message) {
         Long ownerProfile = walletOwnerProfile(wallet);
         if (ownerProfile != null) {
-            String message = "APPROVED".equals(decision)
-                    ? "Yêu cầu rút tiền #" + id + " đã được duyệt. Hệ thống đã ghi nhận khoản chi trả."
-                    : "Yêu cầu rút tiền #" + id + " bị từ chối; số dư đã được hoàn lại vào ví.";
             db.update("INSERT INTO notifications(recipient_profile_id,title,content,notification_type,reference_type,reference_id) VALUES(?,?,?,?,?,?)",
                     ownerProfile, "Cập nhật yêu cầu rút tiền", message, "WITHDRAWAL", "WITHDRAWAL", id);
         }
-        return Map.of("success", true, "id", id, "status", decision);
     }
 
     /** Releases bookings that never reached provider approval before their appointment. */
@@ -340,8 +380,8 @@ public class WalletService {
         Map<String, Object> booking = one("SELECT * FROM bookings WHERE id=? FOR UPDATE", bookingId);
         if (booking == null || !"PENDING_APPROVAL".equals(booking.get("status"))) return;
         releaseEscrowForBooking(bookingId, "booking expired before provider approval");
-        db.update("UPDATE bookings SET status='CANCELLED',cancel_reason='Expired before provider approval' WHERE id=?", bookingId);
-        db.update("INSERT INTO booking_status_history(booking_id,previous_status,new_status,note) VALUES(?,?,?,?)", bookingId, "PENDING_APPROVAL", "CANCELLED", "Escrow released automatically after expiry");
+        db.update("UPDATE bookings SET status='EXPIRED',cancel_reason='Expired before provider approval' WHERE id=?", bookingId);
+        db.update("INSERT INTO booking_status_history(booking_id,previous_status,new_status,note) VALUES(?,?,?,?)", bookingId, "PENDING_APPROVAL", "EXPIRED", "Escrow released automatically after expiry");
         workflowOutbox.enqueue(bookingId, BookingWorkflowEvent.EXPIRED, Map.of("reason", "approval deadline expired"));
     }
 
