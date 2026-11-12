@@ -5,12 +5,15 @@ import com.pawcare.publicapi.auth.CurrentUser;
 import com.pawcare.publicapi.bonita.BookingWorkflowEvent;
 import com.pawcare.publicapi.bonita.BookingWorkflowOutbox;
 import com.pawcare.publicapi.marketplace.dto.BookingStatusRequest;
+import com.pawcare.publicapi.marketplace.dto.CreateBookingRequest;
 import com.pawcare.publicapi.marketplace.dto.DisputeRequest;
 import com.pawcare.publicapi.marketplace.dto.ReviewReplyRequest;
 import com.pawcare.publicapi.wallet.PaymentMethod;
 import com.pawcare.publicapi.wallet.WalletService;
 import com.pawcare.publicapi.web.ApiException;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import jakarta.validation.Valid;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -167,19 +170,22 @@ public class MarketplaceController {
     }
     @PostMapping("/bookings")
     @Transactional
-    public Map<String,Object> createBooking(@CurrentUser CurrentPrincipal p,@RequestBody Map<String,Object>b) {
-        customer(p); long pet=number(b,"petId"),provider=number(b,"providerId"),service=number(b,"serviceId");
+    public Map<String,Object> createBooking(@CurrentUser CurrentPrincipal p,
+                                             @Valid @RequestBody CreateBookingRequest request) {
+        customer(p);
+        long pet=request.petId(),provider=request.providerId(),service=request.serviceId();
         own("SELECT id FROM pets WHERE id=? AND customer_profile_id=? AND is_active=1",pet,p.profileId());
         Map<String,Object>s=one("SELECT * FROM services WHERE id=? AND provider_id=? AND is_active=1",service,provider);if(s==null)throw new ApiException(400,"Service is unavailable");
-        String start=required(b,"bookingStart"); Long staff=b.get("staffId")==null?null:number(b,"staffId");
+        String start = parseBookingStart(request.bookingStart());
+        Long staff=request.staffId();
         if(staff!=null) {
             own("SELECT st.id FROM staff st WHERE st.id=? AND st.provider_id=? AND st.is_active=1",staff,provider);
             Integer conflict=db.queryForObject("SELECT COUNT(*) FROM bookings WHERE staff_id=? AND status IN ('PENDING','CONFIRMED','CHECKED_IN','IN_SERVICE') AND booking_start < DATE_ADD(?,INTERVAL ? MINUTE) AND booking_end > ?",Integer.class,staff,start,s.get("duration_minutes"),start);
             if(conflict != null && conflict > 0) throw new ApiException(409,"Selected staff already has an overlapping booking");
         }
-        db.update("INSERT INTO bookings(customer_profile_id,pet_id,provider_id,service_id,staff_id,booking_start,booking_end,status,estimated_price,customer_note) VALUES(?,?,?,?,?,?,DATE_ADD(?,INTERVAL ? MINUTE),'PENDING_PAYMENT',?,?)",p.profileId(),pet,provider,service,staff,start,start,s.get("duration_minutes"),s.get("price"),text(b,"customerNote"));
+        db.update("INSERT INTO bookings(customer_profile_id,pet_id,provider_id,service_id,staff_id,booking_start,booking_end,status,estimated_price,customer_note) VALUES(?,?,?,?,?,?,DATE_ADD(?,INTERVAL ? MINUTE),'PENDING_PAYMENT',?,?)",p.profileId(),pet,provider,service,staff,start,start,s.get("duration_minutes"),s.get("price"),request.customerNote());
         long bookingId=lastId();
-        Map<String,Object> payment=wallets.fundBooking(p.profileId(),bookingId,(BigDecimal)s.get("price"),PaymentMethod.from(b.get("paymentMethod")));
+        Map<String,Object> payment=wallets.fundBooking(p.profileId(),bookingId,(BigDecimal)s.get("price"),PaymentMethod.from(request.paymentMethod()));
         Map<String,Object> result=new LinkedHashMap<>(); result.put("success",true);result.put("id",bookingId);result.put("payment",payment);return result;
     }
     @PutMapping("/bookings/{id}/status")
@@ -324,6 +330,13 @@ public class MarketplaceController {
     private BigDecimal decimalRequired(Map<String,Object>b,String k){BigDecimal x=decimal(b,k);if(x==null)throw new ApiException(400,k+" is required");return x;}
     private Boolean bool(Map<String,Object>b,String k){return b.get(k)==null?null:Boolean.valueOf(String.valueOf(b.get(k)));}
     private String or(String a,String b){return a==null||a.isBlank()?b:a;}
+    private String parseBookingStart(String value) {
+        try {
+            return LocalDateTime.parse(value.trim()).toString();
+        } catch (DateTimeParseException e) {
+            throw new ApiException(400, "bookingStart must use ISO local date-time, e.g. 2026-10-13T14:30:00");
+        }
+    }
     private boolean transition(String from,String to){return Map.of(
         "PENDING_PAYMENT",List.of("CANCELLED"),
         "PENDING_APPROVAL",List.of("CONFIRMED","REJECTED","CANCELLED"),
