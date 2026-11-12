@@ -340,6 +340,9 @@ class _TopUpSheetState extends State<_TopUpSheet> {
   Map<String, dynamic>? _deposit;
   Timer? _poll;
   bool _loading = false;
+  int _pollAttempts = 0;
+  String? _pollNotice;
+  static const _maxPollAttempts = 180;
 
   @override
   void dispose() {
@@ -360,12 +363,16 @@ class _TopUpSheetState extends State<_TopUpSheet> {
     try {
       final deposit = await widget.api.createWalletTopUp(amount);
       if (!mounted) return;
-      setState(() => _deposit = deposit);
+      setState(() {
+        _deposit = deposit;
+        _pollAttempts = 0;
+        _pollNotice = null;
+      });
       _poll = Timer.periodic(const Duration(seconds: 5), (_) => _check());
     } catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.toString())));
+            .showSnackBar(SnackBar(content: Text(ApiMessages.friendly(error))));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -374,6 +381,15 @@ class _TopUpSheetState extends State<_TopUpSheet> {
   Future<void> _check() async {
     final id = _deposit?['paymentDepositId'];
     if (id == null) return;
+    if (_pollAttempts >= _maxPollAttempts) {
+      _poll?.cancel();
+      if (mounted) {
+        setState(() => _pollNotice =
+            'Đã dừng tự kiểm tra sau 15 phút. Bạn có thể kiểm tra lại khi cần.');
+      }
+      return;
+    }
+    _pollAttempts++;
     try {
       final fresh = await widget.api.walletTopUpStatus((id as num).toInt());
       if (fresh['status'] == 'PAID' && mounted) {
@@ -382,6 +398,8 @@ class _TopUpSheetState extends State<_TopUpSheet> {
       }
     } catch (_) {
       // Continue polling after a transient network failure.
+      if (mounted)
+        setState(() => _pollNotice = 'Chưa thể kiểm tra ngay, sẽ thử lại.');
     }
   }
 
@@ -438,6 +456,12 @@ class _TopUpSheetState extends State<_TopUpSheet> {
             label: const Text('Sao chép nội dung')),
         const Text('Số dư sẽ tự cập nhật ngay sau khi ngân hàng xác nhận.',
             textAlign: TextAlign.center),
+        if (_pollNotice != null) ...[
+          const SizedBox(height: 8),
+          Text(_pollNotice!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: AppColors.coral)),
+        ],
         TextButton.icon(
             onPressed: _check,
             icon: const Icon(Icons.refresh),
