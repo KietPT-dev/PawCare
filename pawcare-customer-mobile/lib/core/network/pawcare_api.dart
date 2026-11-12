@@ -73,6 +73,26 @@ class PawCareApi {
     return _session(data);
   }
 
+  Future<void> requestPasswordReset(String email) async {
+    await post('/auth/password-reset/request', {'email': email},
+        authenticated: false);
+  }
+
+  Future<void> resetPassword(String token, String newPassword) async {
+    await post('/auth/password-reset/confirm',
+        {'token': token, 'newPassword': newPassword},
+        authenticated: false);
+  }
+
+  Future<void> requestEmailVerification() async {
+    await post('/auth/email-verification/request', {});
+  }
+
+  Future<void> confirmEmailVerification(String token) async {
+    await post('/auth/email-verification/confirm', {'token': token},
+        authenticated: false);
+  }
+
   Future<List<Map<String, dynamic>>> listCareNotes() => list('/care-notes');
 
   Future<int> createCareNote({
