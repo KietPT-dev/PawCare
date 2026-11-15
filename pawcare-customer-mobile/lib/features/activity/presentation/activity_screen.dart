@@ -67,8 +67,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   if (s.connectionState != ConnectionState.done)
                     return const Center(child: CircularProgressIndicator());
                   if (s.hasError || s.data == null)
-                    return _Message(
-                        '${s.error ?? 'Không tải được lịch hẹn.'}', _changed);
+                    return _Message(ApiMessages.friendly(s.error), _changed);
                   final ended = {'COMPLETED', 'REJECTED', 'CANCELLED'};
                   final rows = s.data!.bookings
                       .where((b) => _tab == 0
@@ -123,10 +122,18 @@ class _Card extends StatelessWidget {
   final Future<void> Function() changed;
   String get status => '${b['status'] ?? 'PENDING'}';
   Future<void> _confirm(BuildContext c) async {
+    _showWorking(c, 'Đang xác nhận hoàn tất...');
     try {
       await api.post('/bookings/${b['id']}/confirm-completion', {});
+      if (c.mounted) Navigator.of(c, rootNavigator: true).pop();
       await changed();
+      if (c.mounted) {
+        ScaffoldMessenger.of(c).showSnackBar(const SnackBar(
+            content:
+                Text('Đã xác nhận hoàn tất. Bạn có thể đánh giá dịch vụ.')));
+      }
     } catch (e) {
+      if (c.mounted) Navigator.of(c, rootNavigator: true).pop();
       if (c.mounted)
         ScaffoldMessenger.of(c)
             .showSnackBar(SnackBar(content: Text(ApiMessages.friendly(e))));
@@ -163,17 +170,41 @@ class _Card extends StatelessWidget {
               ]));
         });
     if (yes == true) {
+      if (!c.mounted) return;
+      _showWorking(c, 'Đang gửi khiếu nại...');
       try {
         await api.post(
             '/bookings/${b['id']}/disputes', {'content': text.text.trim()});
+        if (c.mounted) Navigator.of(c, rootNavigator: true).pop();
         await changed();
+        if (c.mounted) {
+          ScaffoldMessenger.of(c).showSnackBar(const SnackBar(
+              content:
+                  Text('Đã gửi khiếu nại. Tiền escrow vẫn được tạm giữ.')));
+        }
       } catch (e) {
+        if (c.mounted) Navigator.of(c, rootNavigator: true).pop();
         if (c.mounted)
           ScaffoldMessenger.of(c)
               .showSnackBar(SnackBar(content: Text(ApiMessages.friendly(e))));
       }
     }
     text.dispose();
+  }
+
+  void _showWorking(BuildContext context, String label) {
+    showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => PopScope(
+            canPop: false,
+            child: AlertDialog(
+                content: Row(children: [
+              const SizedBox(
+                  width: 22, height: 22, child: CircularProgressIndicator()),
+              const SizedBox(width: 16),
+              Expanded(child: Text(label)),
+            ]))));
   }
 
   Future<void> _review(BuildContext c) async {
@@ -249,6 +280,20 @@ class _Card extends StatelessWidget {
                   const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
           Text(
               '${b['provider_name'] ?? 'Provider'} · ${AppFormatters.money(b['estimated_price'])}'),
+          if ({
+            'PENDING_PAYMENT',
+            'PENDING_APPROVAL',
+            'CONFIRMED',
+            'CHECKED_IN',
+            'IN_SERVICE',
+            'SERVICE_DONE',
+            'DISPUTED',
+            'SYSTEM_REVIEW'
+          }.contains(status))
+            const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text('Tiền dịch vụ đang được giữ an toàn trong escrow.',
+                    style: TextStyle(color: AppColors.teal, fontSize: 12))),
           if (status == 'SERVICE_DONE') ...[
             const Divider(),
             const Text('Provider báo đã hoàn tất',
@@ -310,7 +355,7 @@ class _Message extends StatelessWidget {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
         const Icon(Icons.cloud_off_outlined, size: 48),
         const SizedBox(height: 10),
-        Text(text, textAlign: TextAlign.center),
+        Text(ApiMessages.friendly(text), textAlign: TextAlign.center),
         TextButton(onPressed: retry, child: const Text('Tải lại'))
       ]));
 }

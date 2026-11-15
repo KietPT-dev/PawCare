@@ -14,6 +14,7 @@ import 'package:pawcare_customer_mobile/features/booking/presentation/booking_sc
 import 'package:pawcare_customer_mobile/features/activity/presentation/activity_screen.dart';
 import 'package:pawcare_customer_mobile/features/home/presentation/home_screen.dart';
 import 'package:pawcare_customer_mobile/features/profile/presentation/profile_screen.dart';
+import 'package:pawcare_customer_mobile/features/notifications/presentation/notifications_screen.dart';
 
 void main() {
   test('persists dark mode and customer session', () async {
@@ -113,6 +114,7 @@ void main() {
 
   testWidgets('SERVICE_DONE booking exposes confirm and dispute',
       (tester) async {
+    var confirmed = false;
     final api = PawCareApi(
         baseUrl: 'http://pawcare.test/api/v1',
         client: MockClient((request) async {
@@ -130,14 +132,56 @@ void main() {
           if (request.url.path.endsWith('/reviews') ||
               request.url.path.endsWith('/complaints'))
             return _jsonResponse([]);
+          if (request.method == 'POST' &&
+              request.url.path.endsWith('/confirm-completion')) {
+            confirmed = true;
+            return _jsonResponse({'success': true});
+          }
           return _jsonResponse({'error': 'Not found'}, 404);
         }));
     addTearDown(api.close);
-    await tester.pumpWidget(
-        MaterialApp(theme: buildTheme(), home: ActivityScreen(api: api)));
+    await tester.pumpWidget(MaterialApp(
+        theme: buildTheme(), home: Scaffold(body: ActivityScreen(api: api))));
     await tester.pumpAndSettle();
     expect(find.text('Xác nhận hoàn tất'), findsOneWidget);
     expect(find.text('Có vấn đề / Khiếu nại'), findsOneWidget);
+    await tester.tap(find.text('Xác nhận hoàn tất'));
+    await tester.pumpAndSettle();
+    expect(confirmed, isTrue);
+  });
+
+  testWidgets('marks notifications read through the real API route',
+      (tester) async {
+    var readAll = false;
+    final api = PawCareApi(
+        baseUrl: 'http://pawcare.test/api/v1',
+        client: MockClient((request) async {
+          if (request.url.path.endsWith('/notifications') &&
+              request.method == 'GET') {
+            return _jsonResponse([
+              {
+                'id': 1,
+                'title': 'Đơn mới',
+                'content': 'Booking đã xác nhận',
+                'is_read': 0
+              }
+            ]);
+          }
+          if (request.url.path.endsWith('/notifications/read-all') &&
+              request.method == 'PUT') {
+            readAll = true;
+            return _jsonResponse({'success': true, 'updated': 1});
+          }
+          return _jsonResponse({'error': 'Not found'}, 404);
+        }));
+    addTearDown(api.close);
+    await tester.pumpWidget(MaterialApp(
+        theme: buildTheme(),
+        home: NotificationsScreen(api: api, onChanged: () {})));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Đọc tất cả'));
+    await tester.pumpAndSettle();
+    expect(readAll, isTrue);
   });
 
   testWidgets('saves a care note without disposing active text fields',

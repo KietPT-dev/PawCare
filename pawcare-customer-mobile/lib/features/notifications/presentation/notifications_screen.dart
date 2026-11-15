@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/network/pawcare_api.dart';
 import '../../activity/presentation/booking_detail_screen.dart';
+import '../../activity/presentation/activity_screen.dart';
+import '../../wallet/presentation/wallet_screen.dart';
 import '../../../core/utils/app_formatters.dart';
 import '../../../core/network/api_messages.dart';
 
@@ -31,7 +33,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Thông báo')),
+        appBar: AppBar(title: const Text('Thông báo'), actions: [
+          TextButton(onPressed: _markAllRead, child: const Text('Đọc tất cả')),
+        ]),
         body: FutureBuilder<List<Map<String, dynamic>>>(
             future: _items,
             builder: (context, snapshot) {
@@ -75,21 +79,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             '${AppFormatters.replaceRawStatusInNotification('${item['content'] ?? ''}')}\n${AppFormatters.relativeTime(item['created_at'] ?? item['createdAt'])}'),
                         isThreeLine: true,
                         onTap: () async {
-                          if (unread)
-                            await widget.api
-                                .put('/notifications/${item['id']}/read', {});
-                          widget.onChanged();
-                          if (!context.mounted) return;
-                          final bookingId =
-                              int.tryParse('${item['reference_id']}');
-                          if ('${item['reference_type']}' == 'BOOKING' &&
-                              bookingId != null) {
-                            await Navigator.of(context).push(MaterialPageRoute(
-                                builder: (_) => BookingDetailScreen(
-                                    api: widget.api, bookingId: bookingId)));
-                            if (mounted) _refresh();
-                          } else {
-                            _refresh();
+                          try {
+                            if (unread) {
+                              await widget.api
+                                  .put('/notifications/${item['id']}/read', {});
+                            }
+                            widget.onChanged();
+                            if (context.mounted) await _openReference(item);
+                          } catch (error) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content:
+                                          Text(ApiMessages.friendly(error))));
+                            }
                           }
                         },
                       );
@@ -97,4 +100,36 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ));
             }),
       );
+
+  Future<void> _markAllRead() async {
+    try {
+      await widget.api.put('/notifications/read-all', {});
+      await _refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Đã đánh dấu tất cả là đã đọc.')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(ApiMessages.friendly(error))));
+      }
+    }
+  }
+
+  Future<void> _openReference(Map<String, dynamic> item) async {
+    final type = '${item['reference_type'] ?? ''}'.toUpperCase();
+    final id = int.tryParse('${item['reference_id']}');
+    if (type == 'BOOKING' && id != null) {
+      await Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => BookingDetailScreen(api: widget.api, bookingId: id)));
+    } else if (type == 'WALLET' || type == 'PAYMENT' || type == 'TOPUP') {
+      await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => WalletScreen(api: widget.api)));
+    } else if (type == 'DISPUTE' || type == 'COMPLAINT') {
+      await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => ActivityScreen(api: widget.api)));
+    }
+    if (mounted) await _refresh();
+  }
 }

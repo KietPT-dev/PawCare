@@ -8,6 +8,7 @@ import 'help_center_screen.dart';
 import 'settings_screen.dart';
 import '../../wallet/presentation/wallet_screen.dart';
 import '../../notifications/presentation/notifications_screen.dart';
+import '../../../core/network/api_messages.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({
@@ -124,6 +125,13 @@ class ProfileScreen extends StatelessWidget {
                     title: const Text('Đổi mật khẩu'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => _changePassword(context)),
+                const Divider(),
+                ListTile(
+                    leading: const Icon(Icons.mark_email_read_outlined),
+                    title: const Text('Xác minh email'),
+                    subtitle: const Text('Gửi hoặc nhập mã xác minh từ email'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _verifyEmail(context)),
               ]),
             ),
             const SectionTitle('Hỗ trợ'),
@@ -159,6 +167,14 @@ class ProfileScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                           builder: (_) => const HelpCenterScreen())),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.key_outlined),
+                  title: const Text('Quên mật khẩu'),
+                  subtitle: const Text('Yêu cầu liên kết đặt lại qua email'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _resetPassword(context),
                 ),
               ]),
             ),
@@ -216,7 +232,7 @@ class ProfileScreen extends StatelessWidget {
                         _unavailable(context, 'Đã cập nhật thông tin cá nhân.');
                       } catch (e) {
                         if (context.mounted)
-                          _unavailable(context, e.toString());
+                          _unavailable(context, ApiMessages.friendly(e));
                       }
                     },
                     child: const Text('Lưu thay đổi')),
@@ -267,11 +283,114 @@ class ProfileScreen extends StatelessWidget {
                             'Đổi mật khẩu thành công. Hãy đăng nhập lại.');
                       }
                     } catch (e) {
-                      if (context.mounted) _unavailable(context, e.toString());
+                      if (context.mounted)
+                        _unavailable(context, ApiMessages.friendly(e));
                     }
                   },
                   child: const Text('Cập nhật')),
             ])));
+  }
+
+  void _verifyEmail(BuildContext context) {
+    final token = TextEditingController();
+    showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (sheet) => Padding(
+            padding: EdgeInsets.fromLTRB(
+                24, 24, 24, 24 + MediaQuery.of(sheet).viewInsets.bottom),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Text('Xác minh email',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              const Text('Yêu cầu một mã từ email rồi dán vào đây.'),
+              TextButton(
+                  onPressed: () async {
+                    try {
+                      await api.requestEmailVerification();
+                      if (sheet.mounted)
+                        _unavailable(sheet, 'Đã gửi yêu cầu xác minh email.');
+                    } catch (e) {
+                      if (sheet.mounted)
+                        _unavailable(sheet, ApiMessages.friendly(e));
+                    }
+                  },
+                  child: const Text('Gửi mã xác minh')),
+              TextField(
+                  controller: token,
+                  decoration: const InputDecoration(labelText: 'Mã xác minh')),
+              const SizedBox(height: 12),
+              FilledButton(
+                  onPressed: () async {
+                    try {
+                      await api.confirmEmailVerification(token.text.trim());
+                      if (sheet.mounted) {
+                        Navigator.pop(sheet);
+                        _unavailable(context, 'Email đã được xác minh.');
+                      }
+                    } catch (e) {
+                      if (sheet.mounted)
+                        _unavailable(sheet, ApiMessages.friendly(e));
+                    }
+                  },
+                  child: const Text('Xác minh')),
+            ])));
+  }
+
+  void _resetPassword(BuildContext context) {
+    final email = TextEditingController(text: _email);
+    final token = TextEditingController();
+    final password = TextEditingController();
+    showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (sheet) => Padding(
+            padding: EdgeInsets.fromLTRB(
+                24, 24, 24, 24 + MediaQuery.of(sheet).viewInsets.bottom),
+            child: SingleChildScrollView(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Text('Đặt lại mật khẩu',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              TextField(
+                  controller: email,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Email')),
+              TextButton(
+                  onPressed: () async {
+                    try {
+                      await api.requestPasswordReset(email.text.trim());
+                      if (sheet.mounted)
+                        _unavailable(
+                            sheet, 'Nếu email hợp lệ, mã đặt lại đã được gửi.');
+                    } catch (e) {
+                      if (sheet.mounted)
+                        _unavailable(sheet, ApiMessages.friendly(e));
+                    }
+                  },
+                  child: const Text('Gửi mã đặt lại')),
+              TextField(
+                  controller: token,
+                  decoration: const InputDecoration(labelText: 'Mã từ email')),
+              TextField(
+                  controller: password,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Mật khẩu mới')),
+              const SizedBox(height: 12),
+              FilledButton(
+                  onPressed: () async {
+                    try {
+                      await api.resetPassword(token.text.trim(), password.text);
+                      if (sheet.mounted) {
+                        Navigator.pop(sheet);
+                        _unavailable(context, 'Đã đặt lại mật khẩu.');
+                      }
+                    } catch (e) {
+                      if (sheet.mounted)
+                        _unavailable(sheet, ApiMessages.friendly(e));
+                    }
+                  },
+                  child: const Text('Cập nhật mật khẩu')),
+            ]))));
   }
 
   void _complaint(BuildContext context) {

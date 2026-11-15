@@ -14,8 +14,6 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late bool darkMode = widget.darkMode;
-  bool notifications = true;
-  bool reminders = true;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -40,16 +38,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SwitchListTile.adaptive(
                 secondary: const Icon(Icons.notifications_outlined),
                 title: const Text('Thông báo ứng dụng'),
-                subtitle: const Text('Nhận cập nhật về đơn lịch'),
-                value: notifications,
-                onChanged: (value) => setState(() => notifications = value)),
+                subtitle: const Text(
+                    'Sắp hỗ trợ khi API tuỳ chọn thông báo sẵn sàng'),
+                value: true,
+                onChanged: null),
             const Divider(),
             SwitchListTile.adaptive(
                 secondary: const Icon(Icons.alarm_outlined),
                 title: const Text('Nhắc lịch chăm sóc'),
-                subtitle: const Text('Nhắc trước lịch hẹn của thú cưng'),
-                value: reminders,
-                onChanged: (value) => setState(() => reminders = value)),
+                subtitle: const Text(
+                    'Sắp hỗ trợ khi API tuỳ chọn thông báo sẵn sàng'),
+                value: true,
+                onChanged: null),
           ])),
           const SectionTitle('Ứng dụng'),
           InfoCard(
