@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/network/pawcare_api.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
-import 'forgot_password_screen.dart';
 
 class AuthForm {
   const AuthForm(
@@ -14,9 +12,8 @@ class AuthForm {
 }
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key, required this.onAuthenticated, this.api});
+  const AuthScreen({super.key, required this.onAuthenticated});
   final Future<void> Function(AuthForm form, bool register) onAuthenticated;
-  final PawCareApi? api;
   @override
   State<AuthScreen> createState() => _AuthScreenState();
 }
@@ -31,43 +28,15 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _register = false, _hide = true, _busy = false;
   String? _error;
 
-  Future<void> _openForgotPassword() async {
-    final resetEmail = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ForgotPasswordScreen(
-          initialEmail: _email.text.trim(),
-          api: widget.api,
-        ),
-      ),
-    );
-    if (resetEmail != null && resetEmail.isNotEmpty && mounted) {
-      setState(() {
-        _email.text = resetEmail;
-        _password.clear();
-        _error = null;
-      });
-      _passwordFocus.requestFocus();
-    }
-  }
-
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.darkCanvas : AppColors.canvas,
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: isDark
-                ? const [AppColors.darkCanvas, Color(0xFF0F172A)]
-                : const [Color(0xFFE6F9FA), Color(0xFFF8FCFC)],
-          ),
-        ),
-        child: SafeArea(
+  Widget build(BuildContext context) => Scaffold(
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFFE6F9FA), Color(0xFFF8FCFC)])),
+          child: SafeArea(
               child: Center(
                   child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
@@ -181,43 +150,17 @@ class _AuthScreenState extends State<AuthScreen> {
                                             ? Icons.visibility_outlined
                                             : Icons.visibility_off_outlined)),
                                     validator: (v) {
-                                      if (v == null || v.isEmpty) {
+                                      if (v == null || v.isEmpty)
                                         return 'Nhập mật khẩu';
-                                      }
                                       if (_register &&
                                           (v.length < 10 ||
-                                              !RegExp(r'[A-Za-z]').hasMatch(v) ||
-                                              !RegExp(r'\d').hasMatch(v))) {
+                                              !RegExp(r'[A-Za-z]')
+                                                  .hasMatch(v) ||
+                                              !RegExp(r'\d').hasMatch(v)))
                                         return 'Ít nhất 10 ký tự, gồm chữ và số';
-                                      }
                                       return null;
                                     }),
-                                if (!_register) ...[
-                                  const SizedBox(height: 6),
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: TextButton(
-                                      onPressed:
-                                          _busy ? null : _openForgotPassword,
-                                      style: TextButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 4),
-                                        visualDensity: VisualDensity.compact,
-                                      ),
-                                      child: const Text(
-                                        'Quên mật khẩu?',
-                                        style: TextStyle(
-                                          color: AppColors.teal,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13.5,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                ] else ...[
-                                  const SizedBox(height: 20),
-                                ],
+                                const SizedBox(height: 20),
                                 SizedBox(
                                     width: double.infinity,
                                     height: 56,
@@ -264,7 +207,6 @@ class _AuthScreenState extends State<AuthScreen> {
           ))),
         ),
       );
-  }
 
   Future<void> _submit() async {
     if (!(_form.currentState?.validate() ?? false)) return;
@@ -328,7 +270,7 @@ class _InputField extends StatefulWidget {
 }
 
 class _InputFieldState extends State<_InputField> {
-  late final FocusNode _focus = widget.focusNode ?? FocusNode();
+  late FocusNode _focus = widget.focusNode ?? FocusNode();
   bool _ownsFocus = false;
   @override
   void initState() {
