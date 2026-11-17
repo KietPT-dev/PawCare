@@ -11,6 +11,8 @@ class AppColors {
   static const canvas = Color(0xFFF8F9F7);
   static const darkCanvas = Color(0xFF081C24);
   static const darkSurface = Color(0xFF102A34);
+  static const surface = Color(0xFFF2F7F5);
+  static const shimmer = Color(0xFFE8F4F0);
 }
 
 ThemeData buildTheme({bool dark = false}) {
@@ -49,25 +51,25 @@ ThemeData buildTheme({bool dark = false}) {
       hintStyle: TextStyle(
           color: dark ? const Color(0xFF9CBAC3) : const Color(0xFF6B8791)),
       border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: outline)),
       enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: outline)),
       focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.teal, width: 2.5)),
       errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: Color(0xFFDC4C45))),
     ),
     cardTheme: CardThemeData(
         color: surface,
         surfaceTintColor: Colors.transparent,
-        elevation: 0,
+        elevation: 0.5,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
             side: BorderSide(
                 color:
                     dark ? const Color(0xFF26434D) : const Color(0xFFE0EFF2)))),
@@ -77,11 +79,11 @@ ThemeData buildTheme({bool dark = false}) {
         // by buttons inside Rows (for example, the booking wizard actions).
         // Size.fromHeight creates an infinite minimum width and triggers a
         // RenderBox layout exception on iOS.
-        minimumSize: const Size(64, 52),
+        minimumSize: const Size(64, 50),
         backgroundColor: AppColors.teal,
         foregroundColor: Colors.white,
         textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),
     dividerTheme: DividerThemeData(
@@ -89,8 +91,10 @@ ThemeData buildTheme({bool dark = false}) {
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: surface,
       elevation: 0,
-      height: 72,
+      height: 68,
       indicatorColor: dark ? const Color(0xFF174B59) : const Color(0xFFC8F1F5),
+      indicatorShape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
           fontWeight: states.contains(WidgetState.selected)
               ? FontWeight.w800

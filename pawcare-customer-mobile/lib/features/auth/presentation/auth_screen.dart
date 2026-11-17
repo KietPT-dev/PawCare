@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/ui.dart';
 
 class AuthForm {
   const AuthForm(
@@ -94,17 +95,9 @@ class _AuthScreenState extends State<AuthScreen> {
                               .bodyLarge
                               ?.copyWith(height: 1.45)),
                       const SizedBox(height: 28),
-                      Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: .92),
-                              borderRadius: BorderRadius.circular(28),
-                              boxShadow: const [
-                                BoxShadow(
-                                    color: Color(0x1200343E),
-                                    blurRadius: 24,
-                                    offset: Offset(0, 10))
-                              ]),
+                      LiquidGlassCard(
+                          radius: 28,
+                          padding: const EdgeInsets.all(22),
                           child: Form(
                               key: _form,
                               child: Column(children: [

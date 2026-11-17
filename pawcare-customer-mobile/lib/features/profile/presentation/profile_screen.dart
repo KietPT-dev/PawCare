@@ -50,37 +50,98 @@ class ProfileScreen extends StatelessWidget {
       .join();
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 26, 20, 28),
-          children: [
-            Center(
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 43,
-                    backgroundColor: AppColors.mint,
-                    child: Text(_initials.isEmpty ? 'PC' : _initials,
-                        style: const TextStyle(
-                            color: AppColors.teal,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 25)),
-                  ),
-                  const SizedBox(height: 11),
-                  Text(_name,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: Theme.of(context).colorScheme.onSurface)),
-                  const SizedBox(height: 3),
-                  Text(_email.isEmpty ? 'Chưa có email' : _email,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant)),
-                ],
-              ),
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+        children: [
+          LiquidGlassCard(
+            radius: 28,
+            padding: const EdgeInsets.all(22),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.teal.withValues(alpha: isDark ? .28 : .14),
+                AppColors.cyan.withValues(alpha: isDark ? .10 : .05),
+              ],
             ),
-            const SectionTitle('Tài khoản'),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [AppColors.teal, AppColors.cyan],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.teal.withValues(alpha: .24),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: CircleAvatar(
+                    radius: 38,
+                    backgroundColor: AppColors.mint,
+                    child: Text(
+                      _initials.isEmpty ? 'PC' : _initials,
+                      style: const TextStyle(
+                          color: AppColors.teal,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 24),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _name,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                      color: Theme.of(context).colorScheme.onSurface),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _email.isEmpty ? 'Chưa có email' : _email,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.teal.withValues(alpha: .14),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: AppColors.teal.withValues(alpha: .28)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.stars_rounded,
+                          size: 14, color: AppColors.teal),
+                      SizedBox(width: 4),
+                      Text(
+                        'Thành viên PawCare VIP',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.teal),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SectionTitle('Tài khoản'),
             InfoCard(
               child: Column(children: [
                 ListTile(
@@ -187,6 +248,7 @@ class ProfileScreen extends StatelessWidget {
           ],
         ),
       );
+  }
 
   void _profileInfo(BuildContext context) {
     final name = TextEditingController(text: _name);

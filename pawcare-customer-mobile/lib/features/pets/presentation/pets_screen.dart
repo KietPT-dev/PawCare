@@ -200,9 +200,23 @@ class _PetCard extends StatelessWidget {
     final species = (pet['species'] ?? '').toString().toLowerCase();
     final emoji =
         species.contains('mèo') || species.contains('cat') ? '🐱' : '🐶';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return InfoCard(
       child: Row(children: [
-        Text(emoji, style: const TextStyle(fontSize: 42)),
+        Container(
+          width: 54,
+          height: 54,
+          decoration: BoxDecoration(
+            color: AppColors.teal.withValues(alpha: .12),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+                color: AppColors.teal.withValues(alpha: .22), width: 1),
+          ),
+          child: Center(
+            child: Text(emoji, style: const TextStyle(fontSize: 30)),
+          ),
+        ),
         const SizedBox(width: 14),
         Expanded(
             child:
@@ -210,16 +224,51 @@ class _PetCard extends StatelessWidget {
           Text('${pet['name']}',
               style:
                   const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-          Text([pet['species'], pet['breed']]
-              .where((value) => value != null && value.toString().isNotEmpty)
-              .join(' · ')),
+          const SizedBox(height: 2),
+          Text(
+            [pet['species'], pet['breed']]
+                .where((value) => value != null && value.toString().isNotEmpty)
+                .join(' · '),
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? const Color(0xFF9CBAC3) : const Color(0xFF6B8791),
+            ),
+          ),
           if ((pet['medical_notes'] ?? '').toString().isNotEmpty) ...[
-            const SizedBox(height: 5),
-            Text('${pet['medical_notes']}',
-                maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.coral.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.info_outline_rounded,
+                      size: 12, color: AppColors.coral),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      '${pet['medical_notes']}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.coral),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ])),
         PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert_rounded,
+                color: isDark
+                    ? const Color(0xFF9CBAC3)
+                    : const Color(0xFF6B8791)),
             onSelected: (value) => value == 'edit' ? onEdit() : onDelete(),
             itemBuilder: (_) => const [
                   PopupMenuItem(value: 'edit', child: Text('Chỉnh sửa')),
