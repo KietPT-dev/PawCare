@@ -31,6 +31,7 @@ class SectionTitle extends StatelessWidget {
                       fontSize: 13)))
       ]));
 }
+
 class InfoCard extends StatelessWidget {
   const InfoCard({super.key, required this.child, this.onTap});
   final Widget child;
@@ -120,6 +121,7 @@ class LiquidGlassCard extends StatelessWidget {
     );
   }
 }
+
 class LiquidAmbientBackground extends StatelessWidget {
   const LiquidAmbientBackground({super.key, required this.child});
   final Widget child;
@@ -201,6 +203,7 @@ class LiquidAmbientBackground extends StatelessWidget {
     );
   }
 }
+
 class GlassIconButton extends StatelessWidget {
   const GlassIconButton({
     super.key,
@@ -247,6 +250,7 @@ class GlassIconButton extends StatelessWidget {
     return button;
   }
 }
+
 class StatusChip extends StatelessWidget {
   const StatusChip(this.label, {super.key, this.color = AppColors.teal});
   final String label;
@@ -286,6 +290,7 @@ class BookingStatusChip extends StatelessWidget {
     );
   }
 }
+
 class FadeSlideIn extends StatelessWidget {
   const FadeSlideIn({super.key, required this.index, required this.child});
   final int index;
@@ -429,3 +434,4 @@ class LiquidModalSheet extends StatelessWidget {
     );
   }
 }
+
