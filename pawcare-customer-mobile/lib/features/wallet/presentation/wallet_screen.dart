@@ -1,12 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../../../core/network/api_messages.dart';
 import '../../../core/network/pawcare_api.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
-import '../../../core/network/api_messages.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key, required this.api});
@@ -27,6 +26,7 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   void _reload() => _data = _load();
+
   Future<_WalletData> _load() async {
     final values = await Future.wait([
       widget.api.wallet(),
@@ -39,16 +39,47 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: const Text('Ví PawCare'),
-          actions: [
-            IconButton(
-                onPressed: () => setState(_reload),
-                icon: const Icon(Icons.refresh))
-          ],
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final canPop = Navigator.canPop(context);
+
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.darkCanvas : AppColors.canvas,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        leading: canPop
+            ? Center(
+                child: GlassIconButton(
+                  size: 38,
+                  icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                  tooltip: 'Quay lại',
+                  onPressed: () => Navigator.pop(context),
+                ),
+              )
+            : null,
+        title: Text(
+          'Ví PawCare',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 20,
+            letterSpacing: -0.3,
+            color: onSurface,
+          ),
         ),
-        body: FutureBuilder<_WalletData>(
+        actions: [
+          IconButton(
+            onPressed: () => setState(_reload),
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Làm mới',
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: LiquidAmbientBackground(
+        child: FutureBuilder<_WalletData>(
           future: _data,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
@@ -62,63 +93,126 @@ class _WalletScreenState extends State<WalletScreen> {
             return RefreshIndicator(
               onRefresh: () async => setState(_reload),
               child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-                  children: [
-                    _BalanceCard(wallet: data.wallet),
-                    const SizedBox(height: 16),
-                    Row(children: [
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 40),
+                children: [
+                  _BalanceCard(wallet: data.wallet),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
                       Expanded(
-                          child: OutlinedButton.icon(
-                        onPressed: () => _showTopUp(context),
-                        icon: const Icon(Icons.qr_code_scanner),
-                        label: const Text('Nạp tiền'),
-                      )),
+                        child: FilledButton.icon(
+                          onPressed: () => _showTopUp(context),
+                          icon: const Icon(Icons.add_card_rounded, size: 20),
+                          label: const Text('Nạp tiền'),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(120, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                        ),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
-                          child: FilledButton.icon(
-                        onPressed: () => _withdraw(context),
-                        icon: const Icon(Icons.account_balance_outlined),
-                        label: const Text('Rút tiền'),
-                      )),
-                    ]),
-                    SectionTitle('Lịch sử biến động',
-                        action: _filter,
-                        onAction: () => _chooseFilter(context)),
-                    if (_filtered(data.transactions).isEmpty)
-                      const InfoCard(
-                          child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 18),
-                        child: Center(child: Text('Chưa có giao dịch nào.')),
-                      ))
-                    else
-                      ..._filtered(data.transactions)
-                          .map((item) => _TransactionRow(item: item)),
-                  ]),
+                        child: OutlinedButton.icon(
+                          onPressed: () => _withdraw(context),
+                          icon: const Icon(Icons.account_balance_rounded,
+                              size: 20),
+                          label: const Text('Rút tiền'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(120, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  SectionTitle(
+                    'Lịch sử biến động',
+                    action: _filter,
+                    onAction: () => _chooseFilter(context),
+                  ),
+                  if (_filtered(data.transactions).isEmpty)
+                    LiquidGlassCard(
+                      radius: 20,
+                      padding: const EdgeInsets.symmetric(vertical: 28),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            const Icon(Icons.receipt_long_rounded,
+                                size: 38, color: Color(0xFF64748B)),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Chưa có giao dịch nào.',
+                              style: TextStyle(
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    ..._filtered(data.transactions)
+                        .map((item) => _TransactionRow(item: item)),
+                ],
+              ),
             );
           },
         ),
-      );
+      ),
+    );
+  }
 
   List<Map<String, dynamic>> _filtered(List<Map<String, dynamic>> items) =>
       _filter == 'Tất cả'
           ? items
           : items.where((x) => '${x['type']}' == _filter).toList();
+
   Future<void> _chooseFilter(BuildContext context) async {
     final value = await showModalBottomSheet<String>(
-        context: context,
-        builder: (_) => ListView(
-            shrinkWrap: true,
-            children: [
-              'Tất cả',
-              'DEPOSIT',
-              'ESCROW_HOLD',
-              'ESCROW_RELEASE',
-              'WITHDRAWAL'
-            ]
-                .map((x) => ListTile(
-                    title: Text(x == 'Tất cả' ? x : x.replaceAll('_', ' ')),
-                    onTap: () => Navigator.pop(context, x)))
-                .toList()));
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => LiquidModalSheet(
+        title: 'Bộ lọc giao dịch',
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            'Tất cả',
+            'DEPOSIT',
+            'ESCROW_HOLD',
+            'ESCROW_RELEASE',
+            'WITHDRAWAL'
+          ]
+              .map(
+                (x) => ListTile(
+                  title: Text(
+                    x == 'Tất cả'
+                        ? 'Tất cả giao dịch'
+                        : x == 'DEPOSIT'
+                            ? 'Nạp tiền vào ví'
+                            : x == 'ESCROW_HOLD'
+                                ? 'Tạm giữ đặt lịch'
+                                : x == 'ESCROW_RELEASE'
+                                    ? 'Giải ngân / Hoàn tiền'
+                                    : 'Rút tiền về ngân hàng',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  trailing: _filter == x
+                      ? const Icon(Icons.check_rounded, color: AppColors.teal)
+                      : null,
+                  onTap: () => Navigator.pop(context, x),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
     if (value != null && mounted) setState(() => _filter = value);
   }
 
@@ -126,7 +220,7 @@ class _WalletScreenState extends State<WalletScreen> {
     final completed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
+      backgroundColor: Colors.transparent,
       builder: (_) => _TopUpSheet(api: widget.api),
     );
     if (completed == true && mounted) setState(_reload);
@@ -137,69 +231,95 @@ class _WalletScreenState extends State<WalletScreen> {
     final bank = TextEditingController();
     final account = TextEditingController();
     final name = TextEditingController();
+
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            24, 16, 24, 24 + MediaQuery.of(sheetContext).viewInsets.bottom),
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => LiquidModalSheet(
+        title: 'Yêu cầu rút tiền',
+        subtitle: 'Tiền sẽ được giải ngân về tài khoản ngân hàng của bạn',
         child: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('Yêu cầu rút tiền',
-              style: Theme.of(sheetContext)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 16),
-          TextField(
-              controller: amount,
-              keyboardType: TextInputType.number,
-              decoration:
-                  const InputDecoration(labelText: 'Số tiền muốn rút (VNĐ)')),
-          const SizedBox(height: 10),
-          TextField(
-              controller: bank,
-              decoration: const InputDecoration(labelText: 'Ngân hàng')),
-          const SizedBox(height: 10),
-          TextField(
-              controller: account,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Số tài khoản')),
-          const SizedBox(height: 10),
-          TextField(
-              controller: name,
-              textCapitalization: TextCapitalization.characters,
-              decoration:
-                  const InputDecoration(labelText: 'Tên chủ tài khoản')),
-          const SizedBox(height: 18),
-          FilledButton(
-              onPressed: () async {
-                final value = num.tryParse(
-                    amount.text.replaceAll(RegExp(r'[^0-9.]'), ''));
-                if (value == null || value <= 0) {
-                  ScaffoldMessenger.of(sheetContext).showSnackBar(
-                      const SnackBar(content: Text('Nhập số tiền hợp lệ.')));
-                  return;
-                }
-                try {
-                  await widget.api.requestWithdrawal(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: amount,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Số tiền muốn rút (VNĐ)',
+                  prefixIcon: Icon(Icons.attach_money_rounded,
+                      color: AppColors.teal),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: bank,
+                decoration: const InputDecoration(
+                  labelText: 'Ngân hàng nhận',
+                  hintText: 'Ví dụ: Vietcombank, MBBank, Techcombank...',
+                  prefixIcon: Icon(Icons.account_balance_rounded,
+                      color: AppColors.teal),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: account,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Số tài khoản',
+                  prefixIcon:
+                      Icon(Icons.credit_card_rounded, color: AppColors.teal),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: name,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  labelText: 'Tên chủ tài khoản (in hoa không dấu)',
+                  prefixIcon:
+                      Icon(Icons.person_outline_rounded, color: AppColors.teal),
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: () async {
+                  final value = num.tryParse(
+                      amount.text.replaceAll(RegExp(r'[^0-9.]'), ''));
+                  if (value == null || value <= 0) {
+                    ScaffoldMessenger.of(sheetContext).showSnackBar(
+                      const SnackBar(content: Text('Nhập số tiền hợp lệ.')),
+                    );
+                    return;
+                  }
+                  try {
+                    await widget.api.requestWithdrawal(
                       amount: value,
                       bankName: bank.text.trim(),
                       bankAccountNo: account.text.trim(),
-                      bankAccountName: name.text.trim());
-                  if (!sheetContext.mounted) return;
-                  Navigator.pop(sheetContext);
-                  setState(_reload);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('Đã gửi yêu cầu rút tiền.')));
-                } catch (error) {
-                  if (sheetContext.mounted)
-                    ScaffoldMessenger.of(sheetContext).showSnackBar(
-                        SnackBar(content: Text(ApiMessages.friendly(error))));
-                }
-              },
-              child: const Text('Gửi yêu cầu')),
-        ])),
+                      bankAccountName: name.text.trim(),
+                    );
+                    if (!sheetContext.mounted) return;
+                    Navigator.pop(sheetContext);
+                    setState(_reload);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Đã gửi yêu cầu rút tiền.')),
+                    );
+                  } catch (error) {
+                    if (sheetContext.mounted) {
+                      ScaffoldMessenger.of(sheetContext).showSnackBar(
+                        SnackBar(content: Text(ApiMessages.friendly(error))),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Gửi yêu cầu rút tiền'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -214,85 +334,299 @@ class _WalletData {
 class _BalanceCard extends StatelessWidget {
   const _BalanceCard({required this.wallet});
   final Map<String, dynamic> wallet;
+
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-            gradient:
-                const LinearGradient(colors: [AppColors.navy, AppColors.teal]),
-            borderRadius: BorderRadius.circular(26)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Row(children: [
-            Icon(Icons.account_balance_wallet_outlined, color: Colors.white),
-            SizedBox(width: 8),
-            Text('VÍ PAWCARE',
-                style:
-                    TextStyle(color: Colors.white, fontWeight: FontWeight.w800))
-          ]),
-          const SizedBox(height: 24),
-          const Text('Số dư khả dụng',
-              style: TextStyle(color: Color(0xFFD7F8FF))),
-          Text(_money(wallet['availableBalance']),
-              style: const TextStyle(
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0F172A), Color(0xFF0D9488), Color(0xFF0284C7)],
+        ),
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0D9488).withValues(alpha: .3),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.account_balance_wallet_rounded,
+                    color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'VÍ PAWCARE SECURE',
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
-                  fontSize: 31)),
-          const SizedBox(height: 14),
+                  fontSize: 12,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const Spacer(),
+              const Icon(Icons.verified_user_rounded,
+                  color: Color(0xFF5EEAD4), size: 18),
+            ],
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Số dư khả dụng',
+            style: TextStyle(color: Color(0xFFCCFBF1), fontSize: 13),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            _money(wallet['availableBalance']),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 32,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 16),
           Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .14),
-                  borderRadius: BorderRadius.circular(14)),
-              child: Row(children: [
-                const Icon(Icons.lock_clock_outlined, color: Color(0xFFD7F8FF)),
-                const SizedBox(width: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: .18),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.lock_clock_rounded,
+                    color: Color(0xFF5EEAD4), size: 18),
+                const SizedBox(width: 10),
                 Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      const Text('Đang tạm giữ',
-                          style: TextStyle(
-                              color: Color(0xFFD7F8FF), fontSize: 12)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Đang tạm giữ Escrow',
+                        style: TextStyle(color: Color(0xFFCCFBF1), fontSize: 11),
+                      ),
                       Text(
-                          '${_money(wallet['lockedBalance'])} · chờ tiệm duyệt/đang thực hiện',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700)),
-                    ])),
-              ])),
-        ]),
-      );
+                        '${_money(wallet['lockedBalance'])} (chờ duyệt / dịch vụ đang chạy)',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _TransactionRow extends StatelessWidget {
   const _TransactionRow({required this.item});
   final Map<String, dynamic> item;
+
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final type = '${item['type'] ?? ''}';
     final amount = _number(item['amount']);
     final refund = type == 'ESCROW_RELEASE' && amount > 0;
     final color = refund
-        ? Colors.deepPurple
+        ? const Color(0xFF8B5CF6)
         : amount >= 0
             ? AppColors.success
             : AppColors.coral;
     final icon = refund
-        ? Icons.replay_circle_filled_outlined
+        ? Icons.replay_circle_filled_rounded
         : amount >= 0
             ? Icons.south_west_rounded
             : Icons.north_east_rounded;
-    return Card(
-        child: ListTile(
-      leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: .12),
-          child: Icon(icon, color: color)),
-      title: Text('${item['description'] ?? type}',
-          maxLines: 2, overflow: TextOverflow.ellipsis),
-      subtitle: Text(_date(item['created_at'] ?? item['createdAt'])),
-      trailing: Text('${amount >= 0 ? '+' : '-'}${_money(amount.abs())}',
-          style: TextStyle(color: color, fontWeight: FontWeight.w800)),
-    ));
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: LiquidGlassCard(
+        radius: 18,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        blur: 10,
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: .14),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${item['description'] ?? type}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _date(item['created_at'] ?? item['createdAt']),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${amount >= 0 ? '+' : '-'}${_money(amount.abs())}',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopUpSheet extends StatefulWidget {
+  const _TopUpSheet({required this.api});
+  final PawCareApi api;
+
+  @override
+  State<_TopUpSheet> createState() => _TopUpSheetState();
+}
+
+class _TopUpSheetState extends State<_TopUpSheet> {
+  final _amount = TextEditingController(text: '100000');
+  bool _loading = false;
+  Map<String, dynamic>? _payment;
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    super.dispose();
+  }
+
+  Future<void> _createTopup() async {
+    final value =
+        num.tryParse(_amount.text.replaceAll(RegExp(r'[^0-9.]'), ''));
+    if (value == null || value <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng nhập số tiền hợp lệ.')),
+      );
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final res = await widget.api.createWalletTopUp(value);
+      if (!mounted) return;
+      setState(() => _payment = res);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ApiMessages.friendly(e))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LiquidModalSheet(
+      title: 'Nạp tiền vào Ví',
+      subtitle: 'Nạp tiền nhanh chóng qua VietQR tự động',
+      child: _payment == null
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: _amount,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Số tiền nạp (VNĐ)',
+                    prefixIcon: Icon(Icons.add_card_rounded,
+                        color: AppColors.teal),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: [50000, 100000, 200000, 500000].map((v) {
+                    return ActionChip(
+                      label: Text(_money(v)),
+                      onPressed: () => setState(() => _amount.text = '$v'),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: _loading ? null : _createTopup,
+                  child: Text(_loading ? 'Đang tạo mã...' : 'Tạo mã VietQR'),
+                ),
+              ],
+            )
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if ('${_payment!['qrUrl'] ?? ''}'.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.network(
+                      '${_payment!['qrUrl']}',
+                      height: 220,
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                Text(
+                  'Nội dung: ${_payment!['paymentCode'] ?? ''}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 16),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Xong'),
+                ),
+              ],
+            ),
+    );
   }
 }
 
@@ -300,173 +634,36 @@ class _WalletError extends StatelessWidget {
   const _WalletError({this.error, required this.onRetry});
   final Object? error;
   final VoidCallback onRetry;
+
   @override
   Widget build(BuildContext context) => Center(
-      child: Padding(
+        child: Padding(
           padding: const EdgeInsets.all(30),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.account_balance_wallet_outlined,
-                size: 48, color: AppColors.teal),
-            const SizedBox(height: 12),
-            const Text('Chưa thể tải Ví PawCare',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19)),
-            const SizedBox(height: 8),
-            Text(ApiMessages.friendly(error), textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: onRetry, child: const Text('Thử lại')),
-          ])));
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.account_balance_wallet_outlined,
+                  size: 48, color: AppColors.teal),
+              const SizedBox(height: 12),
+              const Text(
+                'Chưa thể tải Ví PawCare',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19),
+              ),
+              const SizedBox(height: 8),
+              Text(ApiMessages.friendly(error), textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(onPressed: onRetry, child: const Text('Thử lại')),
+            ],
+          ),
+        ),
+      );
 }
 
-num _number(dynamic value) =>
-    value is num ? value : num.tryParse('$value') ?? 0;
+num _number(dynamic value) => value is num ? value : num.tryParse('$value') ?? 0;
 String _money(dynamic value) =>
     '${_number(value).round().toString().replaceAllMapped(RegExp(r'(?=(\d{3})+(?!\d))'), (_) => '.')}đ';
 String _date(dynamic value) {
-  final parsed = DateTime.tryParse('$value');
-  return parsed == null
-      ? ''
-      : '${parsed.day.toString().padLeft(2, '0')}/${parsed.month.toString().padLeft(2, '0')}/${parsed.year}';
-}
-
-class _TopUpSheet extends StatefulWidget {
-  const _TopUpSheet({required this.api});
-  final PawCareApi api;
-  @override
-  State<_TopUpSheet> createState() => _TopUpSheetState();
-}
-
-class _TopUpSheetState extends State<_TopUpSheet> {
-  final _amount = TextEditingController();
-  Map<String, dynamic>? _deposit;
-  Timer? _poll;
-  bool _loading = false;
-  int _pollAttempts = 0;
-  String? _pollNotice;
-  static const _maxPollAttempts = 180;
-
-  @override
-  void dispose() {
-    _poll?.cancel();
-    _amount.dispose();
-    super.dispose();
-  }
-
-  Future<void> _create() async {
-    final amount =
-        num.tryParse(_amount.text.replaceAll(RegExp(r'[^0-9.]'), ''));
-    if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Nhập số tiền hợp lệ.')));
-      return;
-    }
-    setState(() => _loading = true);
-    try {
-      final deposit = await widget.api.createWalletTopUp(amount);
-      if (!mounted) return;
-      setState(() {
-        _deposit = deposit;
-        _pollAttempts = 0;
-        _pollNotice = null;
-      });
-      _poll = Timer.periodic(const Duration(seconds: 5), (_) => _check());
-    } catch (error) {
-      if (mounted)
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(ApiMessages.friendly(error))));
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _check() async {
-    final id = _deposit?['paymentDepositId'];
-    if (id == null) return;
-    if (_pollAttempts >= _maxPollAttempts) {
-      _poll?.cancel();
-      if (mounted) {
-        setState(() => _pollNotice =
-            'Đã dừng tự kiểm tra sau 15 phút. Bạn có thể kiểm tra lại khi cần.');
-      }
-      return;
-    }
-    _pollAttempts++;
-    try {
-      final fresh = await widget.api.walletTopUpStatus((id as num).toInt());
-      if (fresh['status'] == 'PAID' && mounted) {
-        _poll?.cancel();
-        Navigator.pop(context, true);
-      }
-    } catch (_) {
-      // Continue polling after a transient network failure.
-      if (mounted)
-        setState(() => _pollNotice = 'Chưa thể kiểm tra ngay, sẽ thử lại.');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final deposit = _deposit;
-    if (deposit == null) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(
-            24, 8, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.qr_code_2, size: 52, color: AppColors.teal),
-          const SizedBox(height: 8),
-          const Text('Nạp tiền vào ví',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 14),
-          TextField(
-              controller: _amount,
-              keyboardType: TextInputType.number,
-              decoration:
-                  const InputDecoration(labelText: 'Số tiền nạp (VNĐ)')),
-          const SizedBox(height: 14),
-          FilledButton(
-              onPressed: _loading ? null : _create,
-              child: Text(_loading ? 'Đang tạo mã...' : 'Tạo mã VietQR')),
-        ]),
-      );
-    }
-    final qr = '${deposit['qrUrl'] ?? ''}';
-    final code = '${deposit['paymentCode']}';
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Text('Quét VietQR để nạp tiền',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 14),
-        if (qr.isNotEmpty)
-          Image.network(qr,
-              height: 220,
-              errorBuilder: (_, __, ___) =>
-                  const Icon(Icons.broken_image_outlined, size: 100))
-        else
-          const Icon(Icons.qr_code_2, size: 150),
-        const SizedBox(height: 10),
-        Text('Nội dung: $code',
-            style: const TextStyle(fontWeight: FontWeight.w800)),
-        TextButton.icon(
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: code));
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('Đã sao chép nội dung chuyển khoản.')));
-            },
-            icon: const Icon(Icons.copy_outlined),
-            label: const Text('Sao chép nội dung')),
-        const Text('Số dư sẽ tự cập nhật ngay sau khi ngân hàng xác nhận.',
-            textAlign: TextAlign.center),
-        if (_pollNotice != null) ...[
-          const SizedBox(height: 8),
-          Text(_pollNotice!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: AppColors.coral)),
-        ],
-        TextButton.icon(
-            onPressed: _check,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Kiểm tra ngay')),
-      ]),
-    );
-  }
+  final d = DateTime.tryParse('$value');
+  if (d == null) return '$value';
+  return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 }
