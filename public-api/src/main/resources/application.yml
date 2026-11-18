@@ -47,3 +47,15 @@ pawcare:
       password: ${PAWCARE_BONITA_PASSWORD:}
       process-name: ${PAWCARE_BONITA_BOOKING_PROCESS:BookingService}
       retry-delay-ms: ${PAWCARE_BONITA_WORKFLOW_RETRY_MS:15000}
+    provider-approval:
+      # Enable only after ProviderApproval 1.1 is deployed and its two service
+      # tasks have REST connectors configured as documented in docs/.
+      enabled: ${PAWCARE_BONITA_PROVIDER_APPROVAL_ENABLED:false}
+      base-url: ${PAWCARE_BONITA_PROVIDER_APPROVAL_URL:http://127.0.0.1:62666/bonita}
+      username: ${PAWCARE_BONITA_PROVIDER_APPROVAL_USERNAME:}
+      password: ${PAWCARE_BONITA_PROVIDER_APPROVAL_PASSWORD:}
+      process-name: ${PAWCARE_BONITA_PROVIDER_APPROVAL_PROCESS:ProviderApproval}
+      retry-delay-ms: ${PAWCARE_BONITA_PROVIDER_APPROVAL_RETRY_MS:15000}
+      # Must be configured as an environment secret in production. Empty means
+      # Bonita callbacks are intentionally rejected.
+      bridge-token: ${PAWCARE_BONITA_PROVIDER_APPROVAL_BRIDGE_TOKEN:}

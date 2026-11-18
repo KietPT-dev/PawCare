@@ -31,7 +31,7 @@ public class WebConfig implements WebMvcConfigurer {
                 // PAWCARE_CORS_ORIGIN_PATTERNS to its explicit HTTPS domains.
                 .allowedOriginPatterns(allowedOriginPatterns)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("Authorization", "Content-Type")
+                .allowedHeaders("Authorization", "Content-Type", "X-PawCare-Workflow-Token")
                 .allowCredentials(false);
     }
 }

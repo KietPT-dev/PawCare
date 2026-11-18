@@ -1,6 +1,7 @@
 package com.pawcare.publicapi.auth;
 
 import com.pawcare.publicapi.web.ApiException;
+import com.pawcare.publicapi.bonita.ProviderApprovalWorkflowOutbox;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.sql.Timestamp;
@@ -19,14 +20,17 @@ public class AuthService {
     private final PasswordService passwords = new PasswordService();
     private final SecureRandom random = new SecureRandom();
     private final long refreshDays;
+    private final ProviderApprovalWorkflowOutbox providerApprovalOutbox;
 
     public AuthService(
             JdbcTemplate db,
             JwtService jwt,
+            ProviderApprovalWorkflowOutbox providerApprovalOutbox,
             @Value("${pawcare.auth.refresh-token-days}") long refreshDays
     ) {
         this.db = db;
         this.jwt = jwt;
+        this.providerApprovalOutbox = providerApprovalOutbox;
         this.refreshDays = refreshDays;
     }
 
@@ -95,6 +99,9 @@ public class AuthService {
                     email,
                     Optional.ofNullable(text(body, "address")).orElse("To be completed")
             );
+            Long providerId = db.queryForObject(
+                    "SELECT id FROM providers WHERE owner_profile_id=?", Long.class, id);
+            providerApprovalOutbox.enqueueStart(providerId);
         }
 
         return tokenResponse(profile(id));
