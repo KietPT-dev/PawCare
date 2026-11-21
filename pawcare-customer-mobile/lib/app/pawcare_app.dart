@@ -61,7 +61,7 @@ class _PawCareAppState extends State<PawCareApp> {
                   onThemeChanged: _setTheme,
                   onProfileUpdated: _profileUpdated,
                   onLogout: _logout)
-              : AuthScreen(onAuthenticated: _authenticated));
+              : AuthScreen(api: _api, onAuthenticated: _authenticated));
 
   Future<void> _authenticated(AuthForm form, bool register) async {
     final session = register

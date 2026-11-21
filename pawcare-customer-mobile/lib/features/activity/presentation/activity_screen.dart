@@ -45,21 +45,32 @@ class _ActivityScreenState extends State<ActivityScreen> {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: Row(children: [
               Expanded(
-                  child: Text('Lịch hẹn của tôi',
-                      style: Theme.of(c)
-                          .textTheme
-                          .headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w800))),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text('Lịch hẹn của tôi',
+                        style: const TextStyle(
+                            fontSize: 28, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text('Theo dõi lịch hẹn của bạn',
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: Theme.of(c)
+                                .colorScheme
+                                .onSurfaceVariant)),
+                  ])),
               IconButton(onPressed: _changed, icon: const Icon(Icons.refresh))
             ])),
         Padding(
-            padding: const EdgeInsets.all(20),
-            child: SegmentedButton<int>(segments: const [
-              ButtonSegment(value: 0, label: Text('Sắp tới')),
-              ButtonSegment(value: 1, label: Text('Lịch sử'))
-            ], selected: {
-              _tab
-            }, onSelectionChanged: (v) => setState(() => _tab = v.first))),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+            child: LiquidGlassCard(
+              radius: 16,
+              padding: const EdgeInsets.all(4),
+              child: Row(children: [
+                _tabButton(0, 'Sắp tới'),
+                _tabButton(1, 'Lịch sử'),
+              ]),
+            )),
         Expanded(
             child: FutureBuilder<_Data>(
                 future: _data,
@@ -107,6 +118,58 @@ class _ActivityScreenState extends State<ActivityScreen> {
                           }));
                 }))
       ]));
+
+  Widget _tabButton(int value, String label) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selected = _tab == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _tab = value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? (isDark ? AppColors.darkSurface : Colors.white)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: selected
+                ? Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: .15)
+                        : Colors.white.withValues(alpha: .9),
+                    width: 1)
+                : null,
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: (isDark ? Colors.black : const Color(0xFF163832))
+                          .withValues(alpha: isDark ? .25 : .08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    )
+                  ]
+                : null,
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                color: selected
+                    ? AppColors.teal
+                    : (isDark
+                        ? const Color(0xFF9CBAC3)
+                        : const Color(0xFF6B8791)),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _Data {
@@ -267,81 +330,151 @@ class _Card extends StatelessWidget {
         onTap: () => Navigator.of(c).push(MaterialPageRoute(
             builder: (_) => BookingDetailScreen(
                 api: api, bookingId: int.tryParse('${b['id']}') ?? 0))),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Expanded(
-                child: Text(AppFormatters.dateTime(b['booking_start']),
-                    style: const TextStyle(fontWeight: FontWeight.w800))),
-            BookingStatusChip(status)
-          ]),
-          const SizedBox(height: 8),
-          Text('${b['service_name'] ?? 'Dịch vụ'}',
-              style:
-                  const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-          Text(
-              '${b['provider_name'] ?? 'Provider'} · ${AppFormatters.money(b['estimated_price'])}'),
-          if ({
-            'PENDING_PAYMENT',
-            'PENDING_APPROVAL',
-            'CONFIRMED',
-            'CHECKED_IN',
-            'IN_SERVICE',
-            'SERVICE_DONE',
-            'DISPUTED',
-            'SYSTEM_REVIEW'
-          }.contains(status))
-            const Padding(
-                padding: EdgeInsets.only(top: 6),
-                child: Text('Tiền dịch vụ đang được giữ an toàn trong escrow.',
-                    style: TextStyle(color: AppColors.teal, fontSize: 12))),
-          if (status == 'SERVICE_DONE') ...[
-            const Divider(),
-            const Text('Provider báo đã hoàn tất',
-                style: TextStyle(
-                    fontWeight: FontWeight.w800, color: AppColors.teal)),
-            if ('${b['provider_note'] ?? ''}'.isNotEmpty)
-              Text('${b['provider_note']}'),
-            FilledButton.icon(
-                onPressed: () => _confirm(c),
-                icon: const Icon(Icons.check_circle_outline),
-                label: const Text('Xác nhận hoàn tất')),
-            TextButton.icon(
-                onPressed: () => _dispute(c),
-                icon: const Icon(Icons.report_problem_outlined),
-                label: const Text('Có vấn đề / Khiếu nại'))
-          ],
-          if (status == 'DISPUTED') ...[
-            const Divider(),
-            const Text('Đang chờ Admin xử lý tranh chấp',
-                style: TextStyle(
-                    fontWeight: FontWeight.w800, color: AppColors.coral)),
-            if (complaint?['admin_response'] != null)
-              Text('Phản hồi Admin: ${complaint!['admin_response']}')
-          ],
-          if (status == 'COMPLETED') ...[
-            const Divider(),
-            if (review != null)
-              Text(
-                  'Đánh giá đã gửi: ${review!['rating']}★ · ${review!['comment'] ?? 'Không có nhận xét'}')
-            else
-              TextButton(
-                  onPressed: () => _review(c), child: const Text('Đánh giá'))
-          ],
-          if (canCancel)
-            TextButton(
-                onPressed: () async {
-                  try {
-                    await api.put(
-                        '/bookings/${b['id']}/status', {'status': 'CANCELLED'});
-                    await changed();
-                  } catch (e) {
-                    if (c.mounted)
-                      ScaffoldMessenger.of(c).showSnackBar(
-                          SnackBar(content: Text(ApiMessages.friendly(e))));
-                  }
-                },
-                child:
-                    const Text('Hủy lịch', style: TextStyle(color: Colors.red)))
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+              width: 48,
+              height: 48,
+              decoration: const BoxDecoration(
+                  color: AppColors.mint, shape: BoxShape.circle),
+              child: const Icon(Icons.calendar_month,
+                  color: AppColors.teal, size: 22)),
+          const SizedBox(width: 14),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Text(
+                                AppFormatters.dateTime(b['booking_start']),
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(c)
+                                        .colorScheme
+                                        .onSurfaceVariant)),
+                            const SizedBox(height: 2),
+                            Text('${b['service_name'] ?? 'Dịch vụ'}',
+                                style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800)),
+                          ])),
+                      Text(AppFormatters.money(b['estimated_price']),
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.teal)),
+                    ]),
+                const SizedBox(height: 4),
+                Text('${b['provider_name'] ?? 'Provider'}',
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(c)
+                            .colorScheme
+                            .onSurfaceVariant)),
+                const SizedBox(height: 8),
+                if ({
+                  'PENDING_PAYMENT',
+                  'PENDING_APPROVAL',
+                  'CONFIRMED',
+                  'CHECKED_IN',
+                  'IN_SERVICE',
+                  'SERVICE_DONE',
+                  'DISPUTED',
+                  'SYSTEM_REVIEW'
+                }.contains(status))
+                  Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                          'Tiền dịch vụ đang được giữ an toàn trong escrow.',
+                          style: const TextStyle(
+                              color: AppColors.teal,
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic))),
+                if (status == 'SERVICE_DONE') ...[
+                  const Divider(height: 16),
+                  const Text('Provider báo đã hoàn tất',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.teal,
+                          fontSize: 13)),
+                  if ('${b['provider_note'] ?? ''}'.isNotEmpty)
+                    Text('${b['provider_note']}'),
+                  const SizedBox(height: 6),
+                  Row(children: [
+                    TextButton(
+                        onPressed: () => _confirm(c),
+                        style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 4),
+                            textStyle: const TextStyle(fontSize: 13)),
+                        child: const Text('Xác nhận hoàn tất')),
+                    const SizedBox(width: 6),
+                    TextButton(
+                        onPressed: () => _dispute(c),
+                        style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 4),
+                            foregroundColor: AppColors.coral,
+                            textStyle: const TextStyle(fontSize: 13)),
+                        child: const Text('Có vấn đề / Khiếu nại')),
+                  ]),
+                ],
+                if (status == 'DISPUTED') ...[
+                  const Divider(height: 16),
+                  const Text('Đang chờ Admin xử lý tranh chấp',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.coral,
+                          fontSize: 13)),
+                  if (complaint?['admin_response'] != null)
+                    Text('Phản hồi Admin: ${complaint!['admin_response']}')
+                ],
+                if (status == 'COMPLETED') ...[
+                  const Divider(height: 16),
+                  if (review != null)
+                    Text(
+                        'Đánh giá đã gửi: ${review!['rating']}★ · ${review!['comment'] ?? 'Không có nhận xét'}')
+                  else
+                    TextButton(
+                        onPressed: () => _review(c),
+                        style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 4),
+                            textStyle: const TextStyle(fontSize: 13)),
+                        child: const Text('Đánh giá'))
+                ],
+                const SizedBox(height: 6),
+                Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      BookingStatusChip(status),
+                      if (canCancel)
+                        TextButton(
+                            onPressed: () async {
+                              try {
+                                await api.put('/bookings/${b['id']}/status',
+                                    {'status': 'CANCELLED'});
+                                await changed();
+                              } catch (e) {
+                                if (c.mounted)
+                                  ScaffoldMessenger.of(c).showSnackBar(SnackBar(
+                                      content:
+                                          Text(ApiMessages.friendly(e))));
+                              }
+                            },
+                            style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 4),
+                                foregroundColor: Colors.red,
+                                textStyle: const TextStyle(fontSize: 13)),
+                            child: const Text('Hủy lịch')),
+                    ]),
+              ]))
         ]));
   }
 }

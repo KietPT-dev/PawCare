@@ -62,62 +62,114 @@ class _CustomerShellState extends State<CustomerShell> {
           onLogout: widget.onLogout),
     ];
     const labels = ['Trang chủ', 'Khám phá', 'Đơn lịch', 'Tài khoản'];
-    const icons = [
-      Icons.home_outlined,
-      Icons.search,
-      Icons.calendar_month_outlined,
-      Icons.person_outline
+    final activeIcons = [
+      Icons.home_rounded,
+      Icons.explore_rounded,
+      Icons.calendar_month_rounded,
+      Icons.person_rounded,
     ];
+    final inactiveIcons = [
+      Icons.home_outlined,
+      Icons.explore_outlined,
+      Icons.calendar_month_outlined,
+      Icons.person_outline_rounded,
+    ];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       extendBody: true,
-      body: Stack(children: [
-        IndexedStack(index: index, children: pages),
-        Align(
-          alignment: Alignment.bottomCenter,
-          child: SafeArea(
-            minimum: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-            child: LiquidGlassCard(
-              radius: 32,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              child: Row(
-                  children: List.generate(
-                      4,
-                      (i) => Expanded(
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(24),
-                              onTap: () => setState(() => index = i),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 220),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 9),
-                                decoration: BoxDecoration(
-                                    color: i == index
-                                        ? AppColors.teal.withValues(alpha: .16)
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(22)),
-                                child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(icons[i],
-                                          color: i == index
-                                              ? AppColors.teal
-                                              : AppColors.navy),
-                                      const SizedBox(height: 3),
-                                      Text(labels[i],
-                                          style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: i == index
-                                                  ? FontWeight.w700
-                                                  : FontWeight.w500,
-                                              color: AppColors.navy)),
-                                    ]),
+      body: LiquidAmbientBackground(
+        child: Stack(children: [
+          IndexedStack(index: index, children: pages),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: SafeArea(
+              minimum: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+              child: LiquidGlassCard(
+                radius: 36,
+                blur: 24,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                    children: List.generate(
+                        4,
+                        (i) => Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(26),
+                                onTap: () => setState(() => index = i),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 220),
+                                  curve: Curves.easeOutCubic,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                      color: i == index
+                                          ? AppColors.teal.withValues(
+                                              alpha: isDark ? .24 : .14)
+                                          : Colors.transparent,
+                                      border: i == index
+                                          ? Border.all(
+                                              color: AppColors.teal.withValues(
+                                                  alpha: isDark ? .35 : .22),
+                                              width: 1)
+                                          : null,
+                                      borderRadius: BorderRadius.circular(26)),
+                                  child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Stack(
+                                          clipBehavior: Clip.none,
+                                          children: [
+                                            Icon(
+                                              i == index
+                                                  ? activeIcons[i]
+                                                  : inactiveIcons[i],
+                                              size: 24,
+                                              color: i == index
+                                                  ? AppColors.teal
+                                                  : (isDark
+                                                      ? const Color(0xFF9CBAC3)
+                                                      : const Color(
+                                                          0xFF466571)),
+                                            ),
+                                            if (i == 3 && _unread > 0)
+                                              Positioned(
+                                                right: -4,
+                                                top: -2,
+                                                child: Container(
+                                                  width: 8,
+                                                  height: 8,
+                                                  decoration:
+                                                      const BoxDecoration(
+                                                    color: AppColors.coral,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(labels[i],
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: i == index
+                                                    ? FontWeight.w800
+                                                    : FontWeight.w600,
+                                                color: i == index
+                                                    ? AppColors.teal
+                                                    : (isDark
+                                                        ? const Color(
+                                                            0xFF9CBAC3)
+                                                        : const Color(
+                                                            0xFF466571)))),
+                                      ]),
+                                ),
                               ),
-                            ),
-                          ))),
+                            ))),
+              ),
             ),
           ),
-        ),
-      ]),
+        ]),
+      ),
     );
   }
 }
