@@ -30,28 +30,45 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final onSurface = Theme.of(context).colorScheme.onSurface;
+    final canPop = Navigator.canPop(context);
 
-    return SafeArea(
-      child: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Khám phá dịch vụ',
-                style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                    color: onSurface)),
-            const SizedBox(height: 4),
-            Text('Tìm spa, bác sĩ và khách sạn tốt nhất cho bé',
-                style: TextStyle(
-                    fontSize: 14,
-                    color: isDark
-                        ? const Color(0xFFC6DFE5)
-                        : const Color(0xFF466571),
-                    fontWeight: FontWeight.w500)),
-            const SizedBox(height: 14),
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.darkCanvas : AppColors.canvas,
+      body: LiquidAmbientBackground(
+        child: SafeArea(
+          child: Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child:
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                if (canPop)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: GlassIconButton(
+                        size: 38,
+                        icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                        tooltip: 'Quay lại',
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                  ),
+                Text('Khám phá dịch vụ',
+                    style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                        color: onSurface)),
+                const SizedBox(height: 4),
+                Text('Tìm spa, bác sĩ và khách sạn tốt nhất cho bé',
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
+                        fontWeight: FontWeight.w500)),
+                const SizedBox(height: 14),
             LiquidGlassCard(
               radius: 20,
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -300,9 +317,11 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                 ),
               );
             },
-          ),
+              ),
+            ),
+          ]),
         ),
-      ]),
+      ),
     );
   }
 }

@@ -12,6 +12,7 @@ import 'package:pawcare_customer_mobile/core/theme/app_theme.dart';
 import 'package:pawcare_customer_mobile/features/auth/presentation/auth_screen.dart';
 import 'package:pawcare_customer_mobile/features/booking/presentation/booking_screen.dart';
 import 'package:pawcare_customer_mobile/features/activity/presentation/activity_screen.dart';
+import 'package:pawcare_customer_mobile/features/activity/presentation/booking_detail_screen.dart';
 import 'package:pawcare_customer_mobile/features/home/presentation/home_screen.dart';
 import 'package:pawcare_customer_mobile/features/profile/presentation/profile_screen.dart';
 import 'package:pawcare_customer_mobile/features/notifications/presentation/notifications_screen.dart';
@@ -270,6 +271,52 @@ void main() {
 
     expect(find.text('Quên mật khẩu?'), findsOneWidget);
     expect(find.text('test@pawcare.vn'), findsOneWidget);
+  });
+
+  testWidgets(
+      'booking detail shows cancel button and handles SERVICE_DONE actions',
+      (tester) async {
+    var confirmed = false;
+    final api = PawCareApi(
+        baseUrl: 'http://pawcare.test/api/v1',
+        client: MockClient((request) async {
+          if (request.url.path.endsWith('/bookings')) {
+            return _jsonResponse([
+              {
+                'id': 11,
+                'status': 'SERVICE_DONE',
+                'booking_start': '2026-11-23T09:00:00',
+                'service_name': 'Tắm & tỉa lông',
+                'provider_name': 'kirt',
+                'estimated_price': 150000,
+                'provider_note': 'Bé rất ngoan'
+              }
+            ]);
+          }
+          if (request.method == 'POST' &&
+              request.url.path.endsWith('/confirm-completion')) {
+            confirmed = true;
+            return _jsonResponse({'success': true});
+          }
+          return _jsonResponse({'error': 'Not found'}, 404);
+        }));
+    addTearDown(api.close);
+
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: BookingDetailScreen(api: api, bookingId: 11),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Chi tiết lịch hẹn'), findsOneWidget);
+    expect(find.text('Tắm & tỉa lông'), findsOneWidget);
+    expect(find.text('Xác nhận hoàn tất'), findsOneWidget);
+    expect(find.text('Có vấn đề / Khiếu nại'), findsOneWidget);
+
+    await tester.tap(find.text('Xác nhận hoàn tất'));
+    await tester.pumpAndSettle();
+
+    expect(confirmed, isTrue);
   });
 }
 

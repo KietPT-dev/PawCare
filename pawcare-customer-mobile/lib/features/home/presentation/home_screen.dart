@@ -5,7 +5,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
 import '../../discovery/presentation/discovery_screen.dart';
 import '../../discovery/presentation/provider_detail_screen.dart';
-import '../../pets/presentation/pets_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.profile, required this.api});
@@ -55,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
+      backgroundColor: Colors.transparent,
       builder: (sheetContext) => _CareNotesSheet(
         notes: _careNotes,
         onAdd: (title, content) async {
@@ -161,6 +160,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               onPressed: () => showModalBottomSheet(
                 context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
                 builder: (_) => _Notifications(api: widget.api),
               ),
             ),
@@ -334,76 +335,63 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
 
-          // ── Việc cần làm ──
-          const SectionTitle('Việc cần làm'),
-          Row(children: [
-            Expanded(
-              child: InfoCard(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => PetsScreen(api: widget.api)),
+          // ── Chăm sóc hôm nay ──
+          const SectionTitle('Chăm sóc hôm nay'),
+          LiquidGlassCard(
+            radius: 20,
+            padding: const EdgeInsets.all(16),
+            child: Row(children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.teal.withValues(alpha: .14),
+                  shape: BoxShape.circle,
                 ),
+                child: const Icon(Icons.lightbulb_outline_rounded,
+                    color: AppColors.teal, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: AppColors.coral.withValues(alpha: .14),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.pets,
-                          color: AppColors.coral, size: 20),
+                    Text('Ghi chú chăm sóc',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            color: onSurface)),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Lưu lại điều bé cần được quan tâm',
+                      style: TextStyle(
+                          fontSize: 12.5,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF64748B)),
                     ),
-                    const SizedBox(height: 12),
-                    const Text('Hồ sơ thú cưng',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 15)),
-                    const SizedBox(height: 2),
-                    Text('Xem, thêm và cập nhật',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? const Color(0xFF9CBAC3)
-                                : const Color(0xFF6B8791))),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: InfoCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: AppColors.teal.withValues(alpha: .14),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.calendar_today,
-                          color: AppColors.teal, size: 20),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text('Lịch hẹn tới',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 15)),
-                    const SizedBox(height: 2),
-                    Text('Thứ Bảy, 09:00',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? const Color(0xFF9CBAC3)
-                                : const Color(0xFF6B8791))),
-                  ],
+              TextButton(
+                onPressed: _openCareNotes,
+                style: TextButton.styleFrom(
+                  backgroundColor: AppColors.teal.withValues(alpha: .12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text(
+                  _careNotes.isEmpty ? 'Ghi chú' : '${_careNotes.length} ghi chú',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.teal,
+                      fontSize: 13),
                 ),
               ),
-            ),
-          ]),
+            ]),
+          ),
 
           // ── Gợi ý cho bạn ──
           SectionTitle(
@@ -533,54 +521,6 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
           ),
-
-          // ── Chăm sóc hôm nay ──
-          const SectionTitle('Chăm sóc hôm nay'),
-          InfoCard(
-            child: Row(children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.teal.withValues(alpha: .14),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.lightbulb_outline_rounded,
-                    color: AppColors.teal, size: 22),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Ghi chú chăm sóc',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 15)),
-                    SizedBox(height: 2),
-                    Text('Lưu lại điều bé cần được quan tâm',
-                        style: TextStyle(fontSize: 12)),
-                  ],
-                ),
-              ),
-              TextButton(
-                onPressed: _openCareNotes,
-                style: TextButton.styleFrom(
-                  backgroundColor: AppColors.teal.withValues(alpha: .12),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: Text(
-                  _careNotes.isEmpty ? 'Ghi chú' : '${_careNotes.length} ghi chú',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.teal,
-                      fontSize: 13),
-                ),
-              ),
-            ]),
-          ),
         ]),
       ),
     );
@@ -697,6 +637,7 @@ class _CareNotesSheetState extends State<_CareNotesSheet> {
     final created = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Text('Ghi chú chăm sóc'),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(
@@ -704,14 +645,16 @@ class _CareNotesSheetState extends State<_CareNotesSheet> {
               autofocus: true,
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(
-                  hintText: 'Tiêu đề, ví dụ: Uống thuốc')),
+                  labelText: 'Tiêu đề',
+                  hintText: 'Ví dụ: Uống thuốc sau ăn')),
           const SizedBox(height: 12),
           TextField(
               controller: _contentController,
               maxLines: 3,
               textCapitalization: TextCapitalization.sentences,
-              decoration:
-                  const InputDecoration(hintText: 'Điều cần lưu ý cho bé…')),
+              decoration: const InputDecoration(
+                  labelText: 'Nội dung',
+                  hintText: 'Điều cần lưu ý cho bé…')),
         ]),
         actions: [
           TextButton(
@@ -773,80 +716,142 @@ class _CareNotesSheetState extends State<_CareNotesSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-              20, 0, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
-          child: SizedBox(
-            height: MediaQuery.sizeOf(context).height * .62,
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Expanded(
-                    child: Text('Ghi chú chăm sóc',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w800))),
-                IconButton(
-                    onPressed: _addNote,
-                    tooltip: 'Thêm ghi chú',
-                    icon: const Icon(Icons.add_circle_outline,
-                        color: AppColors.teal)),
-              ]),
-              Text('Lưu ý nhanh cho thú cưng của bạn.',
-                  style: Theme.of(context).textTheme.bodyMedium),
-              if (_error != null) ...[
-                const SizedBox(height: 8),
-                Text(_error!, style: const TextStyle(color: Colors.redAccent)),
-              ],
-              const SizedBox(height: 14),
-              Expanded(
-                child: widget.notes.isEmpty
-                    ? Center(
-                        child:
-                            Column(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.lightbulb_outline,
-                              color: AppColors.teal, size: 42),
-                          const SizedBox(height: 10),
-                          Text('Chưa có ghi chú nào.',
-                              style: Theme.of(context).textTheme.titleMedium),
-                          const SizedBox(height: 6),
-                          const Text('Nhấn dấu + để thêm điều cần quan tâm.'),
-                        ]),
-                      )
-                    : ListView.separated(
-                        itemCount: widget.notes.length,
-                        separatorBuilder: (_, __) => const Divider(),
-                        itemBuilder: (_, index) {
-                          final note = widget.notes[index];
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.lightbulb_outline,
-                                color: AppColors.teal),
-                            title: Text(note.title,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w800)),
-                            subtitle: Text(note.content.isEmpty
-                                ? 'Vừa thêm'
-                                : note.content),
-                            trailing: IconButton(
-                                tooltip: 'Xóa ghi chú',
-                                onPressed:
-                                    _saving ? null : () => _deleteNote(note),
-                                icon: const Icon(Icons.delete_outline)),
-                          );
-                        }),
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return LiquidModalSheet(
+      title: 'Ghi chú chăm sóc',
+      subtitle: 'Lưu ý nhanh cho thú cưng của bạn.',
+      headerAction: IconButton(
+        onPressed: _addNote,
+        tooltip: 'Thêm ghi chú',
+        icon: const Icon(Icons.add_circle_outline, color: AppColors.teal),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_error != null) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.coral.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.coral.withValues(alpha: .3)),
               ),
-              const SizedBox(height: 10),
-              FilledButton.icon(
-                  onPressed: _saving ? null : _addNote,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Thêm ghi chú')),
-            ]),
+              child: Text(_error!,
+                  style: const TextStyle(
+                      color: AppColors.coral,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600)),
+            ),
+          ],
+          Expanded(
+            child: widget.notes.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.teal.withValues(alpha: .12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.lightbulb_outline_rounded,
+                              color: AppColors.teal, size: 36),
+                        ),
+                        const SizedBox(height: 12),
+                        Text('Chưa có ghi chú nào.',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                                color: onSurface)),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Nhấn dấu + để thêm điều cần quan tâm cho bé.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: isDark
+                                  ? const Color(0xFF94A3B8)
+                                  : const Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: widget.notes.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (_, index) {
+                      final note = widget.notes[index];
+                      return LiquidGlassCard(
+                        radius: 18,
+                        padding: const EdgeInsets.all(14),
+                        blur: 10,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.teal.withValues(alpha: .12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.lightbulb_rounded,
+                                  color: AppColors.teal, size: 18),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    note.title,
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                        color: onSurface),
+                                  ),
+                                  if (note.content.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      note.content,
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          height: 1.35,
+                                          color: isDark
+                                              ? const Color(0xFF94A3B8)
+                                              : const Color(0xFF475569)),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Xóa ghi chú',
+                              onPressed:
+                                  _saving ? null : () => _deleteNote(note),
+                              icon: const Icon(Icons.delete_outline_rounded,
+                                  color: AppColors.coral, size: 20),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
           ),
-        ),
-      );
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _saving ? null : _addNote,
+            icon: const Icon(Icons.add_rounded, size: 20),
+            label: const Text('Thêm ghi chú'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SearchPage extends StatelessWidget {
@@ -889,56 +894,156 @@ class _NotificationsState extends State<_Notifications> {
 
   void reload() =>
       setState(() => notifications = widget.api.list('/notifications'));
+
   @override
-  Widget build(BuildContext context) =>
-      FutureBuilder<List<Map<String, dynamic>>>(
-          future: notifications,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done)
-              return const SizedBox(
-                  height: 240,
-                  child: Center(child: CircularProgressIndicator()));
-            if (snapshot.hasError)
-              return SizedBox(
-                  height: 240,
-                  child: Center(
-                      child: Text(snapshot.error.toString(),
-                          textAlign: TextAlign.center)));
-            final rows = snapshot.data ?? [];
-            return Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Thông báo',
-                          style: Theme.of(context).textTheme.titleLarge),
-                      if (rows.isEmpty)
-                        const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 24),
-                            child: Text('Bạn chưa có thông báo nào.')),
-                      ...rows.map((item) => ListTile(
-                          leading: Icon(
-                              item['is_read'] == true || item['is_read'] == 1
-                                  ? Icons.notifications_none
-                                  : Icons.notifications,
-                              color: AppColors.teal),
-                          title:
-                              Text('${item['title'] ?? 'Thông báo PawCare'}'),
-                          subtitle: Text(
-                              '${item['content'] ?? item['message'] ?? ''}'),
-                          trailing:
-                              item['is_read'] == true || item['is_read'] == 1
-                                  ? null
-                                  : const Icon(Icons.circle,
-                                      size: 10, color: AppColors.coral),
-                          onTap: () async {
-                            try {
-                              await widget.api
-                                  .put('/notifications/${item['id']}/read', {});
-                              reload();
-                            } catch (_) {}
-                          })),
-                    ]));
-          });
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return LiquidModalSheet(
+      title: 'Thông báo',
+      subtitle: 'Cập nhật lịch hẹn & dịch vụ chăm sóc',
+      child: FutureBuilder<List<Map<String, dynamic>>>(
+        future: notifications,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const SizedBox(
+              height: 200,
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.hasError) {
+            return SizedBox(
+              height: 200,
+              child: Center(
+                child: Text(snapshot.error.toString(),
+                    textAlign: TextAlign.center),
+              ),
+            );
+          }
+          final rows = snapshot.data ?? [];
+          if (rows.isEmpty) {
+            return Container(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.teal.withValues(alpha: .12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.notifications_none_rounded,
+                        size: 36, color: AppColors.teal),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Bạn chưa có thông báo nào.',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Các cập nhật đơn và lịch hẹn sẽ hiển thị tại đây.',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            );
+          }
+          return ListView.separated(
+            shrinkWrap: true,
+            itemCount: rows.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final item = rows[index];
+              final isRead = item['is_read'] == true || item['is_read'] == 1;
+              return LiquidGlassCard(
+                padding: const EdgeInsets.all(14),
+                radius: 18,
+                blur: 10,
+                onTap: () async {
+                  try {
+                    await widget.api
+                        .put('/notifications/${item['id']}/read', {});
+                    reload();
+                  } catch (_) {}
+                },
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: isRead
+                            ? (isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFF1F5F9))
+                            : AppColors.teal.withValues(alpha: .14),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isRead
+                            ? Icons.notifications_none_rounded
+                            : Icons.notifications_active_rounded,
+                        color: isRead
+                            ? (isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B))
+                            : AppColors.teal,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${item['title'] ?? 'Thông báo PawCare'}',
+                            style: TextStyle(
+                              fontWeight:
+                                  isRead ? FontWeight.w600 : FontWeight.w800,
+                              fontSize: 14.5,
+                              color: onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${item['content'] ?? item['message'] ?? ''}',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              height: 1.35,
+                              color: isDark
+                                  ? const Color(0xFF94A3B8)
+                                  : const Color(0xFF475569),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!isRead)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4, left: 6),
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: AppColors.coral,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
 }

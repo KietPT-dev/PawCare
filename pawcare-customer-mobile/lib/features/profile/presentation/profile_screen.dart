@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_theme.dart';
+import '../../../core/network/api_messages.dart';
 import '../../../core/network/pawcare_api.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
+import '../../notifications/presentation/notifications_screen.dart';
 import '../../pets/presentation/pets_screen.dart';
+import '../../wallet/presentation/wallet_screen.dart';
 import 'help_center_screen.dart';
 import 'settings_screen.dart';
-import '../../wallet/presentation/wallet_screen.dart';
-import '../../notifications/presentation/notifications_screen.dart';
-import '../../../core/network/api_messages.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({
@@ -52,449 +52,857 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
 
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-        children: [
-          LiquidGlassCard(
-            radius: 28,
-            padding: const EdgeInsets.all(22),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.teal.withValues(alpha: isDark ? .28 : .14),
-                AppColors.cyan.withValues(alpha: isDark ? .10 : .05),
-              ],
-            ),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [AppColors.teal, AppColors.cyan],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.teal.withValues(alpha: .24),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: LiquidAmbientBackground(
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+            children: [
+              // ── Header Profile Card ──
+              LiquidGlassCard(
+                radius: 28,
+                padding: const EdgeInsets.all(22),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.teal.withValues(alpha: isDark ? .28 : .14),
+                    AppColors.cyan.withValues(alpha: isDark ? .10 : .05),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [AppColors.teal, AppColors.cyan],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.teal.withValues(alpha: .24),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: CircleAvatar(
-                    radius: 38,
-                    backgroundColor: AppColors.mint,
-                    child: Text(
-                      _initials.isEmpty ? 'PC' : _initials,
-                      style: const TextStyle(
-                          color: AppColors.teal,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 24),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  _name,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3,
-                      color: Theme.of(context).colorScheme.onSurface),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  _email.isEmpty ? 'Chưa có email' : _email,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.teal.withValues(alpha: .14),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: AppColors.teal.withValues(alpha: .28)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.stars_rounded,
-                          size: 14, color: AppColors.teal),
-                      SizedBox(width: 4),
-                      Text(
-                        'Thành viên PawCare VIP',
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.teal),
+                      child: CircleAvatar(
+                        radius: 38,
+                        backgroundColor: AppColors.mint,
+                        child: Text(
+                          _initials.isEmpty ? 'PC' : _initials,
+                          style: const TextStyle(
+                              color: AppColors.teal,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 24),
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _name,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
+                        color: onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _email.isEmpty ? 'Chưa có email' : _email,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.teal.withValues(alpha: .14),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: AppColors.teal.withValues(alpha: .28)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.stars_rounded,
+                              size: 14, color: AppColors.teal),
+                          SizedBox(width: 4),
+                          Text(
+                            'Thành viên PawCare VIP',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.teal),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          const SectionTitle('Tài khoản'),
-            InfoCard(
-              child: Column(children: [
-                ListTile(
-                    leading: const Icon(Icons.person_outline),
-                    title: const Text('Thông tin cá nhân'),
-                    subtitle: const Text('Tên và email đăng ký'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _profileInfo(context)),
-                const Divider(),
-                ListTile(
-                    leading: const Icon(Icons.account_balance_wallet_outlined),
-                    title: const Text('Ví của tôi'),
-                    subtitle: const Text('Số dư, nạp/rút tiền và lịch sử'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.push(
+              ),
+
+              const SizedBox(height: 8),
+
+              // ── Nhóm Tài khoản (Hình 5) ──
+              const SectionTitle('Tài khoản'),
+              LiquidGlassCard(
+                radius: 22,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Column(
+                  children: [
+                    _ProfileMenuTile(
+                      icon: Icons.person_outline_rounded,
+                      iconColor: AppColors.teal,
+                      iconBg: AppColors.teal.withValues(alpha: .12),
+                      title: 'Thông tin cá nhân',
+                      subtitle: 'Tên và email đăng ký',
+                      onTap: () => _profileInfo(context),
+                    ),
+                    const _MenuDivider(),
+                    _ProfileMenuTile(
+                      icon: Icons.account_balance_wallet_outlined,
+                      iconColor: const Color(0xFF0284C7),
+                      iconBg: const Color(0xFF0284C7).withValues(alpha: .12),
+                      title: 'Ví của tôi',
+                      subtitle: 'Số dư, nạp/rút tiền và lịch sử',
+                      onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => WalletScreen(api: api)))),
-                const Divider(),
-                ListTile(
-                    leading: const Icon(Icons.pets_outlined),
-                    title: const Text('Quản lý thú cưng'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.push(
+                            builder: (_) => WalletScreen(api: api)),
+                      ),
+                    ),
+                    const _MenuDivider(),
+                    _ProfileMenuTile(
+                      icon: Icons.pets_rounded,
+                      iconColor: AppColors.coral,
+                      iconBg: AppColors.coral.withValues(alpha: .12),
+                      title: 'Quản lý thú cưng',
+                      subtitle: 'Hồ sơ, chủng ngừa và thói quen',
+                      onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => PetsScreen(api: api)))),
-                const Divider(),
-                ListTile(
-                    leading: const Icon(Icons.settings_outlined),
-                    title: const Text('Cài đặt'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.push(
+                            builder: (_) => PetsScreen(api: api)),
+                      ),
+                    ),
+                    const _MenuDivider(),
+                    _ProfileMenuTile(
+                      icon: Icons.settings_outlined,
+                      iconColor: const Color(0xFF6366F1),
+                      iconBg: const Color(0xFF6366F1).withValues(alpha: .12),
+                      title: 'Cài đặt',
+                      subtitle: 'Chế độ tối, thông báo và bảo mật',
+                      onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => SettingsScreen(
-                                darkMode: darkMode,
-                                onThemeChanged: onThemeChanged)))),
-                const Divider(),
-                ListTile(
-                    leading: const Icon(Icons.lock_outline),
-                    title: const Text('Đổi mật khẩu'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _changePassword(context)),
-                const Divider(),
-                ListTile(
-                    leading: const Icon(Icons.mark_email_read_outlined),
-                    title: const Text('Xác minh email'),
-                    subtitle: const Text('Gửi hoặc nhập mã xác minh từ email'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _verifyEmail(context)),
-              ]),
-            ),
-            const SectionTitle('Hỗ trợ'),
-            InfoCard(
-              child: Column(children: [
-                ListTile(
-                  leading: Badge(
-                      isLabelVisible: unreadNotifications > 0,
-                      label: Text('$unreadNotifications'),
-                      child: const Icon(Icons.notifications_none)),
-                  title: const Text('Thông báo & nhắc lịch'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
+                          builder: (_) => SettingsScreen(
+                            darkMode: darkMode,
+                            onThemeChanged: onThemeChanged,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const _MenuDivider(),
+                    _ProfileMenuTile(
+                      icon: Icons.lock_outline_rounded,
+                      iconColor: const Color(0xFF8B5CF6),
+                      iconBg: const Color(0xFF8B5CF6).withValues(alpha: .12),
+                      title: 'Đổi mật khẩu',
+                      subtitle: 'Cập nhật mật khẩu bảo mật cao',
+                      onTap: () => _changePassword(context),
+                    ),
+                    const _MenuDivider(),
+                    _ProfileMenuTile(
+                      icon: Icons.mark_email_read_outlined,
+                      iconColor: AppColors.success,
+                      iconBg: AppColors.success.withValues(alpha: .12),
+                      title: 'Xác minh email',
+                      subtitle: 'Gửi hoặc nhập mã xác minh từ email',
+                      onTap: () => _verifyEmail(context),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // ── Nhóm Hỗ trợ (Hình 5) ──
+              const SectionTitle('Hỗ trợ'),
+              LiquidGlassCard(
+                radius: 22,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Column(
+                  children: [
+                    _ProfileMenuTile(
+                      icon: Icons.notifications_none_rounded,
+                      iconColor: const Color(0xFFF59E0B),
+                      iconBg: const Color(0xFFF59E0B).withValues(alpha: .12),
+                      title: 'Thông báo & nhắc lịch',
+                      subtitle: 'Xem toàn bộ lịch sử thông báo',
+                      badge: unreadNotifications > 0
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.coral,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '$unreadNotifications',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            )
+                          : null,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
                           builder: (_) => NotificationsScreen(
-                              api: api,
-                              onChanged: onNotificationsChanged ?? () {}))),
+                            api: api,
+                            onChanged: onNotificationsChanged ?? () {},
+                          ),
+                        ),
+                      ),
+                    ),
+                    const _MenuDivider(),
+                    _ProfileMenuTile(
+                      icon: Icons.report_problem_outlined,
+                      iconColor: const Color(0xFFEF4444),
+                      iconBg: const Color(0xFFEF4444).withValues(alpha: .12),
+                      title: 'Gửi khiếu nại',
+                      subtitle: 'Bảo vệ quyền lợi khách hàng 24/7',
+                      onTap: () => _complaint(context),
+                    ),
+                    const _MenuDivider(),
+                    _ProfileMenuTile(
+                      icon: Icons.help_outline_rounded,
+                      iconColor: const Color(0xFF06B6D4),
+                      iconBg: const Color(0xFF06B6D4).withValues(alpha: .12),
+                      title: 'Trung tâm trợ giúp',
+                      subtitle: 'Hướng dẫn sử dụng & câu hỏi thường gặp',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const HelpCenterScreen()),
+                      ),
+                    ),
+                    const _MenuDivider(),
+                    _ProfileMenuTile(
+                      icon: Icons.key_rounded,
+                      iconColor: const Color(0xFF64748B),
+                      iconBg: const Color(0xFF64748B).withValues(alpha: .12),
+                      title: 'Quên mật khẩu',
+                      subtitle: 'Yêu cầu liên kết đặt lại qua email',
+                      onTap: () => _resetPassword(context),
+                    ),
+                  ],
                 ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.report_problem_outlined),
-                  title: const Text('Gửi khiếu nại'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _complaint(context),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ── Nút Đăng xuất ──
+              LiquidGlassCard(
+                radius: 18,
+                padding: EdgeInsets.zero,
+                child: ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.coral.withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.logout_rounded,
+                        color: AppColors.coral, size: 20),
+                  ),
+                  title: const Text(
+                    'Đăng xuất',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.coral,
+                      fontSize: 15,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      color: AppColors.coral, size: 20),
+                  onTap: onLogout,
                 ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.help_outline),
-                  title: const Text('Trung tâm trợ giúp'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const HelpCenterScreen())),
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.key_outlined),
-                  title: const Text('Quên mật khẩu'),
-                  subtitle: const Text('Yêu cầu liên kết đặt lại qua email'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _resetPassword(context),
-                ),
-              ]),
-            ),
-            const SizedBox(height: 24),
-            OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                onPressed: onLogout,
-                icon: const Icon(Icons.logout),
-                label: const Text('Đăng xuất')),
-          ],
+              ),
+            ],
+          ),
         ),
-      );
+      ),
+    );
   }
 
+  // ── Sheet: Thông tin cá nhân (Hình 4) ──
   void _profileInfo(BuildContext context) {
     final name = TextEditingController(text: _name);
     final email = TextEditingController(text: _email);
     final phone = TextEditingController(text: '${profile['phone'] ?? ''}');
+
     showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        builder: (_) => Padding(
-              padding: EdgeInsets.fromLTRB(
-                  24, 24, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Text('Thông tin cá nhân',
-                    style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 16),
-                TextField(
-                    controller: name,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: const InputDecoration(labelText: 'Họ và tên')),
-                const SizedBox(height: 10),
-                TextField(
-                    controller: email,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Email')),
-                const SizedBox(height: 10),
-                TextField(
-                    controller: phone,
-                    keyboardType: TextInputType.phone,
-                    decoration:
-                        const InputDecoration(labelText: 'Số điện thoại')),
-                const SizedBox(height: 16),
-                FilledButton(
-                    onPressed: () async {
-                      try {
-                        final updated = await api.put('/auth/me', {
-                          'fullName': name.text.trim(),
-                          'email': email.text.trim(),
-                          'phone': phone.text.trim(),
-                        });
-                        if (!context.mounted) return;
-                        onProfileUpdated(updated);
-                        Navigator.pop(context);
-                        _unavailable(context, 'Đã cập nhật thông tin cá nhân.');
-                      } catch (e) {
-                        if (context.mounted)
-                          _unavailable(context, ApiMessages.friendly(e));
-                      }
-                    },
-                    child: const Text('Lưu thay đổi')),
-              ]),
-            ));
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => LiquidModalSheet(
+        title: 'Thông tin cá nhân',
+        subtitle: 'Cập nhật tên, email và số điện thoại liên hệ',
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: name,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Họ và tên',
+                  prefixIcon: Icon(Icons.person_outline_rounded,
+                      color: AppColors.teal),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: email,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon:
+                      Icon(Icons.mail_outline_rounded, color: AppColors.teal),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phone,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Số điện thoại',
+                  prefixIcon: Icon(Icons.phone_outlined, color: AppColors.teal),
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: () async {
+                  try {
+                    final updated = await api.put('/auth/me', {
+                      'fullName': name.text.trim(),
+                      'email': email.text.trim(),
+                      'phone': phone.text.trim(),
+                    });
+                    if (!sheetContext.mounted) return;
+                    onProfileUpdated(updated);
+                    Navigator.pop(sheetContext);
+                    _unavailable(
+                        context, 'Đã cập nhật thông tin cá nhân thành công.');
+                  } catch (e) {
+                    if (sheetContext.mounted) {
+                      _unavailable(sheetContext, ApiMessages.friendly(e));
+                    }
+                  }
+                },
+                child: const Text('Lưu thay đổi'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _unavailable(BuildContext context, String message) =>
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
 
+  // ── Sheet: Đổi mật khẩu ──
   void _changePassword(BuildContext context) {
     final current = TextEditingController();
     final next = TextEditingController();
+
     showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        builder: (_) => Padding(
-            padding: EdgeInsets.fromLTRB(
-                24, 24, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text('Đổi mật khẩu',
-                  style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 14),
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => LiquidModalSheet(
+        title: 'Đổi mật khẩu',
+        subtitle: 'Bảo vệ tài khoản PawCare an toàn hơn',
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               TextField(
-                  controller: current,
-                  obscureText: true,
-                  decoration:
-                      const InputDecoration(labelText: 'Mật khẩu hiện tại')),
-              const SizedBox(height: 10),
+                controller: current,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Mật khẩu hiện tại',
+                  prefixIcon:
+                      Icon(Icons.lock_outline_rounded, color: AppColors.teal),
+                ),
+              ),
+              const SizedBox(height: 12),
               TextField(
-                  controller: next,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                      labelText:
-                          'Mật khẩu mới (ít nhất 10 ký tự, gồm chữ và số)')),
-              const SizedBox(height: 14),
+                controller: next,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Mật khẩu mới',
+                  hintText: 'Tối thiểu 10 ký tự gồm chữ và số',
+                  prefixIcon: Icon(Icons.lock_rounded, color: AppColors.teal),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.mint,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded,
+                        size: 16, color: AppColors.teal),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Mật khẩu mới cần ít nhất 10 ký tự, bao gồm cả chữ và số.',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.navy,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
               FilledButton(
-                  onPressed: () async {
-                    try {
-                      await api.put('/auth/password', {
-                        'currentPassword': current.text,
-                        'newPassword': next.text
-                      });
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        _unavailable(context,
-                            'Đổi mật khẩu thành công. Hãy đăng nhập lại.');
-                      }
-                    } catch (e) {
-                      if (context.mounted)
-                        _unavailable(context, ApiMessages.friendly(e));
+                onPressed: () async {
+                  try {
+                    await api.put('/auth/password', {
+                      'currentPassword': current.text,
+                      'newPassword': next.text,
+                    });
+                    if (sheetContext.mounted) {
+                      Navigator.pop(sheetContext);
+                      _unavailable(context,
+                          'Đổi mật khẩu thành công. Hãy đăng nhập lại.');
                     }
-                  },
-                  child: const Text('Cập nhật')),
-            ])));
+                  } catch (e) {
+                    if (sheetContext.mounted) {
+                      _unavailable(sheetContext, ApiMessages.friendly(e));
+                    }
+                  }
+                },
+                child: const Text('Cập nhật mật khẩu'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
+  // ── Sheet: Xác minh email ──
   void _verifyEmail(BuildContext context) {
     final token = TextEditingController();
+
     showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        builder: (sheet) => Padding(
-            padding: EdgeInsets.fromLTRB(
-                24, 24, 24, 24 + MediaQuery.of(sheet).viewInsets.bottom),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Text('Xác minh email',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 8),
-              const Text('Yêu cầu một mã từ email rồi dán vào đây.'),
-              TextButton(
-                  onPressed: () async {
-                    try {
-                      await api.requestEmailVerification();
-                      if (sheet.mounted)
-                        _unavailable(sheet, 'Đã gửi yêu cầu xác minh email.');
-                    } catch (e) {
-                      if (sheet.mounted)
-                        _unavailable(sheet, ApiMessages.friendly(e));
-                    }
-                  },
-                  child: const Text('Gửi mã xác minh')),
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheet) => LiquidModalSheet(
+        title: 'Xác minh email',
+        subtitle: 'Xác thực tài khoản để nhận đầy đủ quyền lợi thành viên',
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.teal.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.mark_email_read_rounded,
+                        color: AppColors.teal, size: 24),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Nhấn nút để nhận mã 6 số qua email đăng ký.',
+                        style: TextStyle(
+                            fontSize: 13,
+                            height: 1.35,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        try {
+                          await api.requestEmailVerification();
+                          if (sheet.mounted) {
+                            _unavailable(sheet,
+                                'Đã gửi mã xác minh vào email của bạn.');
+                          }
+                        } catch (e) {
+                          if (sheet.mounted) {
+                            _unavailable(sheet, ApiMessages.friendly(e));
+                          }
+                        }
+                      },
+                      style: TextButton.styleFrom(
+                        backgroundColor: AppColors.teal,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text('Gửi mã',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 13)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
               TextField(
-                  controller: token,
-                  decoration: const InputDecoration(labelText: 'Mã xác minh')),
-              const SizedBox(height: 12),
+                controller: token,
+                decoration: const InputDecoration(
+                  labelText: 'Mã xác minh (OTP)',
+                  hintText: 'Nhập mã nhận được từ email',
+                  prefixIcon: Icon(Icons.key_rounded, color: AppColors.teal),
+                ),
+              ),
+              const SizedBox(height: 20),
               FilledButton(
-                  onPressed: () async {
-                    try {
-                      await api.confirmEmailVerification(token.text.trim());
-                      if (sheet.mounted) {
-                        Navigator.pop(sheet);
-                        _unavailable(context, 'Email đã được xác minh.');
-                      }
-                    } catch (e) {
-                      if (sheet.mounted)
-                        _unavailable(sheet, ApiMessages.friendly(e));
+                onPressed: () async {
+                  try {
+                    await api.confirmEmailVerification(token.text.trim());
+                    if (sheet.mounted) {
+                      Navigator.pop(sheet);
+                      _unavailable(
+                          context, 'Chúc mừng! Email đã được xác minh.');
                     }
-                  },
-                  child: const Text('Xác minh')),
-            ])));
+                  } catch (e) {
+                    if (sheet.mounted) {
+                      _unavailable(sheet, ApiMessages.friendly(e));
+                    }
+                  }
+                },
+                child: const Text('Xác minh ngay'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
+  // ── Sheet: Đặt lại mật khẩu ──
   void _resetPassword(BuildContext context) {
     final email = TextEditingController(text: _email);
     final token = TextEditingController();
     final password = TextEditingController();
+
     showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        builder: (sheet) => Padding(
-            padding: EdgeInsets.fromLTRB(
-                24, 24, 24, 24 + MediaQuery.of(sheet).viewInsets.bottom),
-            child: SingleChildScrollView(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Text('Đặt lại mật khẩu',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheet) => LiquidModalSheet(
+        title: 'Đặt lại mật khẩu',
+        subtitle: 'Yêu cầu mã đặt lại và tạo mật khẩu mới',
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               TextField(
-                  controller: email,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Email')),
-              TextButton(
-                  onPressed: () async {
-                    try {
-                      await api.requestPasswordReset(email.text.trim());
-                      if (sheet.mounted)
-                        _unavailable(
-                            sheet, 'Nếu email hợp lệ, mã đặt lại đã được gửi.');
-                    } catch (e) {
-                      if (sheet.mounted)
-                        _unavailable(sheet, ApiMessages.friendly(e));
-                    }
-                  },
-                  child: const Text('Gửi mã đặt lại')),
-              TextField(
-                  controller: token,
-                  decoration: const InputDecoration(labelText: 'Mã từ email')),
-              TextField(
-                  controller: password,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Mật khẩu mới')),
-              const SizedBox(height: 12),
-              FilledButton(
-                  onPressed: () async {
-                    try {
-                      await api.resetPassword(token.text.trim(), password.text);
-                      if (sheet.mounted) {
-                        Navigator.pop(sheet);
-                        _unavailable(context, 'Đã đặt lại mật khẩu.');
+                controller: email,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: const Icon(Icons.mail_outline_rounded,
+                      color: AppColors.teal),
+                  suffixIcon: TextButton(
+                    onPressed: () async {
+                      try {
+                        await api.requestPasswordReset(email.text.trim());
+                        if (sheet.mounted) {
+                          _unavailable(sheet,
+                              'Nếu email hợp lệ, mã đặt lại đã được gửi.');
+                        }
+                      } catch (e) {
+                        if (sheet.mounted) {
+                          _unavailable(sheet, ApiMessages.friendly(e));
+                        }
                       }
-                    } catch (e) {
-                      if (sheet.mounted)
-                        _unavailable(sheet, ApiMessages.friendly(e));
+                    },
+                    child: const Text('Gửi mã',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: token,
+                decoration: const InputDecoration(
+                  labelText: 'Mã từ email',
+                  hintText: 'Nhập mã xác nhận nhận được',
+                  prefixIcon:
+                      Icon(Icons.vpn_key_outlined, color: AppColors.teal),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: password,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Mật khẩu mới',
+                  hintText: 'Tối thiểu 10 ký tự',
+                  prefixIcon:
+                      Icon(Icons.lock_outline_rounded, color: AppColors.teal),
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: () async {
+                  try {
+                    await api.resetPassword(token.text.trim(), password.text);
+                    if (sheet.mounted) {
+                      Navigator.pop(sheet);
+                      _unavailable(context, 'Đã đặt lại mật khẩu thành công.');
                     }
-                  },
-                  child: const Text('Cập nhật mật khẩu')),
-            ]))));
+                  } catch (e) {
+                    if (sheet.mounted) {
+                      _unavailable(sheet, ApiMessages.friendly(e));
+                    }
+                  }
+                },
+                child: const Text('Cập nhật mật khẩu mới'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
+  // ── Sheet: Gửi khiếu nại ──
   void _complaint(BuildContext context) {
     final booking = TextEditingController();
     final content = TextEditingController();
+
     showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        builder: (_) => Padding(
-            padding: EdgeInsets.fromLTRB(
-                24, 24, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text('Gửi khiếu nại',
-                  style: Theme.of(context).textTheme.titleLarge),
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => LiquidModalSheet(
+        title: 'Gửi khiếu nại',
+        subtitle: 'PawCare tiếp nhận và xử lý sự cố trong vòng 24h',
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.teal.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(14),
+                  border:
+                      Border.all(color: AppColors.teal.withValues(alpha: .2)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.shield_outlined,
+                        color: AppColors.teal, size: 22),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Tiền thanh toán được bảo lưu an toàn bởi hệ thống Escrow Protection cho đến khi dịch vụ hoàn tất thoả đáng.',
+                        style: TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 14),
               TextField(
-                  controller: booking,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Mã booking')),
-              const SizedBox(height: 10),
+                controller: booking,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Mã đơn / Booking ID',
+                  hintText: 'Ví dụ: 10',
+                  prefixIcon: Icon(Icons.tag_rounded, color: AppColors.teal),
+                ),
+              ),
+              const SizedBox(height: 12),
               TextField(
-                  controller: content,
-                  maxLines: 3,
-                  decoration:
-                      const InputDecoration(labelText: 'Nội dung khiếu nại')),
-              const SizedBox(height: 14),
+                controller: content,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Nội dung khiếu nại',
+                  hintText:
+                      'Mô tả chi tiết vấn đề phát sinh với bé hoặc dịch vụ...',
+                  alignLabelWithHint: true,
+                ),
+              ),
+              const SizedBox(height: 20),
               FilledButton(
-                  onPressed: () async {
-                    try {
-                      await api.post('/complaints', {
-                        'bookingId': int.tryParse(booking.text),
-                        'content': content.text.trim()
-                      });
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        _unavailable(context, 'Đã gửi khiếu nại.');
-                      }
-                    } catch (e) {
-                      if (context.mounted) _unavailable(context, e.toString());
+                style:
+                    FilledButton.styleFrom(backgroundColor: AppColors.coral),
+                onPressed: () async {
+                  try {
+                    await api.post('/complaints', {
+                      'bookingId': int.tryParse(booking.text),
+                      'content': content.text.trim(),
+                    });
+                    if (sheetContext.mounted) {
+                      Navigator.pop(sheetContext);
+                      _unavailable(context,
+                          'Đã gửi khiếu nại. PawCare sẽ liên hệ bạn sớm nhất.');
                     }
-                  },
-                  child: const Text('Gửi khiếu nại')),
-            ])));
+                  } catch (e) {
+                    if (sheetContext.mounted) {
+                      _unavailable(sheetContext, e.toString());
+                    }
+                  }
+                },
+                child: const Text('Gửi khiếu nại'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileMenuTile extends StatelessWidget {
+  const _ProfileMenuTile({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.title,
+    this.subtitle,
+    this.badge,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final String title;
+  final String? subtitle;
+  final Widget? badge;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: onSurface,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (badge != null) ...[
+              badge!,
+              const SizedBox(width: 6),
+            ],
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color:
+                  isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuDivider extends StatelessWidget {
+  const _MenuDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Divider(
+      height: 1,
+      thickness: 1,
+      indent: 68,
+      endIndent: 16,
+      color: isDark
+          ? const Color(0xFF334155).withValues(alpha: .6)
+          : const Color(0xFFF1F5F9),
+    );
   }
 }
