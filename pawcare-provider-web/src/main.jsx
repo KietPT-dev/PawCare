@@ -85,7 +85,7 @@ function App() {
       setNotifications(rowsOf(n))
       setNotice('')
       const now = new Date()
-      setLastSyncTime(`${now.getHours().toString().padLeft(2, '0')}:${now.getMinutes().toString().padLeft(2, '0')}`)
+      setLastSyncTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`)
     } catch (e) {
       setNotice(e.message)
     } finally {

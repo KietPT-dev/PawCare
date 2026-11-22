@@ -3,7 +3,8 @@ import { statusLabel } from './format'
 import { Icons } from './icons'
 
 export function Status({ value }) {
-  const v = String(value || '').toUpperCase()
+  const statusStr = typeof value === 'object' && value !== null ? (value.status || value.value || '') : String(value || '')
+  const v = statusStr.toUpperCase()
   let tone = 'neutral'
   let dotColor = '#64748B'
 
@@ -25,9 +26,9 @@ export function Status({ value }) {
   }
 
   return (
-    <span className={`status-badge status-${tone}`} title={value}>
+    <span className={`status-badge status-${tone}`} title={statusStr}>
       <span className="status-dot" style={{ backgroundColor: dotColor }} />
-      <span className="status-text">{statusLabel(value)}</span>
+      <span className="status-text">{statusLabel(statusStr)}</span>
     </span>
   )
 }
@@ -38,8 +39,12 @@ export function Empty({ title = 'Không có dữ liệu', note = 'Dữ liệu s�
       <div className="empty-state-icon">
         {icon || <Icons.Paw size={28} className="text-teal" />}
       </div>
-      <h4 className="empty-state-title">{title}</h4>
-      <p className="empty-state-note">{note}</p>
+      <h4 className="empty-state-title">
+        {typeof title === 'object' && title !== null ? JSON.stringify(title) : title}
+      </h4>
+      <p className="empty-state-note">
+        {typeof note === 'object' && note !== null ? JSON.stringify(note) : note}
+      </p>
       {action && <div className="empty-state-action">{action}</div>}
     </div>
   )
@@ -49,19 +54,26 @@ export function Loading({ message = 'Đang tải dữ liệu...' }) {
   return (
     <div className="loading-state">
       <div className="loading-spinner" />
-      <p className="loading-text">{message}</p>
+      <p className="loading-text">
+        {typeof message === 'object' && message !== null ? (message.message || JSON.stringify(message)) : message}
+      </p>
     </div>
   )
 }
 
 export function ErrorState({ error, retry }) {
+  const errorMsg =
+    typeof error === 'object' && error !== null
+      ? error.message || JSON.stringify(error)
+      : String(error || 'Đã có lỗi xảy ra')
+
   return (
     <div className="error-alert">
       <div className="error-alert-icon">
         <Icons.AlertCircle size={20} />
       </div>
       <div className="error-alert-content">
-        <strong>Đã xảy ra lỗi:</strong> {error}
+        <strong>Đã xảy ra lỗi:</strong> {errorMsg}
       </div>
       {retry && (
         <button type="button" className="error-alert-retry" onClick={retry}>
@@ -73,6 +85,11 @@ export function ErrorState({ error, retry }) {
 }
 
 export function Metric({ icon, tone = 'blue', label, value, hint, trend, trendType = 'neutral' }) {
+  // Support both string trend (e.g. "+12%") and object trend (e.g. { direction: 'up', text: '+12%' })
+  const trendObj = typeof trend === 'object' && trend !== null ? trend : null
+  const trendText = trendObj ? trendObj.text : (typeof trend === 'string' || typeof trend === 'number' ? trend : null)
+  const trendDir = trendObj ? (trendObj.direction || trendType) : trendType
+
   return (
     <section className={`kpi-card tone-${tone}`}>
       <div className="kpi-header">
@@ -82,13 +99,15 @@ export function Metric({ icon, tone = 'blue', label, value, hint, trend, trendTy
         </div>
       </div>
       <div className="kpi-body">
-        <strong className="kpi-value">{value}</strong>
+        <strong className="kpi-value">
+          {typeof value === 'object' && value !== null ? JSON.stringify(value) : value}
+        </strong>
         <div className="kpi-footer">
-          {trend && (
-            <span className={`kpi-trend kpi-trend-${trendType}`}>
-              {trendType === 'up' && '↑ '}
-              {trendType === 'down' && '↓ '}
-              {trend}
+          {trendText && (
+            <span className={`kpi-trend kpi-trend-${trendDir}`}>
+              {trendDir === 'up' && '↑ '}
+              {trendDir === 'down' && '↓ '}
+              {trendText}
             </span>
           )}
           {hint && <span className="kpi-hint">{hint}</span>}
