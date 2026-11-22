@@ -75,22 +75,25 @@ class _ActivityScreenState extends State<ActivityScreen> {
             child: FutureBuilder<_Data>(
                 future: _data,
                 builder: (c, s) {
-                  if (s.connectionState != ConnectionState.done)
+                  if (s.connectionState != ConnectionState.done) {
                     return const Center(child: CircularProgressIndicator());
-                  if (s.hasError || s.data == null)
+                  }
+                  if (s.hasError || s.data == null) {
                     return _Message(ApiMessages.friendly(s.error), _changed);
+                  }
                   final ended = {'COMPLETED', 'REJECTED', 'CANCELLED'};
                   final rows = s.data!.bookings
                       .where((b) => _tab == 0
                           ? !ended.contains('${b['status']}')
                           : ended.contains('${b['status']}'))
                       .toList();
-                  if (rows.isEmpty)
+                  if (rows.isEmpty) {
                     return _Message(
                         _tab == 0
                             ? 'Bạn chưa có lịch hẹn sắp tới.'
                             : 'Chưa có lịch sử booking.',
                         _changed);
+                  }
                   return RefreshIndicator(
                       onRefresh: _changed,
                       child: ListView.separated(
@@ -197,9 +200,10 @@ class _Card extends StatelessWidget {
       }
     } catch (e) {
       if (c.mounted) Navigator.of(c, rootNavigator: true).pop();
-      if (c.mounted)
+      if (c.mounted) {
         ScaffoldMessenger.of(c)
             .showSnackBar(SnackBar(content: Text(ApiMessages.friendly(e))));
+      }
     }
   }
 
@@ -247,9 +251,10 @@ class _Card extends StatelessWidget {
         }
       } catch (e) {
         if (c.mounted) Navigator.of(c, rootNavigator: true).pop();
-        if (c.mounted)
+        if (c.mounted) {
           ScaffoldMessenger.of(c)
               .showSnackBar(SnackBar(content: Text(ApiMessages.friendly(e))));
+        }
       }
     }
     text.dispose();
@@ -314,9 +319,10 @@ class _Card extends StatelessWidget {
         });
         await changed();
       } catch (e) {
-        if (c.mounted)
+        if (c.mounted) {
           ScaffoldMessenger.of(c)
               .showSnackBar(SnackBar(content: Text(ApiMessages.friendly(e))));
+        }
       }
     }
     note.dispose();
@@ -324,12 +330,20 @@ class _Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext c) {
-    final canCancel = {'PENDING_APPROVAL', 'PENDING', 'CONFIRMED', 'CHECKED_IN'}
-        .contains(status);
+    final canCancel = {
+      'PENDING_APPROVAL',
+      'PENDING',
+      'PENDING_PAYMENT',
+      'CONFIRMED',
+      'CHECKED_IN'
+    }.contains(status);
     return InfoCard(
-        onTap: () => Navigator.of(c).push(MaterialPageRoute(
-            builder: (_) => BookingDetailScreen(
-                api: api, bookingId: int.tryParse('${b['id']}') ?? 0))),
+        onTap: () async {
+          await Navigator.of(c).push(MaterialPageRoute(
+              builder: (_) => BookingDetailScreen(
+                  api: api, bookingId: int.tryParse('${b['id']}') ?? 0)));
+          await changed();
+        },
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
               width: 48,
@@ -404,25 +418,45 @@ class _Card extends StatelessWidget {
                           fontSize: 13)),
                   if ('${b['provider_note'] ?? ''}'.isNotEmpty)
                     Text('${b['provider_note']}'),
-                  const SizedBox(height: 6),
-                  Row(children: [
-                    TextButton(
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.icon(
                         onPressed: () => _confirm(c),
-                        style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 4),
-                            textStyle: const TextStyle(fontSize: 13)),
-                        child: const Text('Xác nhận hoàn tất')),
-                    const SizedBox(width: 6),
-                    TextButton(
+                        icon: const Icon(Icons.check_circle_outline_rounded,
+                            size: 16),
+                        label: const Text('Xác nhận hoàn tất'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.teal,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          textStyle: const TextStyle(
+                              fontSize: 12.5, fontWeight: FontWeight.w700),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      OutlinedButton.icon(
                         onPressed: () => _dispute(c),
-                        style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 4),
-                            foregroundColor: AppColors.coral,
-                            textStyle: const TextStyle(fontSize: 13)),
-                        child: const Text('Có vấn đề / Khiếu nại')),
-                  ]),
+                        icon: const Icon(Icons.report_problem_outlined,
+                            size: 16),
+                        label: const Text('Có vấn đề / Khiếu nại'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.coral,
+                          side: BorderSide(
+                              color: AppColors.coral.withValues(alpha: .5)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          textStyle: const TextStyle(
+                              fontSize: 12.5, fontWeight: FontWeight.w600),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
                 if (status == 'DISPUTED') ...[
                   const Divider(height: 16),
@@ -456,15 +490,43 @@ class _Card extends StatelessWidget {
                       if (canCancel)
                         TextButton(
                             onPressed: () async {
-                              try {
-                                await api.put('/bookings/${b['id']}/status',
-                                    {'status': 'CANCELLED'});
-                                await changed();
-                              } catch (e) {
-                                if (c.mounted)
-                                  ScaffoldMessenger.of(c).showSnackBar(SnackBar(
-                                      content:
-                                          Text(ApiMessages.friendly(e))));
+                              final confirm = await showDialog<bool>(
+                                context: c,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('Hủy lịch hẹn',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w800)),
+                                  content: Text(
+                                      'Bạn có chắc chắn muốn hủy lịch hẹn #${b['id']} không?'),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(18)),
+                                  actions: [
+                                    TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, false),
+                                        child: const Text('Quay lại')),
+                                    FilledButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, true),
+                                        style: FilledButton.styleFrom(
+                                            backgroundColor: AppColors.coral),
+                                        child: const Text('Hủy lịch')),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true) {
+                                try {
+                                  await api.put('/bookings/${b['id']}/status',
+                                      {'status': 'CANCELLED'});
+                                  await changed();
+                                } catch (e) {
+                                  if (c.mounted) {
+                                    ScaffoldMessenger.of(c).showSnackBar(
+                                        SnackBar(
+                                            content:
+                                                Text(ApiMessages.friendly(e))));
+                                  }
+                                }
                               }
                             },
                             style: TextButton.styleFrom(
