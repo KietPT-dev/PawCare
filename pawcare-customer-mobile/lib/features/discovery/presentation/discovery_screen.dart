@@ -93,6 +93,14 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       );
       return;
     }
+    if (value == DiscoveryFilter.newest) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chưa thể sắp xếp mới nhất vì API chưa trả ngày duyệt đối tác.'),
+        ),
+      );
+      return;
+    }
     widget.state.setFilter(value);
   }
 
