@@ -5,10 +5,14 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/app_formatters.dart';
 import '../../../core/widgets/ui.dart';
 import '../../booking/presentation/booking_screen.dart';
+import 'discovery_state.dart';
 
 class ProviderDetailScreen extends StatefulWidget {
-  const ProviderDetailScreen(
-      {super.key, required this.provider, required this.api});
+  const ProviderDetailScreen({
+    super.key,
+    required this.provider,
+    required this.api,
+  });
   final Map<String, String> provider;
   final PawCareApi api;
 
@@ -20,6 +24,7 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
   late Future<List<Map<String, dynamic>>> _services;
   Map<String, dynamic>? selected;
   int get id => int.tryParse(widget.provider['id'] ?? '') ?? 0;
+  ProviderRating get _rating => ProviderRating.fromMap(widget.provider);
 
   @override
   void initState() {
@@ -87,10 +92,12 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: [
-                                  AppColors.teal
-                                      .withValues(alpha: isDark ? .28 : .14),
-                                  AppColors.cyan
-                                      .withValues(alpha: isDark ? .14 : .06),
+                                  AppColors.teal.withValues(
+                                    alpha: isDark ? .28 : .14,
+                                  ),
+                                  AppColors.cyan.withValues(
+                                    alpha: isDark ? .14 : .06,
+                                  ),
                                 ],
                               ),
                               borderRadius: BorderRadius.circular(18),
@@ -99,8 +106,11 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                                 width: 1.2,
                               ),
                             ),
-                            child: const Icon(Icons.storefront_rounded,
-                                color: AppColors.teal, size: 28),
+                            child: const Icon(
+                              Icons.storefront_rounded,
+                              color: AppColors.teal,
+                              size: 28,
+                            ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
@@ -119,8 +129,11 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                                 const SizedBox(height: 3),
                                 Row(
                                   children: [
-                                    const Icon(Icons.location_on_outlined,
-                                        size: 14, color: AppColors.coral),
+                                    const Icon(
+                                      Icons.location_on_outlined,
+                                      size: 14,
+                                      color: AppColors.coral,
+                                    ),
                                     const SizedBox(width: 3),
                                     Expanded(
                                       child: Text(
@@ -146,11 +159,11 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                         ],
                       ),
                       const Divider(height: 28),
-                      const Row(
+                      Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _Metric(
-                            '5.0',
+                            _rating.label,
                             'Đánh giá',
                             icon: Icons.star_rounded,
                             iconColor: Color(0xFFF59E0B),
@@ -183,8 +196,7 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                     ),
                   )
                 else
-                  ...services
-                      .map((x) => _service(x, isDark, onSurface)),
+                  ...services.map((x) => _service(x, isDark, onSurface)),
               ],
             );
           },
@@ -203,8 +215,7 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                   builder: (_) => BookingScreen(
                     api: widget.api,
                     providerId: id,
-                    providerName:
-                        widget.provider['name'] ?? 'Đối tác PawCare',
+                    providerName: widget.provider['name'] ?? 'Đối tác PawCare',
                   ),
                 ),
               ),
@@ -247,8 +258,11 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                     : AppColors.teal.withValues(alpha: .12),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(Icons.pets_rounded,
-                  color: AppColors.teal, size: 24),
+              child: const Icon(
+                Icons.pets_rounded,
+                color: AppColors.teal,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -267,11 +281,13 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                   const SizedBox(height: 3),
                   Row(
                     children: [
-                      Icon(Icons.schedule_rounded,
-                          size: 14,
-                          color: isDark
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF64748B)),
+                      Icon(
+                        Icons.schedule_rounded,
+                        size: 14,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '${x['duration_minutes']} phút',
@@ -307,14 +323,17 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                   color: isSelected
                       ? AppColors.teal
                       : (isDark
-                          ? const Color(0xFF475569)
-                          : const Color(0xFFCBD5E1)),
+                            ? const Color(0xFF475569)
+                            : const Color(0xFFCBD5E1)),
                   width: 2,
                 ),
               ),
               child: isSelected
-                  ? const Icon(Icons.check_rounded,
-                      size: 14, color: Colors.white)
+                  ? const Icon(
+                      Icons.check_rounded,
+                      size: 14,
+                      color: Colors.white,
+                    )
                   : null,
             ),
           ],
@@ -360,9 +379,7 @@ class _Metric extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: isDark
-                ? const Color(0xFF94A3B8)
-                : const Color(0xFF64748B),
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
           ),
         ),
       ],

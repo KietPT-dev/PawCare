@@ -4,12 +4,19 @@ import '../../../core/network/pawcare_api.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
 import '../../discovery/presentation/discovery_screen.dart';
+import '../../discovery/presentation/discovery_state.dart';
 import '../../discovery/presentation/provider_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.profile, required this.api});
+  const HomeScreen({
+    super.key,
+    required this.profile,
+    required this.api,
+    this.onExplore,
+  });
   final Map<String, dynamic> profile;
   final PawCareApi api;
+  final void Function({String? query, String? category})? onExplore;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -24,6 +31,11 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _providers = widget.api.list('/providers');
     _loadCareNotes();
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _providers = widget.api.list('/providers'));
+    await Future.wait([_providers, _loadCareNotes()]);
   }
 
   Future<void> _loadCareNotes() async {
@@ -58,16 +70,22 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (sheetContext) => _CareNotesSheet(
         notes: _careNotes,
         onAdd: (title, content) async {
-          final id =
-              await widget.api.createCareNote(title: title, content: content);
+          final id = await widget.api.createCareNote(
+            title: title,
+            content: content,
+          );
           if (!mounted) return;
-          setState(() => _careNotes.insert(
+          setState(
+            () => _careNotes.insert(
               0,
               _CareNote(
-                  id: id,
-                  title: title,
-                  content: content,
-                  createdAt: DateTime.now())));
+                id: id,
+                title: title,
+                content: content,
+                createdAt: DateTime.now(),
+              ),
+            ),
+          );
         },
         onDelete: (note) async {
           await widget.api.deleteCareNote(note.id);
@@ -78,450 +96,525 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _explore({String? category}) {
+    if (widget.onExplore != null) {
+      widget.onExplore!(category: category);
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            DiscoveryScreen(api: widget.api, state: DiscoveryState()),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // ── Header ──
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.all(2.5),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [AppColors.teal, AppColors.cyan],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.teal.withValues(alpha: .24),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const CircleAvatar(
-                radius: 23,
-                backgroundColor: AppColors.mint,
-                child: Icon(Icons.pets_rounded, color: AppColors.teal, size: 22),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      child: RefreshIndicator(
+        onRefresh: _refresh,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header ──
+              Row(
                 children: [
-                  const Row(
-                    children: [
-                      Text('Xin chào',
-                          style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.cyan,
-                              fontWeight: FontWeight.w600)),
-                      SizedBox(width: 4),
-                      Text('👋', style: TextStyle(fontSize: 12)),
-                    ],
-                  ),
-                  Text(_firstName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
-                          color: onSurface)),
-                ],
-              ),
-            ),
-            GlassIconButton(
-              icon: const Icon(Icons.edit_note_rounded,
-                  color: AppColors.teal, size: 22),
-              tooltip: 'Ghi chú nhanh',
-              onPressed: _openCareNotes,
-            ),
-            const SizedBox(width: 8),
-            GlassIconButton(
-              icon: const Icon(Icons.notifications_outlined, size: 22),
-              tooltip: 'Thông báo',
-              badge: Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(
-                  color: AppColors.coral,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                      color: isDark ? AppColors.darkSurface : Colors.white,
-                      width: 1.5),
-                ),
-              ),
-              onPressed: () => showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (_) => _Notifications(api: widget.api),
-              ),
-            ),
-          ]),
-
-          const SizedBox(height: 18),
-
-          // ── Hero Liquid Glass Banner ──
-          LiquidGlassCard(
-            radius: 26,
-            padding: const EdgeInsets.all(20),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.teal.withValues(alpha: isDark ? .28 : .15),
-                AppColors.cyan.withValues(alpha: isDark ? .12 : .06),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.teal.withValues(alpha: .14),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: AppColors.teal.withValues(alpha: .28)),
+                  Container(
+                    padding: const EdgeInsets.all(2.5),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [AppColors.teal, AppColors.cyan],
                       ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.verified_rounded,
-                              size: 13, color: AppColors.teal),
-                          SizedBox(width: 4),
-                          Text('PawCare Care+',
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.teal)),
-                        ],
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.teal.withValues(alpha: .24),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const CircleAvatar(
+                      radius: 23,
+                      backgroundColor: AppColors.mint,
+                      child: Icon(
+                        Icons.pets_rounded,
+                        color: AppColors.teal,
+                        size: 22,
                       ),
                     ),
-                    const Icon(Icons.favorite_rounded,
-                        size: 18, color: AppColors.coral),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Text(
+                              'Xin chào',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.cyan,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(width: 4),
+                            Text('👋', style: TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                        Text(
+                          _firstName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
+                            color: onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GlassIconButton(
+                    icon: const Icon(
+                      Icons.edit_note_rounded,
+                      color: AppColors.teal,
+                      size: 22,
+                    ),
+                    tooltip: 'Ghi chú nhanh',
+                    onPressed: _openCareNotes,
+                  ),
+                  const SizedBox(width: 8),
+                  GlassIconButton(
+                    icon: const Icon(Icons.notifications_outlined, size: 22),
+                    tooltip: 'Thông báo',
+                    badge: Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(
+                        color: AppColors.coral,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isDark ? AppColors.darkSurface : Colors.white,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                    onPressed: () => showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => _Notifications(api: widget.api),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+
+              // ── Hero Liquid Glass Banner ──
+              LiquidGlassCard(
+                radius: 26,
+                padding: const EdgeInsets.all(20),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.teal.withValues(alpha: isDark ? .28 : .15),
+                    AppColors.cyan.withValues(alpha: isDark ? .12 : .06),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Text('Chăm sóc bé yêu trọn vẹn 🐾',
-                    style: TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.3,
-                        color: onSurface)),
-                const SizedBox(height: 6),
-                Text(
-                  'Đặt lịch spa, làm đẹp hoặc phòng khám thú y uy tín chỉ trong vài thao tác.',
-                  style: TextStyle(
-                      fontSize: 13,
-                      height: 1.38,
-                      color: isDark
-                          ? const Color(0xFFC6DFE5)
-                          : const Color(0xFF466571)),
-                ),
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => DiscoveryScreen(api: widget.api)),
-                  ),
-                  icon: const Icon(Icons.search_rounded, size: 18),
-                  label: const Text('Khám phá dịch vụ'),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(120, 42),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // ── Thanh tìm kiếm Liquid Glass ──
-          LiquidGlassCard(
-            radius: 20,
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            child: TextField(
-              readOnly: true,
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const _SearchPage())),
-              decoration: InputDecoration(
-                hintText: 'Tìm dịch vụ, đối tác, khu vực...',
-                prefixIcon: const Icon(Icons.search_rounded,
-                    color: AppColors.teal, size: 22),
-                suffixIcon: Container(
-                  margin: const EdgeInsets.all(6),
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppColors.teal.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.tune_rounded,
-                      size: 18, color: AppColors.teal),
-                ),
-                filled: false,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── Lối tắt dịch vụ (Categories) theo quy ước J8 ──
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _ServiceCategoryItem(
-                icon: Icons.bathtub_outlined,
-                label: 'Tắm & Spa',
-                color: AppColors.teal,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => DiscoveryScreen(api: widget.api)),
-                ),
-              ),
-              _ServiceCategoryItem(
-                icon: Icons.content_cut_outlined,
-                label: 'Cắt tỉa lông',
-                color: const Color(0xFF7C3AED),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => DiscoveryScreen(api: widget.api)),
-                ),
-              ),
-              _ServiceCategoryItem(
-                icon: Icons.medical_services_outlined,
-                label: 'Khám thú y',
-                color: AppColors.coral,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => DiscoveryScreen(api: widget.api)),
-                ),
-              ),
-              _ServiceCategoryItem(
-                icon: Icons.hotel_outlined,
-                label: 'Khách sạn',
-                color: const Color(0xFFD97706),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => DiscoveryScreen(api: widget.api)),
-                ),
-              ),
-            ],
-          ),
-
-          // ── Chăm sóc hôm nay ──
-          const SectionTitle('Chăm sóc hôm nay'),
-          LiquidGlassCard(
-            radius: 20,
-            padding: const EdgeInsets.all(16),
-            child: Row(children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.teal.withValues(alpha: .14),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.lightbulb_outline_rounded,
-                    color: AppColors.teal, size: 22),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Ghi chú chăm sóc',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
-                            color: onSurface)),
-                    const SizedBox(height: 3),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.teal.withValues(alpha: .14),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.teal.withValues(alpha: .28),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.verified_rounded,
+                                size: 13,
+                                color: AppColors.teal,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'PawCare Care+',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.teal,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.favorite_rounded,
+                          size: 18,
+                          color: AppColors.coral,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     Text(
-                      'Lưu lại điều bé cần được quan tâm',
+                      'Chăm sóc bé yêu trọn vẹn 🐾',
                       style: TextStyle(
-                          fontSize: 12.5,
-                          color: isDark
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF64748B)),
+                        fontSize: 19,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.3,
+                        color: onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Đặt lịch spa, làm đẹp hoặc phòng khám thú y uy tín chỉ trong vài thao tác.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.38,
+                        color: isDark
+                            ? const Color(0xFFC6DFE5)
+                            : const Color(0xFF466571),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    FilledButton.icon(
+                      onPressed: _explore,
+                      icon: const Icon(Icons.search_rounded, size: 18),
+                      label: const Text('Khám phá dịch vụ'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(120, 42),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-              TextButton(
-                onPressed: _openCareNotes,
-                style: TextButton.styleFrom(
-                  backgroundColor: AppColors.teal.withValues(alpha: .12),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: Text(
-                  _careNotes.isEmpty ? 'Ghi chú' : '${_careNotes.length} ghi chú',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800,
+
+              const SizedBox(height: 16),
+
+              // ── Thanh tìm kiếm Liquid Glass ──
+              LiquidGlassCard(
+                radius: 20,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: TextField(
+                  readOnly: true,
+                  onTap: _explore,
+                  decoration: InputDecoration(
+                    hintText: 'Tìm dịch vụ, đối tác, khu vực...',
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
                       color: AppColors.teal,
-                      fontSize: 13),
+                      size: 22,
+                    ),
+                    suffixIcon: Container(
+                      margin: const EdgeInsets.all(6),
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppColors.teal.withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.tune_rounded,
+                        size: 18,
+                        color: AppColors.teal,
+                      ),
+                    ),
+                    filled: false,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                  ),
                 ),
               ),
-            ]),
-          ),
 
-          // ── Gợi ý cho bạn ──
-          SectionTitle(
-            'Gợi ý cho bạn',
-            action: 'Xem tất cả',
-            onAction: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => DiscoveryScreen(api: widget.api)),
-            ),
-          ),
-          FutureBuilder<List<Map<String, dynamic>>>(
-            future: _providers,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const SizedBox(
-                    height: 220,
-                    child: Center(child: CircularProgressIndicator()));
-              }
-              final providers = snapshot.data ?? [];
-              if (providers.isEmpty) {
-                return const InfoCard(
-                    child: Text('Chưa có đối tác phù hợp. Hãy quay lại sau.'));
-              }
-              return SizedBox(
-                height: 224,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: providers.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    final provider = providers[index];
-                    return SizedBox(
-                      width: 280,
-                      child: InfoCard(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ProviderDetailScreen(
-                              api: widget.api,
-                              provider: provider.map((key, value) => MapEntry(
-                                  key, value?.toString() ?? '')),
+              const SizedBox(height: 20),
+
+              // ── Lối tắt dịch vụ (Categories) theo quy ước J8 ──
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _ServiceCategoryItem(
+                    icon: Icons.bathtub_outlined,
+                    label: 'Tắm & Spa',
+                    color: AppColors.teal,
+                    onTap: () => _explore(category: 'Tắm & Spa'),
+                  ),
+                  _ServiceCategoryItem(
+                    icon: Icons.content_cut_outlined,
+                    label: 'Cắt tỉa lông',
+                    color: const Color(0xFF7C3AED),
+                    onTap: () => _explore(category: 'Cắt tỉa lông'),
+                  ),
+                  _ServiceCategoryItem(
+                    icon: Icons.medical_services_outlined,
+                    label: 'Khám thú y',
+                    color: AppColors.coral,
+                    onTap: () => _explore(category: 'Khám thú y'),
+                  ),
+                  _ServiceCategoryItem(
+                    icon: Icons.hotel_outlined,
+                    label: 'Khách sạn',
+                    color: const Color(0xFFD97706),
+                    onTap: () => _explore(category: 'Khách sạn'),
+                  ),
+                ],
+              ),
+
+              // ── Chăm sóc hôm nay ──
+              const SectionTitle('Chăm sóc hôm nay'),
+              LiquidGlassCard(
+                radius: 20,
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppColors.teal.withValues(alpha: .14),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.lightbulb_outline_rounded,
+                        color: AppColors.teal,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Ghi chú chăm sóc',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                              color: onSurface,
                             ),
                           ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Lưu lại điều bé cần được quan tâm',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: isDark
+                                  ? const Color(0xFF94A3B8)
+                                  : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _openCareNotes,
+                      style: TextButton.styleFrom(
+                        backgroundColor: AppColors.teal.withValues(alpha: .12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 24,
-                                  backgroundColor:
-                                      AppColors.teal.withValues(alpha: .14),
-                                  child: const Icon(
-                                      Icons.storefront_rounded,
-                                      color: AppColors.teal,
-                                      size: 24),
-                                ),
-                                const Spacer(),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        const Color(0xFFF4B740).withValues(alpha: .14),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.star_rounded,
-                                          color: Color(0xFFF4B740), size: 16),
-                                      const SizedBox(width: 3),
-                                      Text(
-                                        '${provider['average_rating'] ?? 'Mới'}',
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 12),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Spacer(),
-                            Text(
-                              '${provider['name'] ?? 'Đối tác PawCare'}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w900, fontSize: 16),
-                            ),
-                            const SizedBox(height: 3),
-                            Row(
-                              children: [
-                                Icon(Icons.location_on_outlined,
-                                    size: 14,
-                                    color: isDark
-                                        ? const Color(0xFF9CBAC3)
-                                        : const Color(0xFF6B8791)),
-                                const SizedBox(width: 2),
-                                Expanded(
-                                  child: Text(
-                                    '${provider['service_area'] ?? provider['address'] ?? 'Đang cập nhật khu vực'}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        color: isDark
-                                            ? const Color(0xFF9CBAC3)
-                                            : const Color(0xFF6B8791)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(spacing: 6, children: [
-                              _MiniChip(label: 'Grooming'),
-                              _MiniChip(label: 'Spa'),
-                            ]),
-                          ],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                    );
-                  },
+                      child: Text(
+                        _careNotes.isEmpty
+                            ? 'Ghi chú'
+                            : '${_careNotes.length} ghi chú',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.teal,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              );
-            },
+              ),
+
+              // ── Gợi ý cho bạn ──
+              SectionTitle(
+                'Gợi ý cho bạn',
+                action: 'Xem tất cả',
+                onAction: _explore,
+              ),
+              FutureBuilder<List<Map<String, dynamic>>>(
+                future: _providers,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const SizedBox(
+                      height: 220,
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  final providers = snapshot.data ?? [];
+                  if (providers.isEmpty) {
+                    return const InfoCard(
+                      child: Text('Chưa có đối tác phù hợp. Hãy quay lại sau.'),
+                    );
+                  }
+                  return SizedBox(
+                    height: 224,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: providers.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final provider = providers[index];
+                        return SizedBox(
+                          width: 280,
+                          child: InfoCard(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ProviderDetailScreen(
+                                  api: widget.api,
+                                  provider: provider.map(
+                                    (key, value) =>
+                                        MapEntry(key, value?.toString() ?? ''),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 24,
+                                      backgroundColor:
+                                          AppColors.teal.withValues(
+                                        alpha: .14,
+                                      ),
+                                      child: const Icon(
+                                        Icons.storefront_rounded,
+                                        color: AppColors.teal,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF4B740)
+                                            .withValues(alpha: .14),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.star_rounded,
+                                            color: Color(0xFFF4B740),
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            '${provider['average_rating'] ?? 'Mới'}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Spacer(),
+                                Text(
+                                  '${provider['name'] ?? 'Đối tác PawCare'}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.location_on_outlined,
+                                      size: 14,
+                                      color: isDark
+                                          ? const Color(0xFF9CBAC3)
+                                          : const Color(0xFF6B8791),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Expanded(
+                                      child: Text(
+                                        '${provider['service_area'] ?? provider['address'] ?? 'Đang cập nhật khu vực'}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: isDark
+                                              ? const Color(0xFF9CBAC3)
+                                              : const Color(0xFF6B8791),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 6,
+                                  children: [
+                                    _MiniChip(label: 'Grooming'),
+                                    _MiniChip(label: 'Spa'),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
-        ]),
+        ),
       ),
     );
   }
@@ -581,28 +674,34 @@ class _MiniChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-            color: AppColors.mint,
-            borderRadius: BorderRadius.circular(8)),
-        child: Text(label,
-            style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.teal)),
+          color: AppColors.mint,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: AppColors.teal,
+          ),
+        ),
       );
 }
 
 class _CareNote {
-  const _CareNote(
-      {required this.id,
-      required this.title,
-      required this.content,
-      required this.createdAt});
+  const _CareNote({
+    required this.id,
+    required this.title,
+    required this.content,
+    required this.createdAt,
+  });
   factory _CareNote.fromMap(Map<String, dynamic> row) => _CareNote(
-      id: int.parse('${row['id']}'),
-      title: '${row['title'] ?? ''}',
-      content: '${row['content'] ?? ''}',
-      createdAt:
-          DateTime.tryParse('${row['created_at'] ?? ''}') ?? DateTime.now());
+        id: int.parse('${row['id']}'),
+        title: '${row['title'] ?? ''}',
+        content: '${row['content'] ?? ''}',
+        createdAt:
+            DateTime.tryParse('${row['created_at'] ?? ''}') ?? DateTime.now(),
+      );
   final int id;
   final String title;
   final String content;
@@ -639,33 +738,42 @@ class _CareNotesSheetState extends State<_CareNotesSheet> {
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Text('Ghi chú chăm sóc'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
               controller: _titleController,
               autofocus: true,
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(
-                  labelText: 'Tiêu đề',
-                  hintText: 'Ví dụ: Uống thuốc sau ăn')),
-          const SizedBox(height: 12),
-          TextField(
+                labelText: 'Tiêu đề',
+                hintText: 'Ví dụ: Uống thuốc sau ăn',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
               controller: _contentController,
               maxLines: 3,
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(
-                  labelText: 'Nội dung',
-                  hintText: 'Điều cần lưu ý cho bé…')),
-        ]),
+                labelText: 'Nội dung',
+                hintText: 'Điều cần lưu ý cho bé…',
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Hủy')),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Hủy'),
+          ),
           FilledButton(
-              onPressed: () {
-                FocusScope.of(dialogContext).unfocus();
-                Navigator.pop(dialogContext, true);
-              },
-              child: const Text('Lưu ghi chú')),
+            onPressed: () {
+              FocusScope.of(dialogContext).unfocus();
+              Navigator.pop(dialogContext, true);
+            },
+            child: const Text('Lưu ghi chú'),
+          ),
         ],
       ),
     );
@@ -738,13 +846,18 @@ class _CareNotesSheetState extends State<_CareNotesSheet> {
               decoration: BoxDecoration(
                 color: AppColors.coral.withValues(alpha: .12),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.coral.withValues(alpha: .3)),
+                border: Border.all(
+                  color: AppColors.coral.withValues(alpha: .3),
+                ),
               ),
-              child: Text(_error!,
-                  style: const TextStyle(
-                      color: AppColors.coral,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600)),
+              child: Text(
+                _error!,
+                style: const TextStyle(
+                  color: AppColors.coral,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
           Expanded(
@@ -759,24 +872,31 @@ class _CareNotesSheetState extends State<_CareNotesSheet> {
                             color: AppColors.teal.withValues(alpha: .12),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.lightbulb_outline_rounded,
-                              color: AppColors.teal, size: 36),
+                          child: const Icon(
+                            Icons.lightbulb_outline_rounded,
+                            color: AppColors.teal,
+                            size: 36,
+                          ),
                         ),
                         const SizedBox(height: 12),
-                        Text('Chưa có ghi chú nào.',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 16,
-                                color: onSurface)),
+                        Text(
+                          'Chưa có ghi chú nào.',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            color: onSurface,
+                          ),
+                        ),
                         const SizedBox(height: 6),
                         Text(
                           'Nhấn dấu + để thêm điều cần quan tâm cho bé.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                              fontSize: 13,
-                              color: isDark
-                                  ? const Color(0xFF94A3B8)
-                                  : const Color(0xFF64748B)),
+                            fontSize: 13,
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B),
+                          ),
                         ),
                       ],
                     ),
@@ -799,8 +919,11 @@ class _CareNotesSheetState extends State<_CareNotesSheet> {
                                 color: AppColors.teal.withValues(alpha: .12),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.lightbulb_rounded,
-                                  color: AppColors.teal, size: 18),
+                              child: const Icon(
+                                Icons.lightbulb_rounded,
+                                color: AppColors.teal,
+                                size: 18,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -810,20 +933,22 @@ class _CareNotesSheetState extends State<_CareNotesSheet> {
                                   Text(
                                     note.title,
                                     style: TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 15,
-                                        color: onSurface),
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
+                                      color: onSurface,
+                                    ),
                                   ),
                                   if (note.content.isNotEmpty) ...[
                                     const SizedBox(height: 4),
                                     Text(
                                       note.content,
                                       style: TextStyle(
-                                          fontSize: 13,
-                                          height: 1.35,
-                                          color: isDark
-                                              ? const Color(0xFF94A3B8)
-                                              : const Color(0xFF475569)),
+                                        fontSize: 13,
+                                        height: 1.35,
+                                        color: isDark
+                                            ? const Color(0xFF94A3B8)
+                                            : const Color(0xFF475569),
+                                      ),
                                     ),
                                   ],
                                 ],
@@ -833,8 +958,11 @@ class _CareNotesSheetState extends State<_CareNotesSheet> {
                               tooltip: 'Xóa ghi chú',
                               onPressed:
                                   _saving ? null : () => _deleteNote(note),
-                              icon: const Icon(Icons.delete_outline_rounded,
-                                  color: AppColors.coral, size: 20),
+                              icon: const Icon(
+                                Icons.delete_outline_rounded,
+                                color: AppColors.coral,
+                                size: 20,
+                              ),
                             ),
                           ],
                         ),
@@ -852,29 +980,6 @@ class _CareNotesSheetState extends State<_CareNotesSheet> {
       ),
     );
   }
-}
-
-class _SearchPage extends StatelessWidget {
-  const _SearchPage();
-  @override
-  Widget build(BuildContext context) => Scaffold(
-      appBar: AppBar(title: const Text('Tìm kiếm')),
-      body: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(children: [
-            const TextField(
-                autofocus: true,
-                decoration: InputDecoration(
-                    hintText: 'Nhập tên dịch vụ hoặc khu vực',
-                    prefixIcon: Icon(Icons.search))),
-            const SizedBox(height: 20),
-            Wrap(
-                spacing: 8,
-                children: ['Gần tôi', 'Grooming', 'Khám bệnh', 'Pet Hotel']
-                    .map((item) => FilterChip(
-                        label: Text(item), onSelected: (_) {}, selected: false))
-                    .toList())
-          ])));
 }
 
 class _Notifications extends StatefulWidget {
@@ -916,8 +1021,10 @@ class _NotificationsState extends State<_Notifications> {
             return SizedBox(
               height: 200,
               child: Center(
-                child: Text(snapshot.error.toString(),
-                    textAlign: TextAlign.center),
+                child: Text(
+                  snapshot.error.toString(),
+                  textAlign: TextAlign.center,
+                ),
               ),
             );
           }
@@ -935,21 +1042,26 @@ class _NotificationsState extends State<_Notifications> {
                       color: AppColors.teal.withValues(alpha: .12),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.notifications_none_rounded,
-                        size: 36, color: AppColors.teal),
+                    child: const Icon(
+                      Icons.notifications_none_rounded,
+                      size: 36,
+                      color: AppColors.teal,
+                    ),
                   ),
                   const SizedBox(height: 12),
-                  const Text('Bạn chưa có thông báo nào.',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                  const Text(
+                    'Bạn chưa có thông báo nào.',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     'Các cập nhật đơn và lịch hẹn sẽ hiển thị tại đây.',
                     style: TextStyle(
-                        fontSize: 13,
-                        color: isDark
-                            ? const Color(0xFF94A3B8)
-                            : const Color(0xFF64748B)),
+                      fontSize: 13,
+                      color: isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
+                    ),
                   ),
                 ],
               ),
@@ -968,8 +1080,10 @@ class _NotificationsState extends State<_Notifications> {
                 blur: 10,
                 onTap: () async {
                   try {
-                    await widget.api
-                        .put('/notifications/${item['id']}/read', {});
+                    await widget.api.put(
+                      '/notifications/${item['id']}/read',
+                      {},
+                    );
                     reload();
                   } catch (_) {}
                 },
