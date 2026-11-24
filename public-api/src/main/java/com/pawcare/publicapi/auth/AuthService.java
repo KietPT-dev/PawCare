@@ -2,6 +2,7 @@ package com.pawcare.publicapi.auth;
 
 import com.pawcare.publicapi.web.ApiException;
 import com.pawcare.publicapi.bonita.ProviderApprovalWorkflowOutbox;
+import com.pawcare.publicapi.location.LocationService;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.sql.Timestamp;
@@ -21,16 +22,19 @@ public class AuthService {
     private final SecureRandom random = new SecureRandom();
     private final long refreshDays;
     private final ProviderApprovalWorkflowOutbox providerApprovalOutbox;
+    private final LocationService locations;
 
     public AuthService(
             JdbcTemplate db,
             JwtService jwt,
             ProviderApprovalWorkflowOutbox providerApprovalOutbox,
+            LocationService locations,
             @Value("${pawcare.auth.refresh-token-days}") long refreshDays
     ) {
         this.db = db;
         this.jwt = jwt;
         this.providerApprovalOutbox = providerApprovalOutbox;
+        this.locations = locations;
         this.refreshDays = refreshDays;
     }
 
@@ -174,8 +178,15 @@ public class AuthService {
         } else email = current.get("email").toString();
         String name = text(body, "fullName");
         if (name == null || name.isBlank()) name = current.get("full_name").toString();
-        db.update("UPDATE user_profiles SET full_name=?,email=?,phone=COALESCE(?,phone),address=COALESCE(?,address) WHERE id=?",
-            name, email, text(body,"phone"), text(body,"address"), principal.profileId());
+        String address = address(body);
+        db.update("""
+                UPDATE user_profiles SET full_name=?,email=?,phone=COALESCE(?,phone),
+                  address=COALESCE(?,address),address_line1=COALESCE(?,address_line1),
+                  ward=COALESCE(?,ward),district=COALESCE(?,district),province=COALESCE(?,province)
+                WHERE id=?
+                """, name, email, text(body,"phone"), address, text(body,"addressLine1"),
+                text(body,"ward"), text(body,"district"), text(body,"province"), principal.profileId());
+        if (address != null && !address.equals(current.get("address"))) locations.queueCustomer(principal.profileId());
         return publicProfile(profile(principal.profileId()));
     }
 
@@ -274,6 +285,14 @@ public class AuthService {
         result.put("fullName", p.get("full_name"));
         result.put("email", p.get("email"));
         result.put("phone", p.get("phone"));
+        result.put("address", p.get("address"));
+        result.put("addressLine1", p.get("address_line1"));
+        result.put("ward", p.get("ward"));
+        result.put("district", p.get("district"));
+        result.put("province", p.get("province"));
+        result.put("latitude", p.get("latitude"));
+        result.put("longitude", p.get("longitude"));
+        result.put("geocodeStatus", p.get("geocode_status"));
         result.put("role", p.get("role_code"));
         result.put("emailVerified", p.get("email_verified"));
         return result;
@@ -297,6 +316,12 @@ public class AuthService {
     private String text(Map<String, Object> body, String field) {
         Object value = body.get(field);
         return value == null ? null : value.toString().trim();
+    }
+
+    private String address(Map<String, Object> body) {
+        String joined = java.util.stream.Stream.of(text(body, "addressLine1"), text(body, "ward"), text(body, "district"), text(body, "province"))
+                .filter(Objects::nonNull).filter(value -> !value.isBlank()).collect(java.util.stream.Collectors.joining(", "));
+        return joined.isBlank() ? text(body, "address") : joined;
     }
 
     private String normalizeEmail(String email) {
