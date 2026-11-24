@@ -60,12 +60,23 @@ an IANA timezone name so the requested reporting context is explicit.
 
 ## Marketplace discovery
 
-`GET /api/v1/providers?status=APPROVED` returns active providers newest first.
+`GET /api/v1/providers?status=APPROVED&sort=DEFAULT&page=0&size=20` returns
+active Providers. `size` is capped at 100; `X-Page` and `X-Page-Size` echo the
+effective page. Allowed `sort` values are `DEFAULT`, `RATING`, `NEWEST` and
+`NEAREST`.
+
+`NEAREST` requires an authenticated Customer whose saved address has
+`geocodeStatus: RESOLVED`; otherwise the API returns `409`. It orders with the
+server-side Haversine distance and includes scalar `distance_km`. The API never
+pretends an un-geocoded address is a valid location.
+
 Each Provider includes:
 
 - `average_rating`: an average calculated from visible reviews;
 - `review_count`: the number of visible reviews;
 - `created_at`: scalar timestamp formatted `yyyy-MM-ddTHH:mm:ss`.
+- `cover_image_url`: optional public Provider cover image;
+- `distance_km`: present for `NEAREST` only.
 
 Providers without visible reviews return `average_rating: 0` and
 `review_count: 0`; the client must show “Chưa có đánh giá” rather than treat
@@ -74,6 +85,33 @@ Providers without visible reviews return `average_rating: 0` and
 “Gần tôi” needs Provider coordinates and a granted device location permission.
 Until both exist, clients must show the unavailable/fallback state rather than
 pretending a geographical filter ran.
+
+## Addresses and Provider cover images
+
+`PUT /api/v1/auth/me` accepts the existing `address` string and optional
+`addressLine1`, `ward`, `district`, `province`. `PUT /api/v1/provider/me`
+accepts the same fields. A structured address is joined into the legacy
+`address` field for compatibility. Both responses expose `latitude`,
+`longitude` and `geocodeStatus` once migration 015 has run.
+
+Address updates clear previous coordinates and queue geocoding. By default the
+status becomes `NOT_CONFIGURED`, which is deliberate and safe. To enable real
+geocoding set `PAWCARE_GEOCODING_PROVIDER=MAPBOX` and keep
+`PAWCARE_GEOCODING_API_KEY` only in deployment secrets. The built-in Mapbox
+adapter uses its forward-geocoding API; no secret is committed and no fallback
+coordinates are fabricated.
+
+Authenticated Providers manage their cover through:
+
+- `POST /api/v1/provider/me/cover` with multipart field `file` (JPEG, PNG or
+  WebP, maximum 5 MiB by default); and
+- `DELETE /api/v1/provider/me/cover`.
+
+Local development stores files outside source assets in
+`PAWCARE_PROVIDER_COVER_DIRECTORY` and serves them under
+`PAWCARE_PROVIDER_COVER_PUBLIC_PATH`. Production should supply an object-store
+implementation of `ProviderCoverStorage` and its credentials as deployment
+secrets.
 
 ## Payments
 
