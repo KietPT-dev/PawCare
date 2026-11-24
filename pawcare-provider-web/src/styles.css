@@ -3199,3 +3199,18 @@ main {
   font-size: 11px;
   color: var(--slate-500);
 }
+
+/* Provider store location and cover controls retain the existing modal styling. */
+.legacy-settings { display: none; }
+.provider-store-settings { display: grid; gap: 20px; }
+.store-settings-section { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface-subtle); }
+.store-settings-section h4 { margin: 0; color: var(--text-main); font-size: 14px; }
+.store-settings-section p { margin: 4px 0 0; color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+.location-status { display: grid; gap: 3px; padding: 11px 13px; border-radius: var(--radius-md); font-size: 12px; }
+.location-status.success { color: var(--teal-700); background: var(--teal-50); border: 1px solid var(--teal-100); }
+.location-status.warning { color: var(--amber-600); background: var(--amber-50); border: 1px solid var(--amber-100); }
+.cover-preview { min-height: 132px; overflow: hidden; display: grid; place-items: center; gap: 5px; border-radius: var(--radius-md); border: 1px dashed var(--border); text-align: center; color: var(--text-muted); background: linear-gradient(135deg, var(--cyan-50), var(--teal-50)); }
+.cover-preview img { width: 100%; height: 180px; object-fit: cover; }
+.cover-preview span, .cover-api-note { font-size: 12px; }
+.cover-api-note { color: var(--text-muted); line-height: 1.5; }
+.success-banner { padding: 10px 12px; border-radius: var(--radius-md); color: var(--emerald-600); background: var(--emerald-50); border: 1px solid var(--emerald-100); font-size: 13px; }
