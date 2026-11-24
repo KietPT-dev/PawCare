@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
@@ -96,7 +97,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     if (value == DiscoveryFilter.newest) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Chưa thể sắp xếp mới nhất vì API chưa trả ngày duyệt đối tác.'),
+          content: Text(
+              'Chưa thể sắp xếp mới nhất vì API chưa trả ngày duyệt đối tác.'),
         ),
       );
       return;
@@ -124,7 +126,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                   children: [
                     Text(
                       'Khám phá dịch vụ',
-                      style: Theme.of(context).textTheme.headlineSmall
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineSmall
                           ?.copyWith(fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 4),
@@ -255,6 +259,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                                 provider: providers[index],
                                 api: widget.api,
                                 reviews: snapshot.data!.reviews,
+                                services: snapshot.data!.services,
                               ),
                             ),
                     );
@@ -301,9 +306,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         (a, b) =>
             (ProviderRating.fromMap(b, reviews: data.reviews).average ?? -1)
                 .compareTo(
-                  ProviderRating.fromMap(a, reviews: data.reviews).average ??
-                      -1,
-                ),
+          ProviderRating.fromMap(a, reviews: data.reviews).average ?? -1,
+        ),
       );
     return rows;
   }
@@ -319,10 +323,12 @@ class _ProviderCard extends StatelessWidget {
     required this.provider,
     required this.api,
     required this.reviews,
+    required this.services,
   });
   final Map<String, dynamic> provider;
   final PawCareApi api;
   final List<Map<String, dynamic>> reviews;
+  final List<Map<String, dynamic>> services;
   @override
   Widget build(BuildContext context) {
     final rating = ProviderRating.fromMap(provider, reviews: reviews);
@@ -331,56 +337,135 @@ class _ProviderCard extends StatelessWidget {
       'averageRating': rating.average ?? '',
       'reviewCount': rating.count ?? 0,
     };
-    return InfoCard(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ProviderDetailScreen(
-            api: api,
-            provider: detail.map((k, v) => MapEntry(k, '$v')),
-          ),
-        ),
-      ),
-      child: Row(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tags = services
+        .where((item) =>
+            '${item['provider_id'] ?? item['providerId']}' ==
+            '${provider['id']}')
+        .map((item) => '${item['category_name'] ?? item['name'] ?? ''}')
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .take(2)
+        .toList();
+    final cover =
+        '${provider['cover_image_url'] ?? provider['coverImageUrl'] ?? ''}';
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: Stack(
         children: [
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: AppColors.teal.withValues(alpha: .14),
-            child: const Icon(Icons.storefront_rounded, color: AppColors.teal),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          if (cover.isNotEmpty)
+            Positioned.fill(
+              child: ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
+                child: Image.network(cover,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+              ),
+            ),
+          if (cover.isNotEmpty)
+            Positioned.fill(
+                child: ColoredBox(
+                    color: Colors.black.withValues(alpha: isDark ? .32 : .18))),
+          LiquidGlassCard(
+            radius: 20,
+            padding: const EdgeInsets.all(16),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ProviderDetailScreen(
+                  api: api,
+                  provider: detail.map((k, v) => MapEntry(k, '$v')),
+                ),
+              ),
+            ),
+            child: Row(
               children: [
-                Text(
-                  '${provider['name']}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                      color: AppColors.teal.withValues(alpha: .14),
+                      borderRadius: BorderRadius.circular(16)),
+                  child: const Icon(Icons.storefront_rounded,
+                      color: AppColors.teal, size: 26),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Expanded(
+                            child: Text('${provider['name']}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16))),
+                        _RatingBadge(label: rating.label)
+                      ]),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${provider['service_area'] ?? provider['address'] ?? 'Đang cập nhật khu vực'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      if (tags.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Wrap(
+                            spacing: 6,
+                            children: tags
+                                .map((tag) => _ServiceTag(label: tag))
+                                .toList())
+                      ],
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '${provider['service_area'] ?? provider['address'] ?? 'Đang cập nhật khu vực'}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  rating.label,
-                  style: const TextStyle(
-                    color: AppColors.teal,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                const SizedBox(width: 6),
+                Icon(Icons.chevron_right_rounded,
+                    color: isDark
+                        ? const Color(0xFF9CBAC3)
+                        : const Color(0xFF6B8791)),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded),
         ],
       ),
     );
   }
+}
+
+class _RatingBadge extends StatelessWidget {
+  const _RatingBadge({required this.label});
+  final String label;
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+            color: const Color(0xFFF4B740).withValues(alpha: .14),
+            borderRadius: BorderRadius.circular(9)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.star_rounded, color: Color(0xFFF4B740), size: 14),
+          const SizedBox(width: 3),
+          Text(label,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800))
+        ]),
+      );
+}
+
+class _ServiceTag extends StatelessWidget {
+  const _ServiceTag({required this.label});
+  final String label;
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+            color: AppColors.teal.withValues(alpha: .12),
+            borderRadius: BorderRadius.circular(8)),
+        child: Text(label,
+            style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.teal)),
+      );
 }
 
 class _StateMessage extends StatelessWidget {
@@ -389,14 +474,14 @@ class _StateMessage extends StatelessWidget {
   final Future<void> Function() action;
   @override
   Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.cloud_off_outlined, size: 44),
-        const SizedBox(height: 10),
-        Text(text, textAlign: TextAlign.center),
-        TextButton(onPressed: action, child: const Text('Thử lại')),
-      ],
-    ),
-  );
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_outlined, size: 44),
+            const SizedBox(height: 10),
+            Text(text, textAlign: TextAlign.center),
+            TextButton(onPressed: action, child: const Text('Thử lại')),
+          ],
+        ),
+      );
 }
