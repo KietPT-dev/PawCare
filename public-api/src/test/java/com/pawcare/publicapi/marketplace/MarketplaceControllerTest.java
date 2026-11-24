@@ -2,6 +2,7 @@ package com.pawcare.publicapi.marketplace;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 class MarketplaceControllerTest {
@@ -31,6 +33,19 @@ class MarketplaceControllerTest {
         wallets = mock(WalletService.class);
         controller = new MarketplaceController(db, wallets, mock(BookingWorkflowService.class),
                 mock(BookingWorkflowOutbox.class));
+    }
+
+    @Test
+    void providerCatalogueExposesVisibleReviewMetricsAndCreationTime() {
+        when(db.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
+
+        controller.providers(null);
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(db).queryForList(sql.capture(), any(Object[].class));
+        assertTrue(sql.getValue().contains("r.is_visible = 1"));
+        assertTrue(sql.getValue().contains("review_count"));
+        assertTrue(sql.getValue().contains("DATE_FORMAT(p.created_at"));
     }
 
     @Test

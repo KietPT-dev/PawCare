@@ -37,8 +37,25 @@ public class MarketplaceController {
     // Public catalogue --------------------------------------------------------
     @GetMapping("/providers")
     public List<Map<String,Object>> providers(@RequestParam(required=false) String status) {
-        String s = status == null ? "APPROVED" : status;
-        return db.queryForList("SELECT id,name,provider_type,phone,email,address,service_area,description,average_rating FROM providers WHERE status=? AND is_active=1 ORDER BY id DESC", s);
+        String s = status == null || status.isBlank() ? "APPROVED" : status;
+        return db.queryForList("""
+                SELECT p.id, p.name, p.provider_type, p.phone, p.email, p.address,
+                       p.service_area, p.description,
+                       COALESCE(review_metrics.average_rating, 0) AS average_rating,
+                       COALESCE(review_metrics.review_count, 0) AS review_count,
+                       DATE_FORMAT(p.created_at, '%Y-%m-%dT%H:%i:%s') AS created_at
+                FROM providers p
+                LEFT JOIN (
+                    SELECT r.provider_id,
+                           ROUND(AVG(r.rating), 2) AS average_rating,
+                           COUNT(*) AS review_count
+                    FROM reviews r
+                    WHERE r.is_visible = 1
+                    GROUP BY r.provider_id
+                ) review_metrics ON review_metrics.provider_id = p.id
+                WHERE p.status = ? AND p.is_active = 1
+                ORDER BY p.created_at DESC, p.id DESC
+                """, s);
     }
     @GetMapping("/categories")
     public List<Map<String,Object>> categories() {

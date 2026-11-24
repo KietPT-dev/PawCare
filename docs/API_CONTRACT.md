@@ -58,6 +58,23 @@ and deliberately cannot contact a bank.
 The deployment database is configured in `Asia/Ho_Chi_Minh`; clients must send
 an IANA timezone name so the requested reporting context is explicit.
 
+## Marketplace discovery
+
+`GET /api/v1/providers?status=APPROVED` returns active providers newest first.
+Each Provider includes:
+
+- `average_rating`: an average calculated from visible reviews;
+- `review_count`: the number of visible reviews;
+- `created_at`: scalar timestamp formatted `yyyy-MM-ddTHH:mm:ss`.
+
+Providers without visible reviews return `average_rating: 0` and
+`review_count: 0`; the client must show “Chưa có đánh giá” rather than treat
+`0` as a real score.
+
+“Gần tôi” needs Provider coordinates and a granted device location permission.
+Until both exist, clients must show the unavailable/fallback state rather than
+pretending a geographical filter ran.
+
 ## Payments
 
 `POST /api/v1/payments/webhook` accepts SePay/PayOS-shaped JSON. Send

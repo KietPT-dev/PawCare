@@ -30,7 +30,7 @@ class WalletServiceWithdrawalTest {
                 new WithdrawalDecisionRequest("APPROVED", "verified", null));
 
         assertEquals("APPROVED", result.get("status"));
-        verify(db).update(anyString(), any(Object[].class));
+        verify(db).update(org.mockito.ArgumentMatchers.startsWith("UPDATE withdrawal_requests SET status='APPROVED'"), any(Object[].class));
         org.mockito.Mockito.verify(db, org.mockito.Mockito.never())
                 .update(org.mockito.ArgumentMatchers.startsWith("UPDATE wallets SET locked_balance=? WHERE id=?"), any(Object[].class));
     }
