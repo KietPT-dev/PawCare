@@ -12,6 +12,7 @@ import WalletPage from './features/wallet/WalletPage'
 import ReportsPage from './features/reports/ReportsPage'
 import Notifications from './features/notifications/Notifications'
 import ReviewsPage from './features/reviews/ReviewsPage'
+import ProviderStoreSettings from './features/profile/ProviderStoreSettings'
 
 const storage = {
   token: 'pawcareProviderToken',
@@ -430,6 +431,8 @@ function App() {
               </button>
             </div>
             <div className="modal-body">
+              <ProviderStoreSettings token={token} onClose={() => setSettingsModalOpen(false)} />
+              <div className="legacy-settings" aria-hidden="true">
               <div className="form-grid">
                 <div className="form-group form-full">
                   <label className="form-label">Tên cơ sở / Đối tác</label>
@@ -455,6 +458,7 @@ function App() {
                 <button type="button" className="btn-secondary" onClick={() => setSettingsModalOpen(false)}>
                   Đóng
                 </button>
+              </div>
               </div>
             </div>
           </div>
