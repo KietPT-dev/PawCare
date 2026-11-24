@@ -92,6 +92,11 @@
       <artifactId>mysql-connector-j</artifactId>
       <version>8.4.0</version>
     </dependency>
+    <dependency>
+      <groupId>org.bonitasoft.connectors</groupId>
+      <artifactId>bonita-connector-rest</artifactId>
+      <version>1.5.1</version>
+    </dependency>
   </dependencies>
   <build>
     <plugins>

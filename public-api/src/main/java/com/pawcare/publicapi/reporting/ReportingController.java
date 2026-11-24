@@ -110,10 +110,22 @@ public class ReportingController {
                 + "t.id,t.booking_id,t.type,t.amount,t.balance_before,t.balance_after,t.description,w.owner_type,w.owner_id "
                 + "FROM wallet_transactions t JOIN wallets w ON w.id=t.wallet_id ORDER BY t.created_at DESC,t.id DESC LIMIT ? OFFSET ?", query.size(), query.page() * query.size());
         Long ledgerTotal = scalarValue("SELECT COUNT(*) AS total FROM wallet_transactions");
-        return Map.of("from", from == null ? "" : from, "to", to == null ? "" : to, "timezone", query.timezone(), "granularity", query.granularity(),
-                "summary", summary, "balances", balances, "withdrawals", withdrawals,
-                "bookingStatuses", statuses, "series", series, "ledger", ledger, "page", query.page(), "size", query.size(), "total", ledgerTotal);
-    }
+                Map<String, Object> result = new LinkedHashMap<>();
+        result.put("from", from == null ? "" : from);
+        result.put("to", to == null ? "" : to);
+        result.put("timezone", query.timezone());
+        result.put("granularity", query.granularity());
+        result.put("summary", summary);
+        result.put("balances", balances);
+        result.put("withdrawals", withdrawals);
+        result.put("bookingStatuses", statuses);
+        result.put("series", series);
+        result.put("ledger", ledger);
+        result.put("page", query.page());
+        result.put("size", query.size());
+        result.put("total", ledgerTotal);
+        return result;
+                                                    }
 
     @GetMapping(value = "/admin/reports/finance.csv", produces = "text/csv")
     public ResponseEntity<byte[]> adminFinanceCsv(@CurrentUser CurrentPrincipal principal,
@@ -126,9 +138,9 @@ public class ReportingController {
         List<Map<String, Object>> rows = db.queryForList("SELECT DATE_FORMAT(b.created_at,'%Y-%m-%d') date,b.status,COUNT(*) bookings,"
                 + "COALESCE(SUM(b.estimated_price),0) gross_amount FROM bookings b WHERE 1=1" + filter.sql()
                 + " GROUP BY date,b.status ORDER BY date,status", filter.args().toArray());
-        StringBuilder csv = new StringBuilder("date,status,bookings,gross_amount\\n");
+        StringBuilder csv = new StringBuilder("date,status,bookings,gross_amount\n");
         for (Map<String,Object> row : rows) csv.append(row.get("date")).append(',').append(row.get("status")).append(',')
-                .append(row.get("bookings")).append(',').append(row.get("gross_amount")).append('\\n');
+                .append(row.get("bookings")).append(',').append(row.get("gross_amount")).append('\n');
         return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename("pawcare-finance.csv").build().toString())
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8)).body(csv.toString().getBytes(StandardCharsets.UTF_8));
     }
