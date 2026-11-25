@@ -119,6 +119,15 @@ export const Icons = {
       size,
       className
     ),
+  Chat: ({ size = 18, className = '' }) =>
+    iconBase(
+      <>
+        <path d="M21 11.5a8.4 8.4 0 0 1-9 8.3 9.4 9.4 0 0 1-4-.9L3 21l1.6-4.1A8.2 8.2 0 0 1 3 12a8.5 8.5 0 0 1 9-8.5 8.5 8.5 0 0 1 9 8Z" />
+        <line x1="8" y1="12" x2="16" y2="12" />
+      </>,
+      size,
+      className
+    ),
   Refresh: ({ size = 18, className = '' }) =>
     iconBase(
       <>
