@@ -8,6 +8,23 @@ import '../../../core/network/pawcare_api.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/app_formatters.dart';
 
+Future<void> openDirectConversation(
+    BuildContext context, PawCareApi api, int providerId) async {
+  try {
+    final raw = await api.post('/providers/$providerId/conversation', {});
+    if (!context.mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => ConversationScreen(
+            api: api, conversation: Map<String, dynamic>.from(raw as Map))));
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(ApiMessages.friendly(error,
+              fallback: 'Chưa thể mở cuộc trò chuyện với cơ sở.'))));
+    }
+  }
+}
+
 class ConversationScreen extends StatefulWidget {
   const ConversationScreen(
       {super.key, required this.api, required this.conversation});

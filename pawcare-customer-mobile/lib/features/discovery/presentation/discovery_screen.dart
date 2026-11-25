@@ -7,6 +7,7 @@ import '../../../core/network/api_messages.dart';
 import '../../../core/network/pawcare_api.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
+import '../../chat/presentation/conversation_screen.dart';
 import 'discovery_state.dart';
 import 'provider_detail_screen.dart';
 
@@ -416,6 +417,18 @@ class _ProviderCard extends StatelessWidget {
                                 .map((tag) => _ServiceTag(label: tag))
                                 .toList())
                       ],
+                      const SizedBox(height: 4),
+                      TextButton.icon(
+                        onPressed: () => openDirectConversation(context, api,
+                            int.tryParse('${provider['id']}') ?? 0),
+                        icon: const Icon(Icons.chat_bubble_outline_rounded,
+                            size: 16),
+                        label: const Text('Nhắn tin'),
+                        style: TextButton.styleFrom(
+                            foregroundColor: AppColors.teal,
+                            minimumSize: const Size(0, 30),
+                            padding: const EdgeInsets.symmetric(horizontal: 4)),
+                      ),
                     ],
                   ),
                 ),

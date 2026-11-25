@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/app_formatters.dart';
 import '../../../core/widgets/ui.dart';
 import '../../booking/presentation/booking_screen.dart';
+import '../../chat/presentation/conversation_screen.dart';
 import 'discovery_state.dart';
 
 class ProviderDetailScreen extends StatefulWidget {
@@ -206,23 +207,35 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
-          child: SizedBox(
-            height: 52,
-            child: FilledButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => BookingScreen(
-                    api: widget.api,
-                    providerId: id,
-                    providerName: widget.provider['name'] ?? 'Đối tác PawCare',
+          child: Row(children: [
+            Expanded(
+                child: SizedBox(
+              height: 52,
+              child: FilledButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => BookingScreen(
+                      api: widget.api,
+                      providerId: id,
+                      providerName:
+                          widget.provider['name'] ?? 'Đối tác PawCare',
+                    ),
                   ),
                 ),
+                icon: const Icon(Icons.calendar_month_rounded, size: 20),
+                label: const Text('Đặt lịch ngay'),
               ),
-              icon: const Icon(Icons.calendar_month_rounded, size: 20),
-              label: const Text('Đặt lịch ngay'),
-            ),
-          ),
+            )),
+            const SizedBox(width: 10),
+            SizedBox(
+                height: 52,
+                child: OutlinedButton(
+                  onPressed: () =>
+                      openDirectConversation(context, widget.api, id),
+                  child: const Icon(Icons.chat_bubble_outline_rounded),
+                )),
+          ]),
         ),
       ),
     );
@@ -323,8 +336,8 @@ class _ProviderDetailScreenState extends State<ProviderDetailScreen> {
                   color: isSelected
                       ? AppColors.teal
                       : (isDark
-                            ? const Color(0xFF475569)
-                            : const Color(0xFFCBD5E1)),
+                          ? const Color(0xFF475569)
+                          : const Color(0xFFCBD5E1)),
                   width: 2,
                 ),
               ),
