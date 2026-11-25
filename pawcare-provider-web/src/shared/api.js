@@ -18,3 +18,21 @@ export async function api(path, options = {}, token) {
 }
 
 export const rowsOf = value => Array.isArray(value) ? value : (value?.data || [])
+
+// XMLHttpRequest exposes upload progress; FormData lets the browser set the
+// multipart boundary (setting Content-Type here would break the request).
+export function uploadFile(path, file, token, onProgress) {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest()
+    request.open('POST', `${API_BASE}${path}`)
+    if (token) request.setRequestHeader('Authorization', `Bearer ${token}`)
+    request.upload.onprogress = event => { if (event.lengthComputable) onProgress?.(Math.round(event.loaded / event.total * 100)) }
+    request.onerror = () => reject(new ApiError('Không thể tải ảnh lên. Vui lòng thử lại.'))
+    request.onload = () => {
+      const body = (() => { try { return JSON.parse(request.responseText || '{}') } catch { return {} } })()
+      if (request.status < 200 || request.status >= 300) reject(new ApiError(body.error || `Lỗi ${request.status}`, request.status))
+      else resolve(body)
+    }
+    const form = new FormData(); form.append('file', file); request.send(form)
+  })
+}

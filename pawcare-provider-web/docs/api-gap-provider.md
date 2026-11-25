@@ -1,18 +1,13 @@
 # Provider API gaps
 
-## Provider address geocoding and cover image
+## Provider location and cover status
 
-The current Provider contract only supports the flat `address` string on
-`GET/PUT /api/v1/provider/me`. It does not expose ward, district, province,
-latitude, longitude, geocode status, or a cover image URL.
+Resolved on backend migration `015_provider_location_and_cover.sql`:
 
-Required additions:
+- `GET/PUT /api/v1/provider/me` exposes structured address and geocode state.
+- `POST /api/v1/provider/me/cover` accepts multipart field `file` (JPEG, PNG,
+  WebP; maximum 5 MiB by default) and returns `coverImageUrl`.
+- `DELETE /api/v1/provider/me/cover` clears the stored cover.
 
-- Structured address fields and read-only geocode result (`latitude`,
-  `longitude`, `geocodeStatus`) on `/provider/me`.
-- Provider-authorised cover endpoints: upload, replace and delete. The upload
-  contract must define accepted MIME types, maximum bytes and return a stored
-  URL; clients must send multipart data, never base64 data in the database.
-- Public Provider discovery response must include the cover URL and geocoded
-  location so Customer Mobile can render fallback images and delegate distance
-  sorting to backend.
+There is no current Provider Web API gap for address, geocoding status or cover
+management.
