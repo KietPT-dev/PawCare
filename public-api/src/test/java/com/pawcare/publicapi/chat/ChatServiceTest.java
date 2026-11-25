@@ -8,11 +8,13 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.pawcare.publicapi.audit.AuditService;
 import com.pawcare.publicapi.auth.CurrentPrincipal;
 import com.pawcare.publicapi.chat.dto.SendChatMessageRequest;
+import com.pawcare.publicapi.chat.dto.UpdateConversationReportRequest;
 import com.pawcare.publicapi.notification.NotificationService;
 import com.pawcare.publicapi.web.ApiException;
 import java.util.List;
@@ -23,6 +25,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class ChatServiceTest {
     private static final CurrentPrincipal CUSTOMER = new CurrentPrincipal(11L, "CUSTOMER", "customer@pawcare.test");
     private static final CurrentPrincipal OUTSIDER = new CurrentPrincipal(99L, "CUSTOMER", "other@pawcare.test");
+    private static final CurrentPrincipal ADMIN = new CurrentPrincipal(1L, "ADMIN", "admin@pawcare.test");
 
     @Test
     void onlyBookingPartiesCanCreateConversation() {
@@ -49,6 +52,54 @@ class ChatServiceTest {
 
         assertEquals(91L, result.get("id"));
         verify(notifications, never()).notifyOnce(anyLong(), anyString(), anyString(), anyString(), anyString(), anyLong(), anyString());
+    }
+
+    @Test
+    void onlyAdminCanReadModerationReports() {
+        JdbcTemplate db = mock(JdbcTemplate.class);
+        ChatService service = service(db);
+
+        ApiException error = assertThrows(ApiException.class, () -> service.reports(CUSTOMER, "OPEN", 0, 20));
+
+        assertEquals(403, error.status());
+        verifyNoInteractions(db);
+    }
+
+    @Test
+    void moderationUpdateWritesMetadataOnlyAudit() {
+        JdbcTemplate db = mock(JdbcTemplate.class);
+        AuditService audit = mock(AuditService.class);
+        when(db.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(Map.of(
+                "id", 4L, "conversation_id", 8L, "status", "OPEN")));
+        ChatService service = new ChatService(db, mock(NotificationService.class), audit);
+
+        Map<String,Object> result = service.updateReport(ADMIN, 4L,
+                new UpdateConversationReportRequest("REVIEWED", "Handled"));
+
+        assertEquals("REVIEWED", result.get("status"));
+        verify(db).update(anyString(), any(Object[].class));
+        verify(audit).record(org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq("CONVERSATION_REPORT_MODERATED"),
+                org.mockito.ArgumentMatchers.eq("CONVERSATION_REPORT"), org.mockito.ArgumentMatchers.eq(4L),
+                org.mockito.ArgumentMatchers.argThat(details -> !details.containsKey("content")
+                        && "OPEN".equals(details.get("oldStatus"))
+                        && "REVIEWED".equals(details.get("newStatus"))));
+    }
+
+    @Test
+    void sameModerationRequestIsIdempotent() {
+        JdbcTemplate db = mock(JdbcTemplate.class);
+        AuditService audit = mock(AuditService.class);
+        when(db.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(Map.of(
+                "id", 4L, "conversation_id", 8L, "status", "REVIEWED", "reviewer_note", "Handled")));
+        ChatService service = new ChatService(db, mock(NotificationService.class), audit);
+
+        Map<String,Object> result = service.updateReport(ADMIN, 4L,
+                new UpdateConversationReportRequest("REVIEWED", "Handled"));
+
+        assertEquals(true, result.get("idempotent"));
+        verify(db, never()).update(anyString(), any(Object[].class));
+        verifyNoInteractions(audit);
     }
 
     private ChatService service(JdbcTemplate db) {

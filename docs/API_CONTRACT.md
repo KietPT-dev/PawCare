@@ -143,10 +143,32 @@ five seconds), stop when backgrounded, and retry a failed send using the same
 `clientMessageId`. A non-participant receives `403`; unavailable booking/chat
 state receives `409`.
 
-Admin moderation is intentionally narrow: `GET /api/v1/admin/conversations/reports`
-lists reports and `GET /api/v1/admin/conversations/{id}/messages` only works for
-a reported conversation. These reads are audited without storing raw message
-content in audit logs.
+Admin moderation is intentionally narrow. `GET /api/v1/admin/conversations/reports`
+accepts `status=OPEN|REVIEWED|DISMISSED`, `page` and `size`, and returns:
+
+```json
+{
+  "content": [{
+    "report_id": 17, "conversation_id": 9, "booking_id": 42,
+    "status": "OPEN", "category": "ABUSE", "note": "…",
+    "reporter_profile_id": 11, "reporter_name": "Customer A", "reporter_role": "CUSTOMER",
+    "customer_profile_id": 11, "customer_name": "Customer A",
+    "provider_profile_id": 22, "provider_name": "PawCare Clinic",
+    "created_at": "2026-11-25T10:00:00", "reviewed_at": null,
+    "reviewer_profile_id": null, "reviewer_name": null, "reviewer_note": null
+  }],
+  "page": 0, "size": 20, "totalElements": 1, "totalPages": 1
+}
+```
+
+Only an Admin can change a report, with
+`PUT /api/v1/admin/conversations/reports/{reportId}` and body
+`{ "status": "OPEN|REVIEWED|DISMISSED", "reviewerNote": "…" }`.
+Retrying the same status/note is idempotent. Moving a report back to `OPEN`
+clears its reviewer identity/time; this endpoint never edits, recalls or deletes
+chat messages. `GET /api/v1/admin/conversations/{id}/messages` only works for a
+reported conversation. Reads and state changes are audited with metadata only;
+raw message content is never written to audit logs.
 
 ## Account recovery and verification
 

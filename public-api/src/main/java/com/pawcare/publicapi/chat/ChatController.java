@@ -4,6 +4,7 @@ import com.pawcare.publicapi.auth.CurrentPrincipal;
 import com.pawcare.publicapi.auth.CurrentUser;
 import com.pawcare.publicapi.chat.dto.ConversationReportRequest;
 import com.pawcare.publicapi.chat.dto.SendChatMessageRequest;
+import com.pawcare.publicapi.chat.dto.UpdateConversationReportRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PutMapping;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -34,7 +36,9 @@ public class ChatController {
     @PostMapping("/conversations/{id}/reports")
     public Map<String,Object> report(@CurrentUser CurrentPrincipal principal, @PathVariable long id, @Valid @RequestBody ConversationReportRequest request) { return chat.report(principal, id, request); }
     @GetMapping("/admin/conversations/reports")
-    public List<Map<String,Object>> reports(@CurrentUser CurrentPrincipal principal, @RequestParam(required=false) String status, @RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="20") int size) { return chat.reports(principal, status, page, size); }
+    public Map<String,Object> reports(@CurrentUser CurrentPrincipal principal, @RequestParam(required=false) String status, @RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="20") int size) { return chat.reports(principal, status, page, size); }
+    @PutMapping("/admin/conversations/reports/{id}")
+    public Map<String,Object> updateReport(@CurrentUser CurrentPrincipal principal, @PathVariable long id, @Valid @RequestBody UpdateConversationReportRequest request) { return chat.updateReport(principal, id, request); }
     @GetMapping("/admin/conversations/{id}/messages")
     public List<Map<String,Object>> reportedMessages(@CurrentUser CurrentPrincipal principal, @PathVariable long id, @RequestParam(required=false) Long beforeId, @RequestParam(defaultValue="50") int size) { return chat.reportedMessages(principal, id, beforeId, size); }
 }

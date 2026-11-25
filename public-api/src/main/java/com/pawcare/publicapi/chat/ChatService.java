@@ -4,11 +4,13 @@ import com.pawcare.publicapi.audit.AuditService;
 import com.pawcare.publicapi.auth.CurrentPrincipal;
 import com.pawcare.publicapi.chat.dto.ConversationReportRequest;
 import com.pawcare.publicapi.chat.dto.SendChatMessageRequest;
+import com.pawcare.publicapi.chat.dto.UpdateConversationReportRequest;
 import com.pawcare.publicapi.notification.NotificationService;
 import com.pawcare.publicapi.web.ApiException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -129,17 +131,61 @@ public class ChatService {
         return Map.of("success", true, "id", reportId, "status", "OPEN");
     }
 
-    public List<Map<String, Object>> reports(CurrentPrincipal principal, String status, int page, int size) {
+    public Map<String, Object> reports(CurrentPrincipal principal, String status, int page, int size) {
         requireAdmin(principal);
         int safePage = Math.max(page, 0), safeSize = Math.min(Math.max(size, 1), 100);
-        String selected = status == null || status.isBlank() ? "OPEN" : status.trim().toUpperCase();
-        return db.queryForList("""
-                SELECT r.id,r.conversation_id,r.category,r.note,r.status,r.created_at,
-                       reporter.full_name reporter_name,c.booking_id
-                FROM conversation_reports r JOIN user_profiles reporter ON reporter.id=r.reporter_profile_id
+        String selected = normalizeReportStatus(status == null || status.isBlank() ? "OPEN" : status);
+        Long total = db.queryForObject("SELECT COUNT(*) FROM conversation_reports WHERE status=?", Long.class, selected);
+        List<Map<String, Object>> content = db.queryForList("""
+                SELECT r.id AS report_id,r.conversation_id,r.category,r.note,r.status,r.created_at,
+                       r.reviewed_at,r.reviewer_note,c.booking_id,
+                       reporter.id AS reporter_profile_id,reporter.full_name AS reporter_name,
+                       reporter.role_code AS reporter_role,
+                       customer.id AS customer_profile_id,customer.full_name AS customer_name,
+                       provider_profile.id AS provider_profile_id,
+                       COALESCE(provider.name,provider_profile.full_name) AS provider_name,
+                       reviewer.id AS reviewer_profile_id,reviewer.full_name AS reviewer_name
+                FROM conversation_reports r
                 JOIN conversations c ON c.id=r.conversation_id
-                WHERE r.status=? ORDER BY r.created_at ASC LIMIT ? OFFSET ?
+                JOIN user_profiles reporter ON reporter.id=r.reporter_profile_id
+                JOIN user_profiles customer ON customer.id=c.customer_profile_id
+                JOIN user_profiles provider_profile ON provider_profile.id=c.provider_profile_id
+                LEFT JOIN providers provider ON provider.owner_profile_id=c.provider_profile_id
+                LEFT JOIN user_profiles reviewer ON reviewer.id=r.reviewed_by_profile_id
+                WHERE r.status=? ORDER BY r.created_at ASC,r.id ASC LIMIT ? OFFSET ?
                 """, selected, safeSize, (long) safePage * safeSize);
+        long totalElements = total == null ? 0L : total;
+        Map<String,Object> response = new java.util.LinkedHashMap<>();
+        response.put("content", content);
+        response.put("page", safePage);
+        response.put("size", safeSize);
+        response.put("totalElements", totalElements);
+        response.put("totalPages", totalElements == 0 ? 0 : (totalElements + safeSize - 1) / safeSize);
+        return response;
+    }
+
+    @Transactional
+    public Map<String, Object> updateReport(CurrentPrincipal principal, long reportId, UpdateConversationReportRequest request) {
+        requireAdmin(principal);
+        Map<String,Object> report = one("SELECT id,conversation_id,status,reviewer_note FROM conversation_reports WHERE id=?", reportId);
+        if (report == null) throw new ApiException(404, "Conversation report not found");
+        String requestedStatus = normalizeReportStatus(request.status());
+        String requestedNote = blankToNull(request.reviewerNote());
+        String oldStatus = String.valueOf(report.get("status"));
+        String oldNote = report.get("reviewer_note") == null ? null : String.valueOf(report.get("reviewer_note"));
+        if (requestedStatus.equals(oldStatus) && Objects.equals(requestedNote, oldNote)) {
+            return reportResponse(reportId, ((Number) report.get("conversation_id")).longValue(), requestedStatus, requestedNote, true);
+        }
+        if ("OPEN".equals(requestedStatus)) {
+            db.update("UPDATE conversation_reports SET status='OPEN',reviewed_by_profile_id=NULL,reviewed_at=NULL,reviewer_note=? WHERE id=?", requestedNote, reportId);
+        } else {
+            db.update("UPDATE conversation_reports SET status=?,reviewed_by_profile_id=?,reviewed_at=CURRENT_TIMESTAMP,reviewer_note=? WHERE id=?",
+                    requestedStatus, principal.profileId(), requestedNote, reportId);
+        }
+        long conversationId = ((Number) report.get("conversation_id")).longValue();
+        audit.record(principal.profileId(), "CONVERSATION_REPORT_MODERATED", "CONVERSATION_REPORT", reportId,
+                Map.of("conversationId", conversationId, "oldStatus", oldStatus, "newStatus", requestedStatus));
+        return reportResponse(reportId, conversationId, requestedStatus, requestedNote, false);
     }
 
     @Transactional
@@ -182,6 +228,17 @@ public class ChatService {
     private void ensureReadState(long conversationId, long profileId) { db.update("INSERT IGNORE INTO conversation_read_states(conversation_id,profile_id) VALUES(?,?)", conversationId, profileId); }
     private long otherParticipant(Map<String, Object> conversation, long sender) { long customer=((Number) conversation.get("customer_profile_id")).longValue(); return sender == customer ? ((Number) conversation.get("provider_profile_id")).longValue() : customer; }
     private void requireAdmin(CurrentPrincipal principal) { if (!"ADMIN".equals(principal.role())) throw new ApiException(403, "Admin account required"); }
+    private String normalizeReportStatus(String status) {
+        String normalized = status == null ? "" : status.trim().toUpperCase();
+        if (!Set.of("OPEN", "REVIEWED", "DISMISSED").contains(normalized)) throw new ApiException(400, "Unsupported report status");
+        return normalized;
+    }
+    private Map<String,Object> reportResponse(long reportId, long conversationId, String status, String reviewerNote, boolean idempotent) {
+        Map<String,Object> response = new java.util.LinkedHashMap<>();
+        response.put("id", reportId); response.put("conversationId", conversationId); response.put("status", status);
+        response.put("reviewerNote", reviewerNote); response.put("idempotent", idempotent);
+        return response;
+    }
     private Map<String, Object> one(String sql, Object... args) { List<Map<String,Object>> rows=db.queryForList(sql,args); return rows.isEmpty()?null:rows.get(0); }
     private long lastId() { Long id=db.queryForObject("SELECT LAST_INSERT_ID()", Long.class); return id == null ? 0L : id; }
     private Object[] prepend(Object first, List<Object> rest) { List<Object> values=new ArrayList<>(); values.add(first); values.addAll(rest); return values.toArray(); }

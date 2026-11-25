@@ -22,8 +22,12 @@ for the other participant without exposing message content in notification logs.
 
 Participants can report a conversation. Admin may see only reported
 conversations through the moderation endpoints; each view creates an audit event
-containing metadata only. No general admin inbox exists. Retention, recall and
-legal-hold policy must be defined before enabling deletion or attachments.
+containing metadata only. Admin may move an individual report between `OPEN`,
+`REVIEWED` and `DISMISSED`, recording only report/conversation identifiers and
+the status transition in the audit trail. A moderation retry with the same
+status and reviewer note is idempotent. No general admin inbox exists, and a
+moderation action never modifies a message. Retention, recall and legal-hold
+policy must be defined before enabling deletion or attachments.
 
 ## Upgrade path to real time
 
