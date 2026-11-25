@@ -13,6 +13,7 @@ import ReportsPage from './features/reports/ReportsPage'
 import Notifications from './features/notifications/Notifications'
 import ReviewsPage from './features/reviews/ReviewsPage'
 import ProviderStoreSettings from './features/profile/ProviderStoreSettings'
+import MessagesPage from './features/messages/MessagesPage'
 
 const storage = {
   token: 'pawcareProviderToken',
@@ -30,6 +31,7 @@ const menu = [
   { key: 'reports', icon: <Icons.Reports size={18} />, label: 'Báo cáo' },
   { key: 'reviews', icon: <Icons.Reviews size={18} />, label: 'Đánh giá' },
   { key: 'notifications', icon: <Icons.Bell size={18} />, label: 'Thông báo' },
+  { key: 'messages', icon: <Icons.Chat size={18} />, label: 'Tin nhắn' },
 ]
 
 function App() {
@@ -152,7 +154,7 @@ function App() {
 
   const content = {
     dashboard: <Dashboard bookings={bookings} dashboard={dashboard} onNavigate={setPage} onRefresh={reload} />,
-    bookings: <BookingsPage token={token} onMutated={reload} />,
+    bookings: <BookingsPage token={token} onMutated={reload} onOpenMessages={() => setPage('messages')} />,
     services: <OperationsPage kind="services" token={token} />,
     staff: <OperationsPage kind="staff" token={token} />,
     schedules: <OperationsPage kind="schedules" token={token} />,
@@ -160,6 +162,7 @@ function App() {
     reports: <ReportsPage token={token} />,
     notifications: <Notifications token={token} onBooking={() => setPage('bookings')} />,
     reviews: <ReviewsPage token={token} />,
+    messages: <MessagesPage token={token} />,
   }[page]
 
   return (
