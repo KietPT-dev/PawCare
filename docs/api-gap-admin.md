@@ -32,6 +32,23 @@ The `pawcare_api` permission must be assigned to the Bonita Administrator profil
   pending task and marketplace booking. Do not infer a task state from a wallet
   transaction or booking status.
 - The public API's booking orchestration should remain the authority for status changes. Do not let generic Admin widgets submit arbitrary booking statuses.
+- Conversation moderation is deliberately **not** exposed in the Bonita Admin application yet. The upstream API has only these audited read operations:
+  `GET /api/v1/admin/conversations/reports?status=OPEN&page=0&size=20` and
+  `GET /api/v1/admin/conversations/{conversationId}/messages`. The latter correctly
+  refuses unreported conversations and records an audit event, but the report-list
+  response currently contains only the reporter and booking id. It does not provide
+  Customer/Provider display data, report review metadata, or a total-count envelope
+  for pagination.
+- Before creating the Admin **Báo cáo hội thoại** page, add an authenticated
+  moderation contract (and expose it through the Bonita REST extension) with:
+  `GET /api/v1/admin/conversations/reports?status=&page=&size=` returning report id,
+  status, booking id, Customer, Provider, category, created/reviewed timestamps and
+  pagination metadata; and `PUT /api/v1/admin/conversations/reports/{id}` accepting
+  only `OPEN`, `REVIEWED`, or `DISMISSED`, optional reviewer note, and recording the
+  reviewer/audit event. The mutation must never delete or alter chat messages.
+  Keep the message-detail endpoint restricted to a selected reported conversation;
+  do not add a general conversation inbox, log raw message content, or put tokens in
+  UI Designer resources.
 
 ## Export/import and deployment
 
