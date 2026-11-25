@@ -120,6 +120,34 @@ secrets.
 recognises `PAW<depositId>` inside `content`/`transferContent`; `bank_tran_id`
 is the idempotency key. Never put the token or bank account in client code.
 
+## Booking chat
+
+Chat v1 is text/emoji only and is scoped to exactly one booking. A Customer or
+the Provider owner of that booking creates or retrieves the same conversation
+idempotently with `POST /api/v1/bookings/{bookingId}/conversation`. Chat is
+available from `PENDING_APPROVAL` through `COMPLETED`/`DISPUTED`; it is never
+available for unpaid, rejected or cancelled bookings.
+
+| Endpoint | Contract |
+| --- | --- |
+| `GET /api/v1/conversations?page=0&size=20` | Current participant's inbox with unread count and last-message preview. |
+| `GET /api/v1/conversations/{id}/messages?beforeId=&size=50` | Participant-only history, returned oldest to newest within the page. |
+| `POST /api/v1/conversations/{id}/messages` | `{ "content": "…", "clientMessageId": "client-generated-id" }`; 1–2000 characters, idempotent per sender/conversation/client id. |
+| `POST /api/v1/conversations/{id}/read` | Marks the current participant's messages read. |
+| `POST /api/v1/conversations/{id}/reports` | Participant report body `{ "category": "…", "note": "…" }`. |
+
+Each new message creates a deduplicated notification with
+`referenceType=CONVERSATION`; its text deliberately does not include message
+content. Clients poll only while a conversation is visible (recommended every
+five seconds), stop when backgrounded, and retry a failed send using the same
+`clientMessageId`. A non-participant receives `403`; unavailable booking/chat
+state receives `409`.
+
+Admin moderation is intentionally narrow: `GET /api/v1/admin/conversations/reports`
+lists reports and `GET /api/v1/admin/conversations/{id}/messages` only works for
+a reported conversation. These reads are audited without storing raw message
+content in audit logs.
+
 ## Account recovery and verification
 
 `POST /api/v1/auth/password-reset/request` accepts `{ "email": "..." }` and
