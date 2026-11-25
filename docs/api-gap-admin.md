@@ -32,30 +32,20 @@ The `pawcare_api` permission must be assigned to the Bonita Administrator profil
   pending task and marketplace booking. Do not infer a task state from a wallet
   transaction or booking status.
 - The public API's booking orchestration should remain the authority for status changes. Do not let generic Admin widgets submit arbitrary booking statuses.
-- Conversation moderation is deliberately **not** exposed in the Bonita Admin application yet. The upstream API has only these audited read operations:
-  `GET /api/v1/admin/conversations/reports?status=OPEN&page=0&size=20` and
-  `GET /api/v1/admin/conversations/{conversationId}/messages`. The latter correctly
-  refuses unreported conversations and records an audit event, but the report-list
-  response currently contains only the reporter and booking id. It does not provide
-  Customer/Provider display data, report review metadata, or a total-count envelope
-  for pagination.
-- Before creating the Admin **Báo cáo hội thoại** page, add an authenticated
-  moderation contract (and expose it through the Bonita REST extension) with:
-  `GET /api/v1/admin/conversations/reports?status=&page=&size=` returning report id,
-  status, booking id, Customer, Provider, category, created/reviewed timestamps and
-  pagination metadata; and `PUT /api/v1/admin/conversations/reports/{id}` accepting
-  only `OPEN`, `REVIEWED`, or `DISMISSED`, optional reviewer note, and recording the
-  reviewer/audit event. The mutation must never delete or alter chat messages.
-  Keep the message-detail endpoint restricted to a selected reported conversation;
-  do not add a general conversation inbox, log raw message content, or put tokens in
-  UI Designer resources.
+- Conversation moderation is available to Bonita Admin through authenticated REST
+  extension adapters: `GET|PUT /bonita/API/extension/conversation-reports` and
+  `GET /bonita/API/extension/conversation-messages?conversation_id=...`. They mirror
+  the Public API moderation contract for report filtering/pagination, state changes
+  (`OPEN`, `REVIEWED`, `DISMISSED`) and audited reported-conversation reads. The
+  message route rejects conversations without a report. No general inbox, message
+  mutation route, token, or public-API secret is exposed to UI Designer resources.
 
 ## Export/import and deployment
 
 1. Run `mvn test` at the repository root; it validates UI Designer resources and creates the Business Archive.
 2. In Bonita Studio, select **BookingService 2.0** and deploy the generated process; map `Customer`, `Provider`, and `Admin` actors to their intended groups before enabling it. The task **Đặt lịch** is mapped to `PawCareBookingRequestForm`; other unmapped workflow tasks explicitly use `NONE` until their business contracts and task forms are specified.
 3. Export the custom pages/widgets from the project or import the project resource ZIP into the target Studio. Import the REST extension ZIP before navigating to Admin pages.
-4. Deploy `PawCareAdmin` application descriptor, then add/verify menu entries for Booking, Tài chính sàn and Tranh chấp.
+4. Deploy `PawCareAdmin` application descriptor, then add/verify menu entries for Booking, Tài chính sàn, Tranh chấp and Báo cáo hội thoại.
 5. Clear the browser cache (or use a private window) and reload the Bonita portal after page/widget deployments.
 
 No passwords, access tokens, database credentials, or public-API secrets belong in UI Designer resources or exported ZIPs.
