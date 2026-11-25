@@ -3214,3 +3214,10 @@ main {
 .cover-preview span, .cover-api-note { font-size: 12px; }
 .cover-api-note { color: var(--text-muted); line-height: 1.5; }
 .success-banner { padding: 10px 12px; border-radius: var(--radius-md); color: var(--emerald-600); background: var(--emerald-50); border: 1px solid var(--emerald-100); font-size: 13px; }
+.cover-file-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.cover-preview { position: relative; cursor: pointer; transition: border-color var(--transition-fast), background var(--transition-fast); }
+.cover-preview.is-dragging { border-color: var(--teal-500); background: var(--teal-50); }
+.cover-uploading { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; background: rgba(6, 24, 43, .72); font-weight: 700; font-size: 13px; }
+.cover-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-danger { border: 1px solid var(--coral-100); border-radius: var(--radius-md); padding: 9px 13px; background: var(--coral-50); color: var(--coral-600); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.btn-danger:disabled, .cover-actions button:disabled { cursor: not-allowed; opacity: .55; }
