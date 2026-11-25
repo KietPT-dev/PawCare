@@ -1,0 +1,24 @@
+{
+  "id": "pawCareAdminShell",
+  "name": "PawCareAdminShell",
+  "type": "widget",
+  "custom": true,
+  "modelVersion": "2.6",
+  "description": "Enterprise sidebar and topbar shell for PawCare Admin Bonita Living Application.",
+  "template": "@pawCareAdminShell.tpl.html",
+  "controller": "@pawCareAdminShell.ctrl.js",
+  "properties": [],
+  "assets": [
+    {
+      "id": "b1a92001-7c24-4a91-9e10-200000000001",
+      "name": "pawcare-shell.css",
+      "type": "css",
+      "order": 1,
+      "external": false
+    }
+  ],
+  "requiredModules": [],
+  "webResources": [],
+  "order": 1,
+  "hasHelp": false
+}

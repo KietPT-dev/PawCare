@@ -1,7 +1,538 @@
-<style>.pc-fin{font-family:Arial;background:#f5f8fc;color:#163b5a;padding:28px;min-height:680px}.pc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.pc-card,.pc-box{background:#fff;border-radius:12px;padding:18px;box-shadow:0 3px 13px #083a5e17}.pc-card small,.pc-muted{color:#718b9e}.pc-card b{display:block;font-size:22px;margin-top:8px}.pc-box{margin-top:18px}.pc-table{width:100%;border-collapse:collapse;font-size:13px}.pc-table th,.pc-table td{padding:10px 7px;border-bottom:1px solid #e8eef3;text-align:left;vertical-align:top}.pc-bar,.pc-status{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:13px}.pc-btn,.pc-select,.pc-date{border:0;border-radius:7px;padding:8px 11px}.pc-btn{background:#e6f5f0;color:#08765b;font-weight:bold}.primary{background:#1677b5!important;color:#fff!important}.danger{background:#fff0ed!important;color:#bd4d34!important}.pc-select,.pc-date,.pc-note{border:1px solid #cbdce9;background:#fff}.pc-note{width:100%;min-height:60px;border-radius:7px;padding:8px}.pc-alert{padding:11px;border-radius:8px;background:#e5f7ee;color:#11795b;margin:10px 0}.error{background:#fff0ed!important;color:#c54f36!important}.pc-tag,.pc-status span{background:#eef5fb;border-radius:10px;padding:5px 8px;font-size:11px}.pc-modal{position:fixed;inset:0;background:#0a233686;z-index:1000;display:flex;align-items:center;justify-content:center}.pc-modal-body{background:#fff;max-width:650px;width:92%;border-radius:14px;padding:22px}@media(max-width:800px){.pc-grid{grid-template-columns:repeat(2,1fr)}.pc-table{display:block;overflow-x:auto}}</style>
-<div class="pc-fin"><div class="pc-muted">PAWCARE · QUẢN TRỊ NỘI BỘ</div><h1>Tài chính sàn &amp; đối soát</h1><div class="pc-bar"><label>Từ <input class="pc-date" type="date" ng-model="ctrl.filter.from"></label><label>Đến <input class="pc-date" type="date" ng-model="ctrl.filter.to"></label><button class="pc-btn primary" ng-click="ctrl.refresh()" ng-disabled="ctrl.loading">{{ctrl.loading ? 'Đang tải…' : 'Áp dụng / Làm mới'}}</button></div><div class="pc-alert" ng-if="ctrl.message" ng-class="{error:ctrl.error}">{{ctrl.message}}</div>
-<div class="pc-grid"><div class="pc-card"><small>GMV</small><b>{{ctrl.money(ctrl.data.summary.gmv)}}</b></div><div class="pc-card"><small>Escrow đang khóa</small><b>{{ctrl.money(ctrl.data.summary.escrow_held)}}</b></div><div class="pc-card"><small>Phí sàn</small><b>{{ctrl.money(ctrl.data.summary.commission_revenue)}}</b></div><div class="pc-card"><small>Đã payout Provider</small><b>{{ctrl.money(ctrl.data.summary.provider_payout)}}</b></div><div class="pc-card"><small>Tổng ví User</small><b>{{ctrl.money(ctrl.data.summary.user_wallets)}}</b></div><div class="pc-card"><small>Tổng ví Provider</small><b>{{ctrl.money(ctrl.data.summary.provider_wallets)}}</b></div><div class="pc-card"><small>Rút đã duyệt</small><b>{{ctrl.money(ctrl.data.summary.approved_amount)}}</b></div><div class="pc-card"><small>Rút chờ duyệt</small><b>{{ctrl.data.summary.pending_count||0}} · {{ctrl.money(ctrl.data.summary.pending_amount)}}</b></div></div>
-<section class="pc-box"><h2>Báo cáo booking theo trạng thái</h2><div class="pc-status"><span ng-repeat="s in ctrl.data.bookingStatuses">{{s.status}}: <b>{{s.booking_count}}</b> · {{ctrl.money(s.gross_amount)}}</span><span ng-if="!ctrl.data.bookingStatuses.length">Chưa có booking trong khoảng đã chọn.</span></div></section>
-<section class="pc-box"><div class="pc-bar"><h2 style="margin:0;flex:1">Lệnh rút tiền</h2><select class="pc-select" ng-model="ctrl.filter.status" ng-change="ctrl.load()"><option value="PENDING">Chờ duyệt</option><option value="APPROVED">Đã duyệt</option><option value="REJECTED">Đã từ chối</option><option value="">Tất cả</option></select></div><table class="pc-table"><thead><tr><th>Thời gian</th><th>Case</th><th>Người nhận</th><th>Ngân hàng</th><th>Số tiền</th><th></th></tr></thead><tbody><tr ng-repeat="w in ctrl.data.withdrawals"><td>{{w.created_at}}</td><td>#{{w.id}}<br><span class="pc-muted" ng-if="w.bonita_case_id">Case {{w.bonita_case_id}}</span></td><td><b>{{w.owner_name}}</b><br>{{w.owner_type}}</td><td>{{w.bank_name}}<br>{{w.bank_account_no}} · {{w.bank_account_name}}</td><td><b>{{ctrl.money(w.amount)}}</b></td><td><button class="pc-btn primary" ng-if="w.status==='PENDING'" ng-click="ctrl.open(w)">Xử lý</button><span class="pc-tag" ng-if="w.status!=='PENDING'">{{w.status}}</span></td></tr></tbody></table></section>
-<section class="pc-box"><div class="pc-bar"><h2 style="margin:0;flex:1">Master Ledger</h2><select class="pc-select" ng-model="ctrl.filter.type" ng-change="ctrl.load()"><option value="">Tất cả loại giao dịch</option><option>DEPOSIT</option><option>ESCROW_HOLD</option><option>ESCROW_RELEASE</option><option>COMMISSION_FEE</option><option>PROVIDER_PAYOUT</option><option>WITHDRAWAL</option></select></div><table class="pc-table"><thead><tr><th>Thời điểm</th><th>Loại</th><th>Ví sở hữu</th><th>Booking</th><th>Số tiền</th><th>Mô tả</th></tr></thead><tbody><tr ng-repeat="t in ctrl.data.ledger"><td>{{t.created_at}}</td><td><span class="pc-tag">{{t.type}}</span></td><td>{{t.owner_name}}<br><span class="pc-muted">{{t.owner_type}}</span></td><td>{{t.booking_id||'—'}}</td><td>{{ctrl.money(t.amount)}}</td><td>{{t.description}}</td></tr></tbody></table></section>
-<div class="pc-modal" ng-if="ctrl.selected"><div class="pc-modal-body"><div class="pc-bar"><h2 style="margin:0;flex:1">Xử lý lệnh rút #{{ctrl.selected.id}}</h2><button class="pc-btn" ng-click="ctrl.selected=null">Đóng</button></div><p><b>{{ctrl.selected.owner_name}}</b><br>Nhận {{ctrl.money(ctrl.selected.amount)}} tại {{ctrl.selected.bank_name}}<br>{{ctrl.selected.bank_account_no}} · {{ctrl.selected.bank_account_name}}</p><textarea class="pc-note" ng-model="ctrl.note" placeholder="Ghi chú Admin"></textarea><p><button class="pc-btn primary" ng-click="ctrl.decide('APPROVED')">Xác nhận đã chuyển khoản</button><button class="pc-btn danger" ng-click="ctrl.decide('REJECTED')">Từ chối · hoàn ví</button></p></div></div></div>
+<div class="pc-page">
+  <!-- Page Header -->
+  <header class="pc-page-head">
+    <div class="pc-page-head-main">
+      <div class="pc-eyebrow">PAWCARE · FINANCIAL &amp; ESCROW CONTROL</div>
+      <h1 class="pc-page-title">Tài chính sàn &amp; Đối soát</h1>
+      <p class="pc-page-desc">Theo dõi GMV, phí nền tảng 10%, số dư bảo chứng Escrow, phê duyệt lệnh rút tiền và sổ cái giao dịch Master Ledger.</p>
+    </div>
+    <div class="pc-page-actions">
+      <button type="button" class="pc-btn" ng-click="ctrl.refresh()" ng-disabled="ctrl.loading">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ng-style="ctrl.loading ? {'animation':'pc-spin 0.7s linear infinite'} : {}"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+        <span>{{ctrl.loading ? 'Đang tải…' : 'Làm mới'}}</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Date Filter Bar -->
+  <section class="pc-panel" style="padding:14px 18px;">
+    <div class="pc-toolbar" style="margin-bottom:0;">
+      <span style="font-size:12.5px;font-weight:600;color:#526A80;">Kỳ đối soát:</span>
+      <div class="pc-pills">
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.preset === 'all'}" ng-click="ctrl.applyPreset('all')">Tất cả</button>
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.preset === 'today'}" ng-click="ctrl.applyPreset('today')">Hôm nay</button>
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.preset === '7d'}" ng-click="ctrl.applyPreset('7d')">7 ngày qua</button>
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.preset === '30d'}" ng-click="ctrl.applyPreset('30d')">30 ngày qua</button>
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.preset === 'thisMonth'}" ng-click="ctrl.applyPreset('thisMonth')">Tháng này</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:6px;margin:0;font-weight:500;font-size:12.5px;color:#526A80;">
+          <span>Từ</span>
+          <input class="pc-input" type="date" ng-model="ctrl.filter.from" ng-change="ctrl.preset='custom'">
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;margin:0;font-weight:500;font-size:12.5px;color:#526A80;">
+          <span>Đến</span>
+          <input class="pc-input" type="date" ng-model="ctrl.filter.to" ng-change="ctrl.preset='custom'">
+        </label>
+        <button type="button" class="pc-btn pc-btn--primary" ng-click="ctrl.refresh()" ng-disabled="ctrl.loading">Áp dụng</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Alert Feedback -->
+  <div class="pc-alert" ng-if="ctrl.message" ng-class="{'pc-alert--error': ctrl.error}">
+    <span>{{ctrl.message}}</span>
+    <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.message=''">Đóng</button>
+  </div>
+
+  <!-- Group 1: Platform Volume & Escrow KPIs -->
+  <div class="pc-section-label"><span>Doanh số sàn, Phí nền tảng &amp; Escrow</span></div>
+  <section class="pc-kpi-grid">
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">GMV (Tổng giá trị Booking)</span>
+        <span class="pc-kpi-icon pc-kpi-icon--blue">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value pc-kpi-value--money">{{ctrl.money(ctrl.data.summary.gmv)}}</div>
+      <div class="pc-kpi-hint">Tính từ các booking đã ký quỹ &amp; hoàn thành</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Phí sàn (10% hoa hồng)</span>
+        <span class="pc-kpi-icon pc-kpi-icon--success">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value pc-kpi-value--money">{{ctrl.money(ctrl.data.summary.commission_revenue)}}</div>
+      <div class="pc-kpi-hint">Doanh thu ròng ghi nhận ví Platform</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Escrow đang khóa</span>
+        <span class="pc-kpi-icon pc-kpi-icon--amber">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value pc-kpi-value--money">{{ctrl.money(ctrl.data.summary.escrow_held)}}</div>
+      <div class="pc-kpi-hint">Chờ xác nhận: {{ctrl.data.summary.waiting_customer_confirmation || 0}} · Tranh chấp: {{ctrl.data.summary.disputed_bookings || 0}}</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Đã payout Provider</span>
+        <span class="pc-kpi-icon pc-kpi-icon--teal">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 14h.01"/><path d="M7 7h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value pc-kpi-value--money">{{ctrl.money(ctrl.data.summary.provider_payout)}}</div>
+      <div class="pc-kpi-hint">90% giá trị đơn đã giải ngân cho đối tác</div>
+    </div>
+  </section>
+
+  <!-- Group 2: Wallet Liquidity & Withdrawals -->
+  <div class="pc-section-label"><span>Số dư Ví &amp; Thanh khoản Rút tiền</span></div>
+  <section class="pc-kpi-grid">
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Tổng ví User</span>
+        <span class="pc-kpi-icon pc-kpi-icon--blue">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value pc-kpi-value--money">{{ctrl.money(ctrl.data.summary.user_wallets)}}</div>
+      <div class="pc-kpi-hint">Số dư khả dụng + đang khóa của khách hàng</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Tổng ví Provider</span>
+        <span class="pc-kpi-icon pc-kpi-icon--teal">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value pc-kpi-value--money">{{ctrl.money(ctrl.data.summary.provider_wallets)}}</div>
+      <div class="pc-kpi-hint">Số dư hiện có trong ví đối tác</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Rút đã duyệt</span>
+        <span class="pc-kpi-icon pc-kpi-icon--success">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value pc-kpi-value--money">{{ctrl.money(ctrl.data.summary.approved_amount)}}</div>
+      <div class="pc-kpi-hint">Đã xác nhận chuyển khoản trong kỳ</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Rút chờ duyệt</span>
+        <span class="pc-kpi-icon" ng-class="(ctrl.data.summary.pending_count || 0) > 0 ? 'pc-kpi-icon--orange' : 'pc-kpi-icon--teal'">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value pc-kpi-value--money">{{ctrl.money(ctrl.data.summary.pending_amount)}}</div>
+      <div class="pc-kpi-hint"><strong>{{ctrl.data.summary.pending_count || 0}} yêu cầu</strong> đang chờ xử lý</div>
+    </div>
+  </section>
+
+  <!-- Interactive Financial Charts & Booking Status Report -->
+  <div class="pc-grid-main-side">
+    <!-- Left: Interactive Chart Tabs (Ledger Cashflow Trend vs Flow Comparison) -->
+    <section class="pc-panel" style="margin-bottom:0;">
+      <div class="pc-panel-head">
+        <div>
+          <h2 class="pc-panel-title">Phân tích biểu đồ tài chính</h2>
+          <p class="pc-panel-sub">Tổng hợp từ dữ liệu giao dịch thực tế trong sổ cái Ledger (không tạo dữ liệu giả)</p>
+        </div>
+        <div class="pc-pills">
+          <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.chartTab === 'timeline'}" ng-click="ctrl.chartTab = 'timeline'">Biến động theo ngày</button>
+          <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.chartTab === 'flows'}" ng-click="ctrl.chartTab = 'flows'">Cơ cấu dòng tiền</button>
+        </div>
+      </div>
+
+      <!-- Tab 1: Ledger Daily Series -->
+      <div ng-if="ctrl.chartTab === 'timeline'">
+        <div style="display:flex;gap:14px;align-items:center;margin-bottom:8px;flex-wrap:wrap;font-size:12px;color:#526A80;">
+          <span style="display:inline-flex;align-items:center;gap:6px;"><i style="width:10px;height:10px;border-radius:3px;background:#0F766E;display:inline-block;"></i> Payout Provider</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;"><i style="width:10px;height:10px;border-radius:3px;background:#167CB7;display:inline-block;"></i> Phí sàn (10%)</span>
+        </div>
+
+        <div ng-if="ctrl.ledgerSeries.length >= 2">
+          <div class="pc-bar-row">
+            <div class="pc-bar-col" ng-repeat="d in ctrl.ledgerSeries" title="{{d.fullDate}} · Payout: {{ctrl.money(d.payout)}} · Phí sàn: {{ctrl.money(d.fee)}}">
+              <span class="pc-bar-val">{{ctrl.compactMoney(d.payout + d.fee)}}</span>
+              <div style="display:flex;gap:3px;align-items:flex-end;height:125px;width:100%;justify-content:center;">
+                <div class="pc-bar-fill pc-bar-fill--teal" style="max-width:14px;" ng-style="{'height': d.payoutPct + '%'}"></div>
+                <div class="pc-bar-fill" style="max-width:14px;" ng-style="{'height': d.feePct + '%'}"></div>
+              </div>
+            </div>
+          </div>
+          <div class="pc-bar-labels">
+            <span class="pc-bar-lbl" ng-repeat="d in ctrl.ledgerSeries" title="{{d.fullDate}}">{{d.label}}</span>
+          </div>
+        </div>
+
+        <div class="pc-empty" style="padding:26px 16px;" ng-if="ctrl.ledgerSeries.length === 1">
+          <div style="font-size:20px;font-weight:700;color:#0B3557;">Payout: {{ctrl.money(ctrl.ledgerSeries[0].payout)}} · Phí sàn: {{ctrl.money(ctrl.ledgerSeries[0].fee)}}</div>
+          <p class="pc-empty-desc" style="margin-top:6px;">Dữ liệu giải ngân mới ghi nhận ở ngày {{ctrl.ledgerSeries[0].fullDate}}. Biểu đồ so sánh sẽ hiển thị khi có từ 2 ngày giao dịch trở lên.</p>
+        </div>
+
+        <div class="pc-empty" style="padding:28px 16px;" ng-if="ctrl.ledgerSeries.length === 0">
+          <p class="pc-empty-title">Chưa phát sinh giao dịch giải ngân / phí sàn trong kỳ</p>
+          <p class="pc-empty-desc">API Ledger chưa ghi nhận giao dịch PROVIDER_PAYOUT hoặc COMMISSION_FEE trong khoảng ngày đã chọn.</p>
+        </div>
+      </div>
+
+      <!-- Tab 2: Flow Comparison Bars -->
+      <div ng-if="ctrl.chartTab === 'flows'">
+        <div class="pc-breakdown-list">
+          <div class="pc-breakdown-item" ng-repeat="f in ctrl.flowBars">
+            <div class="pc-breakdown-row">
+              <span style="font-weight:600;color:#0B3557;">{{f.label}}</span>
+              <span class="pc-num" style="color:#0B3557;">{{ctrl.money(f.amount)}}</span>
+            </div>
+            <div class="pc-progress-track">
+              <div class="pc-progress-fill" ng-style="{'width': f.pct + '%', 'background': f.color}"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: Booking Status Report -->
+    <section class="pc-panel" style="margin-bottom:0;">
+      <div class="pc-panel-head">
+        <div>
+          <h2 class="pc-panel-title">Báo cáo Booking theo trạng thái</h2>
+          <p class="pc-panel-sub">Tổng hợp từ dữ liệu kỳ đối soát đang chọn</p>
+        </div>
+        <span class="pc-badge pc-badge--info">{{ctrl.totalStatusBookings}} đơn</span>
+      </div>
+
+      <div ng-if="ctrl.data.bookingStatuses && ctrl.data.bookingStatuses.length > 0">
+        <!-- SVG Donut + Legend -->
+        <div style="display:flex;align-items:center;gap:18px;margin-bottom:16px;flex-wrap:wrap;" ng-if="ctrl.donutSegments.length > 0">
+          <svg width="112" height="112" viewBox="0 0 112 112" aria-label="Biểu đồ phân bổ trạng thái Booking" style="flex-shrink:0;">
+            <circle cx="56" cy="56" r="42" fill="none" stroke="#F1F5F9" stroke-width="14"></circle>
+            <circle ng-repeat="seg in ctrl.donutSegments"
+                    cx="56" cy="56" r="42"
+                    fill="none"
+                    ng-attr-stroke="{{seg.color}}"
+                    stroke-width="14"
+                    ng-attr-stroke-dasharray="{{seg.dashArray}}"
+                    ng-attr-stroke-dashoffset="{{seg.dashOffset}}"
+                    transform="rotate(-90 56 56)"></circle>
+            <text x="56" y="53" text-anchor="middle" style="font-size:18px;font-weight:700;fill:#0B3557;">{{ctrl.totalStatusBookings}}</text>
+            <text x="56" y="68" text-anchor="middle" style="font-size:10px;fill:#71889E;">Booking</text>
+          </svg>
+
+          <div style="flex:1;min-width:180px;display:flex;flex-direction:column;gap:7px;">
+            <div ng-repeat="s in ctrl.donutSegments" style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px;">
+              <span style="display:inline-flex;align-items:center;gap:6px;min-width:0;">
+                <i ng-style="{'width':'8px','height':'8px','border-radius':'50%','background':s.color,'flex-shrink':'0'}"></i>
+                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ctrl.statusLabel(s.status)}}</span>
+              </span>
+              <span class="pc-num" style="white-space:nowrap;">{{s.booking_count}} ({{s.pct}}%)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pc-table-wrap">
+          <table class="pc-table">
+            <thead>
+              <tr>
+                <th>Trạng thái</th>
+                <th class="pc-text-right">Số đơn</th>
+                <th class="pc-text-right">Tổng giá trị</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr ng-repeat="s in ctrl.data.bookingStatuses">
+                <td><span ng-class="ctrl.statusClass(s.status)"><span class="pc-badge-dot"></span>{{ctrl.statusLabel(s.status)}}</span></td>
+                <td class="pc-text-right pc-num">{{s.booking_count}}</td>
+                <td class="pc-text-right pc-num">{{ctrl.money(s.gross_amount)}}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="pc-empty" style="padding:28px 16px;" ng-if="!ctrl.data.bookingStatuses || !ctrl.data.bookingStatuses.length">
+        <p class="pc-empty-title">Chưa có Booking trong khoảng đã chọn</p>
+        <p class="pc-empty-desc">Thử chọn "Tất cả" hoặc mở rộng ngày đối soát.</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- Withdrawal Requests Panel -->
+  <section class="pc-panel" style="margin-top:20px;">
+    <div class="pc-panel-head">
+      <div>
+        <h2 class="pc-panel-title">Quản lý lệnh rút tiền</h2>
+        <p class="pc-panel-sub">Kiểm tra thông tin tài khoản thụ hưởng và xác nhận giải ngân / từ chối hoàn ví</p>
+      </div>
+      <span class="pc-badge pc-badge--neutral">{{ctrl.filteredWithdrawals.length}} lệnh</span>
+    </div>
+
+    <div class="pc-toolbar">
+      <div class="pc-search-box">
+        <span class="pc-search-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
+        <input type="text" class="pc-input" ng-model="ctrl.withdrawalQuery" ng-change="ctrl.wPage=0" placeholder="Tìm tên người nhận, ngân hàng, số tài khoản, mã Case…">
+        <button type="button" class="pc-search-clear" ng-if="ctrl.withdrawalQuery" ng-click="ctrl.withdrawalQuery='';ctrl.wPage=0">×</button>
+      </div>
+
+      <select class="pc-select" ng-model="ctrl.filter.status" ng-change="ctrl.load()" aria-label="Lọc trạng thái rút tiền">
+        <option value="PENDING">Chờ duyệt</option>
+        <option value="APPROVED">Đã duyệt</option>
+        <option value="REJECTED">Đã từ chối</option>
+        <option value="">Tất cả trạng thái</option>
+      </select>
+    </div>
+
+    <div class="pc-table-wrap" ng-if="ctrl.pagedWithdrawals.items.length > 0">
+      <table class="pc-table">
+        <thead>
+          <tr>
+            <th>Thời gian</th>
+            <th>Mã &amp; Case</th>
+            <th>Người nhận</th>
+            <th>Tài khoản ngân hàng</th>
+            <th class="pc-text-right">Số tiền</th>
+            <th>Trạng thái</th>
+            <th class="pc-text-right">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr ng-repeat="w in ctrl.pagedWithdrawals.items">
+            <td style="white-space:nowrap;">{{ctrl.formatDateTime(w.created_at)}}</td>
+            <td>
+              <span class="pc-cell-primary pc-num">#{{w.id}}</span>
+              <span class="pc-cell-sub" ng-if="w.bonita_case_id">Case {{w.bonita_case_id}}</span>
+            </td>
+            <td>
+              <span class="pc-cell-primary">{{w.owner_name || '—'}}</span>
+              <span class="pc-cell-sub">{{w.owner_type}}</span>
+            </td>
+            <td>
+              <span class="pc-cell-primary">{{w.bank_name}}</span>
+              <span class="pc-cell-sub">{{w.bank_account_no}} · {{w.bank_account_name}}</span>
+            </td>
+            <td class="pc-text-right pc-num" style="color:#0B3557;font-size:14px;">{{ctrl.money(w.amount)}}</td>
+            <td><span ng-class="ctrl.statusClass(w.status)"><span class="pc-badge-dot"></span>{{ctrl.statusLabel(w.status)}}</span></td>
+            <td class="pc-text-right">
+              <button type="button" class="pc-btn pc-btn--primary pc-btn--sm" ng-if="w.status==='PENDING'" ng-click="ctrl.open(w)">Xử lý</button>
+              <button type="button" class="pc-btn pc-btn--sm" ng-if="w.status!=='PENDING'" ng-click="ctrl.open(w)">Chi tiết</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pc-empty" ng-if="ctrl.pagedWithdrawals.items.length === 0 && !ctrl.loading">
+      <p class="pc-empty-title">Không có lệnh rút tiền phù hợp</p>
+      <p class="pc-empty-desc">Chưa ghi nhận yêu cầu rút tiền theo bộ lọc hiện tại.</p>
+    </div>
+
+    <div class="pc-pagination" ng-if="ctrl.pagedWithdrawals.total > ctrl.pagedWithdrawals.size">
+      <span>Hiển thị {{ctrl.pagedWithdrawals.from}}–{{ctrl.pagedWithdrawals.to}} / {{ctrl.pagedWithdrawals.total}} lệnh</span>
+      <div class="pc-pagination-controls">
+        <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.wPage = ctrl.wPage - 1; ctrl.updatePages()" ng-disabled="ctrl.pagedWithdrawals.page === 0">← Trước</button>
+        <span>Trang {{ctrl.pagedWithdrawals.page + 1}} / {{ctrl.pagedWithdrawals.totalPages}}</span>
+        <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.wPage = ctrl.wPage + 1; ctrl.updatePages()" ng-disabled="ctrl.pagedWithdrawals.page + 1 >= ctrl.pagedWithdrawals.totalPages">Sau →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Master Ledger Panel -->
+  <section class="pc-panel" style="margin-bottom:0;">
+    <div class="pc-panel-head">
+      <div>
+        <h2 class="pc-panel-title">Master Ledger (Sổ cái giao dịch toàn sàn)</h2>
+        <p class="pc-panel-sub">Lịch sử ghi nhận bất biến mọi biến động số dư ví User, Provider và Platform</p>
+      </div>
+      <span class="pc-badge pc-badge--neutral">{{ctrl.filteredLedger.length}} bút toán</span>
+    </div>
+
+    <div class="pc-toolbar">
+      <div class="pc-search-box">
+        <span class="pc-search-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
+        <input type="text" class="pc-input" ng-model="ctrl.ledgerQuery" ng-change="ctrl.lPage=0" placeholder="Tìm theo tên ví, mã Booking, nội dung diễn giải…">
+        <button type="button" class="pc-search-clear" ng-if="ctrl.ledgerQuery" ng-click="ctrl.ledgerQuery='';ctrl.lPage=0">×</button>
+      </div>
+
+      <select class="pc-select" ng-model="ctrl.filter.type" ng-change="ctrl.load()" aria-label="Lọc loại giao dịch Ledger">
+        <option value="">Tất cả loại giao dịch</option>
+        <option value="DEPOSIT">DEPOSIT · Nạp tiền ví</option>
+        <option value="ESCROW_HOLD">ESCROW_HOLD · Khóa Escrow</option>
+        <option value="ESCROW_RELEASE">ESCROW_RELEASE · Giải phóng Escrow</option>
+        <option value="COMMISSION_FEE">COMMISSION_FEE · Phí nền tảng</option>
+        <option value="PROVIDER_PAYOUT">PROVIDER_PAYOUT · Payout Provider</option>
+        <option value="WITHDRAWAL">WITHDRAWAL · Rút tiền</option>
+      </select>
+    </div>
+
+    <div class="pc-table-wrap" ng-if="ctrl.pagedLedger.items.length > 0">
+      <table class="pc-table">
+        <thead>
+          <tr>
+            <th>Thời điểm</th>
+            <th>Loại giao dịch</th>
+            <th>Ví sở hữu</th>
+            <th>Booking</th>
+            <th class="pc-text-right">Số tiền</th>
+            <th>Diễn giải</th>
+            <th class="pc-text-right">Chi tiết</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr ng-repeat="t in ctrl.pagedLedger.items">
+            <td style="white-space:nowrap;">{{ctrl.formatDateTime(t.created_at)}}</td>
+            <td><span ng-class="ctrl.statusClass(t.type)"><span class="pc-badge-dot"></span>{{ctrl.statusLabel(t.type)}}</span></td>
+            <td>
+              <span class="pc-cell-primary">{{t.owner_name || '—'}}</span>
+              <span class="pc-cell-sub">{{t.owner_type}}</span>
+            </td>
+            <td class="pc-num">{{t.booking_id ? ('#' + t.booking_id) : '—'}}</td>
+            <td class="pc-text-right pc-num" ng-style="{'color': t.amount < 0 ? '#BE123C' : '#047857'}">{{t.amount > 0 ? '+' : ''}}{{ctrl.money(t.amount)}}</td>
+            <td><span class="pc-truncate-2" title="{{t.description}}">{{t.description || '—'}}</span></td>
+            <td class="pc-text-right">
+              <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.selectedLedger = t">Xem</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pc-empty" ng-if="ctrl.pagedLedger.items.length === 0 && !ctrl.loading">
+      <p class="pc-empty-title">Chưa có bút toán giao dịch phù hợp</p>
+      <p class="pc-empty-desc">Thử xóa từ khóa tìm kiếm hoặc chọn loại giao dịch khác.</p>
+    </div>
+
+    <div class="pc-pagination" ng-if="ctrl.pagedLedger.total > ctrl.pagedLedger.size">
+      <span>Hiển thị {{ctrl.pagedLedger.from}}–{{ctrl.pagedLedger.to}} / {{ctrl.pagedLedger.total}} bút toán</span>
+      <div class="pc-pagination-controls">
+        <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.lPage = ctrl.lPage - 1; ctrl.updatePages()" ng-disabled="ctrl.pagedLedger.page === 0">← Trước</button>
+        <span>Trang {{ctrl.pagedLedger.page + 1}} / {{ctrl.pagedLedger.totalPages}}</span>
+        <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.lPage = ctrl.lPage + 1; ctrl.updatePages()" ng-disabled="ctrl.pagedLedger.page + 1 >= ctrl.pagedLedger.totalPages">Sau →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal: Process / View Withdrawal -->
+  <div class="pc-modal-backdrop" ng-if="ctrl.selected" ng-click="ctrl.selected=null">
+    <div class="pc-modal" ng-click="$event.stopPropagation()">
+      <div class="pc-modal-head">
+        <div>
+          <h3 class="pc-modal-title">Lệnh rút tiền #{{ctrl.selected.id}}</h3>
+          <p class="pc-modal-sub">Tạo lúc {{ctrl.formatDateTime(ctrl.selected.created_at)}}</p>
+        </div>
+        <button type="button" class="pc-modal-close" ng-click="ctrl.selected=null" aria-label="Đóng">×</button>
+      </div>
+      <div class="pc-modal-body">
+        <div class="pc-desc-grid">
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Người nhận</div>
+            <div class="pc-desc-val">{{ctrl.selected.owner_name}} ({{ctrl.selected.owner_type}})</div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Số tiền yêu cầu</div>
+            <div class="pc-desc-val pc-num" style="color:#0F766E;font-size:16px;">{{ctrl.money(ctrl.selected.amount)}}</div>
+          </div>
+          <div class="pc-desc-item pc-desc-item--full">
+            <div class="pc-desc-label">Thông tin ngân hàng</div>
+            <div class="pc-desc-val">{{ctrl.selected.bank_name}} · STK: {{ctrl.selected.bank_account_no}} · {{ctrl.selected.bank_account_name}}</div>
+          </div>
+          <div class="pc-desc-item" ng-if="ctrl.selected.bonita_case_id">
+            <div class="pc-desc-label">Bonita Case</div>
+            <div class="pc-desc-val">#{{ctrl.selected.bonita_case_id}}</div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Trạng thái</div>
+            <div class="pc-desc-val"><span ng-class="ctrl.statusClass(ctrl.selected.status)"><span class="pc-badge-dot"></span>{{ctrl.statusLabel(ctrl.selected.status)}}</span></div>
+          </div>
+        </div>
+
+        <label style="display:block;font-size:12.5px;font-weight:600;color:#0B3557;margin-bottom:6px;">Ghi chú Admin</label>
+        <textarea class="pc-textarea" ng-model="ctrl.note" ng-readonly="ctrl.selected.status !== 'PENDING'" placeholder="Nhập mã giao dịch ngân hàng hoặc lý do xử lý…"></textarea>
+
+        <div class="pc-alert" ng-if="ctrl.pendingDecision" ng-class="{'pc-alert--error': ctrl.pendingDecision === 'REJECTED'}" style="margin-top:12px;margin-bottom:0;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <strong ng-if="ctrl.pendingDecision === 'APPROVED'">Xác nhận đã chuyển khoản đúng {{ctrl.money(ctrl.selected.amount)}} tới {{ctrl.selected.bank_account_no}}?</strong>
+            <strong ng-if="ctrl.pendingDecision === 'REJECTED'">Xác nhận từ chối lệnh rút và hoàn {{ctrl.money(ctrl.selected.amount)}} về ví?</strong>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.cancelDecision()" ng-disabled="ctrl.saving">Hủy</button>
+            <button type="button" class="pc-btn pc-btn--sm" ng-class="ctrl.pendingDecision === 'REJECTED' ? 'pc-btn--danger' : 'pc-btn--primary'" ng-click="ctrl.decide()" ng-disabled="ctrl.saving">
+              {{ctrl.saving ? 'Đang xử lý…' : 'Xác nhận'}}
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="pc-modal-foot" style="justify-content:space-between;flex-wrap:wrap;">
+        <button type="button" class="pc-btn" ng-click="ctrl.selected=null;ctrl.pendingDecision=''" ng-disabled="ctrl.saving">Đóng</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;" ng-if="ctrl.selected.status === 'PENDING' && !ctrl.pendingDecision">
+          <button type="button" class="pc-btn pc-btn--danger" ng-click="ctrl.chooseDecision('REJECTED')" ng-disabled="ctrl.saving">Từ chối · hoàn ví</button>
+          <button type="button" class="pc-btn pc-btn--primary" ng-click="ctrl.chooseDecision('APPROVED')" ng-disabled="ctrl.saving">Xác nhận đã chuyển khoản</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Master Ledger Detail -->
+  <div class="pc-modal-backdrop" ng-if="ctrl.selectedLedger" ng-click="ctrl.selectedLedger=null">
+    <div class="pc-modal" ng-click="$event.stopPropagation()">
+      <div class="pc-modal-head">
+        <div>
+          <h3 class="pc-modal-title">Chi tiết bút toán #{{ctrl.selectedLedger.id}}</h3>
+          <p class="pc-modal-sub">{{ctrl.formatDateTime(ctrl.selectedLedger.created_at)}}</p>
+        </div>
+        <button type="button" class="pc-modal-close" ng-click="ctrl.selectedLedger=null" aria-label="Đóng">×</button>
+      </div>
+      <div class="pc-modal-body">
+        <div class="pc-desc-grid">
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Loại giao dịch</div>
+            <div class="pc-desc-val"><span ng-class="ctrl.statusClass(ctrl.selectedLedger.type)"><span class="pc-badge-dot"></span>{{ctrl.statusLabel(ctrl.selectedLedger.type)}}</span></div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Số tiền biến động</div>
+            <div class="pc-desc-val pc-num">{{ctrl.money(ctrl.selectedLedger.amount)}}</div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Số dư trước</div>
+            <div class="pc-desc-val pc-num">{{ctrl.money(ctrl.selectedLedger.balance_before)}}</div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Số dư sau</div>
+            <div class="pc-desc-val pc-num">{{ctrl.money(ctrl.selectedLedger.balance_after)}}</div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Ví sở hữu</div>
+            <div class="pc-desc-val">{{ctrl.selectedLedger.owner_name}} ({{ctrl.selectedLedger.owner_type}})</div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Mã Booking</div>
+            <div class="pc-desc-val">{{ctrl.selectedLedger.booking_id ? ('#' + ctrl.selectedLedger.booking_id) : '—'}}</div>
+          </div>
+          <div class="pc-desc-item pc-desc-item--full">
+            <div class="pc-desc-label">Mô tả đầy đủ</div>
+            <div class="pc-desc-val" style="font-weight:500;">{{ctrl.selectedLedger.description || '—'}}</div>
+          </div>
+        </div>
+      </div>
+      <div class="pc-modal-foot">
+        <button type="button" class="pc-btn pc-btn--primary" ng-click="ctrl.selectedLedger=null">Đóng</button>
+      </div>
+    </div>
+  </div>
+</div>

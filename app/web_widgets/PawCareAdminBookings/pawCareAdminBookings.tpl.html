@@ -1,1 +1,220 @@
-<style>.pc-module{font-family:Arial,sans-serif;background:#f5f8fc;min-height:640px;padding:28px;color:#163b5a}.pc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}.pc-over{font-size:11px;font-weight:bold;color:#6d8ca5;letter-spacing:1px}.pc-head h1{margin:6px 0 0;font-size:30px}.pc-panel,.pc-stat{background:#fff;border-radius:14px;padding:20px;box-shadow:0 4px 14px rgba(8,58,94,.08)}.pc-table{width:100%;border-collapse:collapse;font-size:14px}.pc-table th,.pc-table td{padding:13px 8px;text-align:left;border-bottom:1px solid #e9f0f5;vertical-align:top}.pc-table th{font-size:11px;color:#708ba0}.pc-sub{display:block;color:#8096a8;font-size:12px;margin-top:4px}.pc-btn{border:0;border-radius:7px;padding:8px 11px;margin:2px;background:#e6f5f0;color:#08765b;font-weight:bold;cursor:pointer}.pc-btn.primary{background:#1677b5;color:#fff}.pc-btn.danger{background:#fff0ed;color:#c45234}.pc-input,.pc-select,.pc-area{border:1px solid #cbdce9;border-radius:7px;padding:8px;background:#fff;max-width:100%}.pc-area{min-height:58px;width:190px}.pc-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.pc-toolbar .pc-input{min-width:190px;flex:1}.pc-alert{padding:11px 13px;border-radius:9px;margin-bottom:14px;background:#e5f7ee;color:#11795b}.pc-alert.error{background:#fff0ed;color:#c54f36}.pc-tag{display:inline-block;padding:5px 8px;border-radius:12px;background:#e9f4ff;color:#2673a2;font-size:11px;font-weight:bold}.pc-tag.pending{background:#fff3d9;color:#9b6900}.pc-tag.ok{background:#e4f7ee;color:#137e5c}.pc-empty{padding:38px;text-align:center;color:#8096a8}.pc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.pc-stat small{color:#718b9e;font-weight:bold}.pc-stat b{display:block;font-size:34px;margin-top:10px}@media(max-width:760px){.pc-module{padding:16px}.pc-stats{grid-template-columns:repeat(2,1fr)}.pc-table{display:block;overflow-x:auto}}</style><div class="pc-module"><header class="pc-head"><div><div class="pc-over">PAWCARE · QUẢN TRỊ NỘI BỘ</div><h1>Quản lý Booking</h1></div><button class="pc-btn" ng-click="ctrl.load()">Làm mới</button></header><div class="pc-alert" ng-if="ctrl.message" ng-class="{error:ctrl.error}">{{ctrl.message}}</div><section class="pc-panel"><table class="pc-table"><thead><tr><th>ID</th><th>Provider</th><th>Thời gian</th><th>Hiện tại</th><th>Cập nhật</th></tr></thead><tbody><tr ng-repeat="b in ctrl.rows"><td>#{{b.id}}</td><td><b>{{b.provider_name}}</b></td><td>{{b.booking_start}}</td><td><span class="pc-tag">{{b.status}}</span></td><td><select class="pc-select" ng-model="b.nextStatus" ng-options="s for s in ctrl.statuses"></select><button class="pc-btn primary" ng-click="ctrl.save(b)">Lưu</button></td></tr></tbody></table><div class="pc-empty" ng-if="!ctrl.rows.length">Chưa có booking.</div></section></div>
+<div class="pc-page">
+  <header class="pc-page-head">
+    <div class="pc-page-head-main">
+      <div class="pc-eyebrow">PAWCARE · QUẢN LÝ ĐẶT LỊCH</div>
+      <h1 class="pc-page-title">Quản lý Booking</h1>
+      <p class="pc-page-desc">Theo dõi lịch hẹn toàn hệ thống, tra cứu thời gian chăm sóc và cập nhật trạng thái xử lý khi cần điều phối.</p>
+    </div>
+    <div class="pc-page-actions">
+      <button type="button" class="pc-btn" ng-click="ctrl.load()" ng-disabled="ctrl.loading">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ng-style="ctrl.loading ? {'animation':'pc-spin 0.7s linear infinite'} : {}"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+        <span>{{ctrl.loading ? 'Đang tải…' : 'Làm mới'}}</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="pc-alert" ng-if="ctrl.message" ng-class="{'pc-alert--error': ctrl.error}">
+    <span>{{ctrl.message}}</span>
+    <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.message=''">Đóng</button>
+  </div>
+
+  <!-- Summary KPIs -->
+  <section class="pc-kpi-grid">
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Tổng Booking</span>
+        <span class="pc-kpi-icon pc-kpi-icon--blue">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.stats.total}}</div>
+      <div class="pc-kpi-hint">Giá trị ước tính: {{ctrl.money(ctrl.stats.totalAmount)}}</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Đang thực hiện / Chờ</span>
+        <span class="pc-kpi-icon pc-kpi-icon--amber">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.stats.active}}</div>
+      <div class="pc-kpi-hint">Chờ duyệt, Đã xác nhận, Check-in, Đang làm</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Hoàn thành</span>
+        <span class="pc-kpi-icon pc-kpi-icon--success">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.stats.completed}}</div>
+      <div class="pc-kpi-hint">Đã tất toán dịch vụ</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Hủy / Tranh chấp</span>
+        <span class="pc-kpi-icon pc-kpi-icon--danger">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.stats.cancelledOrDisputed}}</div>
+      <div class="pc-kpi-hint">Cần theo dõi &amp; hoàn tiền nếu có</div>
+    </div>
+  </section>
+
+  <!-- Filters & Table -->
+  <section class="pc-panel" style="margin-bottom:0;">
+    <div class="pc-toolbar">
+      <div class="pc-search-box">
+        <span class="pc-search-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
+        <input type="text" class="pc-input" ng-model="ctrl.query" ng-change="ctrl.applyFilter(true)" placeholder="Tìm mã #ID, tên Provider, ghi chú…">
+        <button type="button" class="pc-search-clear" ng-if="ctrl.query" ng-click="ctrl.query='';ctrl.applyFilter(true)">×</button>
+      </div>
+
+      <input type="date" class="pc-input" ng-model="ctrl.dateFilter" ng-change="ctrl.applyFilter(true)" aria-label="Lọc theo ngày hẹn" title="Lọc theo ngày lịch hẹn">
+
+      <select class="pc-select" ng-model="ctrl.statusFilter" ng-change="ctrl.applyFilter(true)" aria-label="Lọc trạng thái Booking">
+        <option value="">Tất cả trạng thái</option>
+        <option value="PENDING">PENDING · Chờ xử lý</option>
+        <option value="PENDING_APPROVAL">PENDING_APPROVAL · Chờ Provider duyệt</option>
+        <option value="CONFIRMED">CONFIRMED · Đã xác nhận</option>
+        <option value="CHECKED_IN">CHECKED_IN · Đã check-in</option>
+        <option value="IN_SERVICE">IN_SERVICE · Đang thực hiện</option>
+        <option value="SERVICE_DONE">SERVICE_DONE · Chờ khách xác nhận</option>
+        <option value="COMPLETED">COMPLETED · Hoàn thành</option>
+        <option value="DISPUTED">DISPUTED · Tranh chấp</option>
+        <option value="CANCELLED">CANCELLED · Đã hủy</option>
+        <option value="REJECTED">REJECTED · Đã từ chối</option>
+      </select>
+
+      <button type="button" class="pc-btn pc-btn--sm" ng-if="ctrl.query || ctrl.dateFilter || ctrl.statusFilter" ng-click="ctrl.clearFilters()">Xóa lọc</button>
+    </div>
+
+    <div class="pc-loading" ng-if="ctrl.loading">
+      <span class="pc-spinner"></span>
+      <span>Đang tải danh sách Booking…</span>
+    </div>
+
+    <div class="pc-table-wrap" ng-if="!ctrl.loading && ctrl.paged.items.length > 0">
+      <table class="pc-table">
+        <thead>
+          <tr>
+            <th>Mã Booking</th>
+            <th>Cơ sở Provider</th>
+            <th>Thời gian lịch hẹn</th>
+            <th class="pc-text-right">Giá trị</th>
+            <th>Trạng thái</th>
+            <th>Cập nhật trạng thái</th>
+            <th class="pc-text-right">Chi tiết</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr ng-repeat="b in ctrl.paged.items">
+            <td>
+              <span class="pc-cell-primary pc-num">#{{b.id}}</span>
+              <span class="pc-cell-sub">Tạo: {{ctrl.formatDateOnly(b.created_at)}}</span>
+            </td>
+            <td>
+              <span class="pc-cell-primary">{{b.provider_name || '—'}}</span>
+              <span class="pc-cell-sub">Customer #{{b.customer_profile_id || '—'}} · Pet #{{b.pet_id || '—'}}</span>
+            </td>
+            <td style="white-space:nowrap;">
+              <span class="pc-cell-primary">{{ctrl.formatDateTime(b.booking_start)}}</span>
+              <span class="pc-cell-sub" ng-if="b.booking_end">Kết thúc: {{ctrl.formatTimeOnly(b.booking_end) || ctrl.formatDateTime(b.booking_end)}}</span>
+            </td>
+            <td class="pc-text-right pc-num">{{ctrl.money(b.estimated_price)}}</td>
+            <td><span ng-class="ctrl.statusClass(b.status)"><span class="pc-badge-dot"></span>{{ctrl.statusLabel(b.status)}}</span></td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                <select class="pc-select pc-select--sm" ng-model="b.nextStatus" ng-options="s for s in ctrl.statuses" aria-label="Chọn trạng thái mới"></select>
+                <button type="button" class="pc-btn pc-btn--primary pc-btn--sm" ng-click="ctrl.save(b)" ng-disabled="b.nextStatus === b.status">Lưu</button>
+              </div>
+            </td>
+            <td class="pc-text-right">
+              <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.selected = b">Xem</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pc-empty" ng-if="!ctrl.loading && ctrl.paged.items.length === 0">
+      <div class="pc-empty-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+      </div>
+      <p class="pc-empty-title">Không có Booking phù hợp</p>
+      <p class="pc-empty-desc">Chưa có Booking nào khớp với điều kiện tìm kiếm hoặc bộ lọc hiện tại.</p>
+      <button type="button" class="pc-btn pc-btn--sm" ng-if="ctrl.query || ctrl.dateFilter || ctrl.statusFilter" ng-click="ctrl.clearFilters()">Xóa bộ lọc</button>
+    </div>
+
+    <div class="pc-pagination" ng-if="ctrl.paged.total > ctrl.paged.size">
+      <span>Hiển thị {{ctrl.paged.from}}–{{ctrl.paged.to}} / {{ctrl.paged.total}} booking</span>
+      <div class="pc-pagination-controls">
+        <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.page = ctrl.page - 1; ctrl.updatePage()" ng-disabled="ctrl.paged.page === 0">← Trước</button>
+        <span>Trang {{ctrl.paged.page + 1}} / {{ctrl.paged.totalPages}}</span>
+        <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.page = ctrl.page + 1; ctrl.updatePage()" ng-disabled="ctrl.paged.page + 1 >= ctrl.paged.totalPages">Sau →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal: Booking Detail -->
+  <div class="pc-modal-backdrop" ng-if="ctrl.selected" ng-click="ctrl.selected=null">
+    <div class="pc-modal" ng-click="$event.stopPropagation()">
+      <div class="pc-modal-head">
+        <div>
+          <h3 class="pc-modal-title">Chi tiết Booking #{{ctrl.selected.id}}</h3>
+          <p class="pc-modal-sub">Tạo lúc {{ctrl.formatDateTime(ctrl.selected.created_at)}}</p>
+        </div>
+        <button type="button" class="pc-modal-close" ng-click="ctrl.selected=null" aria-label="Đóng">×</button>
+      </div>
+      <div class="pc-modal-body">
+        <div class="pc-desc-grid">
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Cơ sở Provider</div>
+            <div class="pc-desc-val">{{ctrl.selected.provider_name || ('Provider #' + ctrl.selected.provider_id)}}</div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Trạng thái</div>
+            <div class="pc-desc-val"><span ng-class="ctrl.statusClass(ctrl.selected.status)"><span class="pc-badge-dot"></span>{{ctrl.statusLabel(ctrl.selected.status)}}</span></div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Bắt đầu</div>
+            <div class="pc-desc-val">{{ctrl.formatDateTime(ctrl.selected.booking_start)}}</div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Kết thúc</div>
+            <div class="pc-desc-val">{{ctrl.formatDateTime(ctrl.selected.booking_end)}}</div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Giá trị ước tính</div>
+            <div class="pc-desc-val pc-num" style="color:#0F766E;">{{ctrl.money(ctrl.selected.estimated_price)}}</div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Tham chiếu hồ sơ</div>
+            <div class="pc-desc-val">Customer #{{ctrl.selected.customer_profile_id}} · Pet #{{ctrl.selected.pet_id}} · Service #{{ctrl.selected.service_id}}</div>
+          </div>
+          <div class="pc-desc-item pc-desc-item--full" ng-if="ctrl.selected.customer_note">
+            <div class="pc-desc-label">Ghi chú khách hàng</div>
+            <div class="pc-desc-val" style="font-weight:500;">{{ctrl.selected.customer_note}}</div>
+          </div>
+          <div class="pc-desc-item pc-desc-item--full" ng-if="ctrl.selected.provider_note">
+            <div class="pc-desc-label">Ghi chú Provider</div>
+            <div class="pc-desc-val" style="font-weight:500;">{{ctrl.selected.provider_note}}</div>
+          </div>
+          <div class="pc-desc-item pc-desc-item--full" ng-if="ctrl.selected.cancel_reason">
+            <div class="pc-desc-label">Lý do hủy / từ chối</div>
+            <div class="pc-desc-val" style="color:#BE123C;">{{ctrl.selected.cancel_reason}}</div>
+          </div>
+        </div>
+      </div>
+      <div class="pc-modal-foot">
+        <button type="button" class="pc-btn pc-btn--primary" ng-click="ctrl.selected=null">Đóng</button>
+      </div>
+    </div>
+  </div>
+</div>
