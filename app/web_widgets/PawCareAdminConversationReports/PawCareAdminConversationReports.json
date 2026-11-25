@@ -1,0 +1,12 @@
+{
+  "id": "pawCareAdminConversationReports",
+  "name": "PawCareAdminConversationReports",
+  "type": "widget",
+  "custom": true,
+  "modelVersion": "2.6",
+  "description": "Narrow, audited PawCare Admin conversation report moderation widget.",
+  "template": "@pawCareAdminConversationReports.tpl.html",
+  "controller": "@pawCareAdminConversationReports.ctrl.js",
+  "properties": [], "assets": [], "requiredModules": [], "webResources": [],
+  "order": 100, "hasHelp": false
+}

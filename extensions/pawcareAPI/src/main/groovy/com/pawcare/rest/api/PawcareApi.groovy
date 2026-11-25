@@ -1,6 +1,7 @@
 package com.pawcare.rest.api
 
 import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
 import groovy.sql.Sql
 import org.bonitasoft.web.extension.rest.RestAPIContext
 import org.bonitasoft.web.extension.rest.RestApiController
@@ -132,6 +133,14 @@ class PawcareService {
 
         if (action == 'finance') {
             return handleFinance(method)
+        }
+
+        if (action == 'conversation-reports') {
+            return handleConversationReports(method)
+        }
+
+        if (action == 'conversation-messages') {
+            return handleReportedConversationMessages(method)
         }
 
         if (!RESOURCES.containsKey(action)) {
@@ -743,6 +752,115 @@ class PawcareService {
                 return resolveDispute(profile, requestBody())
             default:
                 throw new ApiException(405, "Method ${method} is not allowed for finance")
+        }
+    }
+
+    /**
+     * Bonita-session adapter for the Public API's intentionally narrow chat
+     * moderation contract. It never lists arbitrary conversations and it never
+     * returns message content unless the caller selected a reported conversation.
+     */
+    private Object handleConversationReports(String method) {
+        Map profile = requireProfile(currentProfile(false))
+        if (!isAdmin(profile)) throw new ApiException(403, 'Admin permission is required')
+
+        switch (method) {
+            case 'GET':
+                return listConversationReports(query('status'), integerQuery('page', 0), integerQuery('size', 20))
+            case 'PUT':
+                return updateConversationReport(profile, requestBody())
+            default:
+                throw new ApiException(405, "Method ${method} is not allowed for conversation reports")
+        }
+    }
+
+    private Object handleReportedConversationMessages(String method) {
+        if (method != 'GET') throw new ApiException(405, "Method ${method} is not allowed for conversation messages")
+        Map profile = requireProfile(currentProfile(false))
+        if (!isAdmin(profile)) throw new ApiException(403, 'Admin permission is required')
+        Long conversationId = asLong(query('conversation_id'), 'conversation_id')
+        if (sql.firstRow('SELECT id FROM conversation_reports WHERE conversation_id = ?', [conversationId]) == null) {
+            throw new ApiException(403, 'Conversation is not reported')
+        }
+        int size = Math.min(Math.max(integerQuery('size', 50), 1), 100)
+        List rows = sql.rows('''
+            SELECT m.id,m.conversation_id,m.sender_profile_id,m.content,m.recalled_at,
+                   DATE_FORMAT(m.sent_at, '%d/%m/%Y %H:%i') AS sent_at,u.full_name AS sender_name
+            FROM chat_messages m JOIN user_profiles u ON u.id = m.sender_profile_id
+            WHERE m.conversation_id = ? ORDER BY m.id DESC LIMIT ?
+        ''', [conversationId, size]).reverse()
+        recordConversationAudit(profile.id as Long, 'CONVERSATION_REPORTED_VIEWED', 'CONVERSATION', conversationId,
+                "messageCount=${rows.size()}")
+        return [success: true, conversation_id: conversationId, messages: rows]
+    }
+
+    private Map listConversationReports(String status, int page, int size) {
+        String selectedStatus = normalizeConversationReportStatus(status ?: 'OPEN')
+        int safePage = Math.max(page, 0)
+        int safeSize = Math.min(Math.max(size, 1), 100)
+        Long total = sql.firstRow('SELECT COUNT(*) AS total FROM conversation_reports WHERE status = ?', [selectedStatus]).total as Long
+        List content = sql.rows('''
+            SELECT r.id AS report_id,r.conversation_id,r.category,r.note,r.status,
+                   DATE_FORMAT(r.created_at, '%d/%m/%Y %H:%i') AS created_at,
+                   DATE_FORMAT(r.reviewed_at, '%d/%m/%Y %H:%i') AS reviewed_at,
+                   r.reviewer_note,c.booking_id,
+                   reporter.id AS reporter_profile_id,reporter.full_name AS reporter_name,reporter.role_code AS reporter_role,
+                   customer.id AS customer_profile_id,customer.full_name AS customer_name,
+                   provider_profile.id AS provider_profile_id,
+                   COALESCE(provider.name, provider_profile.full_name) AS provider_name,
+                   reviewer.id AS reviewer_profile_id,reviewer.full_name AS reviewer_name
+            FROM conversation_reports r
+            JOIN conversations c ON c.id = r.conversation_id
+            JOIN user_profiles reporter ON reporter.id = r.reporter_profile_id
+            JOIN user_profiles customer ON customer.id = c.customer_profile_id
+            JOIN user_profiles provider_profile ON provider_profile.id = c.provider_profile_id
+            LEFT JOIN providers provider ON provider.owner_profile_id = c.provider_profile_id
+            LEFT JOIN user_profiles reviewer ON reviewer.id = r.reviewed_by_profile_id
+            WHERE r.status = ? ORDER BY r.created_at ASC,r.id ASC LIMIT ? OFFSET ?
+        ''', [selectedStatus, safeSize, safePage * safeSize])
+        return [success: true, content: content, page: safePage, size: safeSize,
+                totalElements: total ?: 0L, totalPages: total ? Math.ceil((total as double) / safeSize) as long : 0L]
+    }
+
+    private Map updateConversationReport(Map profile, Map body) {
+        Long reportId = asLong(body.report_id, 'report_id')
+        String status = normalizeConversationReportStatus(requiredText(body.status, 'status'))
+        String reviewerNote = body.reviewerNote == null ? null : body.reviewerNote.toString().trim()
+        if (reviewerNote != null && reviewerNote.length() > 1000) throw new ApiException(400, 'reviewerNote must not exceed 1000 characters')
+        return sql.withTransaction {
+            Map report = sql.firstRow('SELECT id,conversation_id,status,reviewer_note FROM conversation_reports WHERE id = ? FOR UPDATE', [reportId])
+            if (report == null) throw new ApiException(404, 'Conversation report not found')
+            String oldStatus = report.status as String
+            if (status == 'OPEN') {
+                sql.executeUpdate('''UPDATE conversation_reports
+                    SET status = 'OPEN', reviewed_by_profile_id = NULL, reviewed_at = NULL, reviewer_note = ? WHERE id = ?''', [reviewerNote, reportId])
+            } else {
+                sql.executeUpdate('''UPDATE conversation_reports
+                    SET status = ?, reviewed_by_profile_id = ?, reviewed_at = CURRENT_TIMESTAMP, reviewer_note = ? WHERE id = ?''',
+                        [status, profile.id, reviewerNote, reportId])
+            }
+            recordConversationAudit(profile.id as Long, 'CONVERSATION_REPORT_MODERATED', 'CONVERSATION_REPORT', reportId,
+                    "conversationId=${report.conversation_id};oldStatus=${oldStatus};newStatus=${status}")
+            return [success: true, report_id: reportId, conversation_id: report.conversation_id, status: status,
+                    reviewer_note: reviewerNote]
+        }
+    }
+
+    private String normalizeConversationReportStatus(String status) {
+        String value = status?.trim()?.toUpperCase()
+        if (!(value in ['OPEN', 'REVIEWED', 'DISMISSED'])) {
+            throw new ApiException(400, 'status must be OPEN, REVIEWED, or DISMISSED')
+        }
+        return value
+    }
+
+    private void recordConversationAudit(Long profileId, String action, String entityType, Long entityId, String metadata) {
+        try {
+            sql.executeInsert('''INSERT INTO audit_logs (actor_profile_id,action_type,entity_type,entity_id,details_json)
+                VALUES (?, ?, ?, ?, CAST(? AS JSON))''', [profileId, action, entityType, entityId,
+                JsonOutput.toJson([event: metadata])])
+        } catch (Exception ignored) {
+            // Deployments predating audit_logs still enforce moderation; never log message bodies as a fallback.
         }
     }
 
