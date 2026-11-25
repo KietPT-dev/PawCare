@@ -5,6 +5,7 @@ import '../../../core/network/pawcare_api.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
 import '../../notifications/presentation/notifications_screen.dart';
+import '../../chat/presentation/chat_inbox_screen.dart';
 import '../../pets/presentation/pets_screen.dart';
 import '../../wallet/presentation/wallet_screen.dart';
 import 'help_center_screen.dart';
@@ -173,6 +174,19 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     const _MenuDivider(),
                     _ProfileMenuTile(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      iconColor: AppColors.teal,
+                      iconBg: AppColors.teal.withValues(alpha: .12),
+                      title: 'Tin nhắn với cơ sở',
+                      subtitle: 'Trao đổi trực tiếp theo từng lịch hẹn',
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatInboxScreen(api: api),
+                          )),
+                    ),
+                    const _MenuDivider(),
+                    _ProfileMenuTile(
                       icon: Icons.account_balance_wallet_outlined,
                       iconColor: const Color(0xFF0284C7),
                       iconBg: const Color(0xFF0284C7).withValues(alpha: .12),
@@ -193,8 +207,7 @@ class ProfileScreen extends StatelessWidget {
                       subtitle: 'Hồ sơ, chủng ngừa và thói quen',
                       onTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(
-                            builder: (_) => PetsScreen(api: api)),
+                        MaterialPageRoute(builder: (_) => PetsScreen(api: api)),
                       ),
                     ),
                     const _MenuDivider(),
@@ -376,8 +389,8 @@ class ProfileScreen extends StatelessWidget {
                 textCapitalization: TextCapitalization.words,
                 decoration: const InputDecoration(
                   labelText: 'Họ và tên',
-                  prefixIcon: Icon(Icons.person_outline_rounded,
-                      color: AppColors.teal),
+                  prefixIcon:
+                      Icon(Icons.person_outline_rounded, color: AppColors.teal),
                 ),
               ),
               const SizedBox(height: 12),
@@ -562,8 +575,8 @@ class ProfileScreen extends StatelessWidget {
                         try {
                           await api.requestEmailVerification();
                           if (sheet.mounted) {
-                            _unavailable(sheet,
-                                'Đã gửi mã xác minh vào email của bạn.');
+                            _unavailable(
+                                sheet, 'Đã gửi mã xác minh vào email của bạn.');
                           }
                         } catch (e) {
                           if (sheet.mounted) {
@@ -774,8 +787,7 @@ class ProfileScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               FilledButton(
-                style:
-                    FilledButton.styleFrom(backgroundColor: AppColors.coral),
+                style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
                 onPressed: () async {
                   try {
                     await api.post('/complaints', {
@@ -879,8 +891,7 @@ class _ProfileMenuTile extends StatelessWidget {
             Icon(
               Icons.chevron_right_rounded,
               size: 20,
-              color:
-                  isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+              color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
             ),
           ],
         ),
