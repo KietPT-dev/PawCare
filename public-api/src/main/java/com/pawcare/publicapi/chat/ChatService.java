@@ -37,19 +37,39 @@ public class ChatService {
         if (!CHAT_BOOKING_STATUSES.contains(String.valueOf(booking.get("status")))) {
             throw new ApiException(409, "Chat is unavailable for this booking status");
         }
-        db.update("INSERT IGNORE INTO conversations(booking_id,customer_profile_id,provider_profile_id,status) VALUES(?,?,?,'OPEN')",
+        db.update("INSERT IGNORE INTO conversations(booking_id,conversation_type,customer_profile_id,provider_profile_id,status) VALUES(?,'BOOKING',?,?,'OPEN')",
                 bookingId, booking.get("customer_profile_id"), booking.get("provider_profile_id"));
         Map<String, Object> conversation = conversationByBooking(bookingId);
         ensureReadState(((Number) conversation.get("id")).longValue(), ((Number) booking.get("customer_profile_id")).longValue());
         ensureReadState(((Number) conversation.get("id")).longValue(), ((Number) booking.get("provider_profile_id")).longValue());
-        return conversation;
+        return conversationResponse(conversation);
+    }
+
+    @Transactional
+    public Map<String, Object> createDirect(CurrentPrincipal principal, long providerId) {
+        if (!"CUSTOMER".equals(principal.role())) throw new ApiException(403, "Only Customer accounts can start a direct conversation");
+        Map<String,Object> provider = one("SELECT id,owner_profile_id,status,is_active FROM providers WHERE id=?", providerId);
+        if (provider == null) throw new ApiException(404, "Provider not found");
+        if (!"APPROVED".equals(String.valueOf(provider.get("status"))) || !isActive(provider.get("is_active"))) {
+            throw new ApiException(409, "Provider is unavailable for direct chat");
+        }
+        long providerProfileId = ((Number) provider.get("owner_profile_id")).longValue();
+        String directKey = "DIRECT:" + principal.profileId() + ":" + providerProfileId;
+        db.update("INSERT IGNORE INTO conversations(booking_id,conversation_type,direct_conversation_key,customer_profile_id,provider_profile_id,status) VALUES(NULL,'DIRECT',?,?,?,'OPEN')",
+                directKey, principal.profileId(), providerProfileId);
+        Map<String,Object> conversation = one("SELECT * FROM conversations WHERE direct_conversation_key=?", directKey);
+        ensureReadState(((Number) conversation.get("id")).longValue(), principal.profileId());
+        ensureReadState(((Number) conversation.get("id")).longValue(), providerProfileId);
+        return conversationResponse(conversation);
     }
 
     public List<Map<String, Object>> list(CurrentPrincipal principal, int page, int size) {
         int safePage = Math.max(page, 0), safeSize = Math.min(Math.max(size, 1), 100);
         return db.queryForList("""
-                SELECT c.id,c.booking_id,c.status,c.last_message_at,c.created_at,
-                       customer.full_name AS customer_name,provider.full_name AS provider_name,
+                SELECT c.id,c.booking_id,c.booking_id AS bookingId,c.conversation_type AS conversationType,
+                       c.status,c.last_message_at,c.created_at,
+                       customer.full_name AS customer_name,customer.full_name AS customerName,
+                       provider.full_name AS provider_name,provider.full_name AS providerName,
                        latest.content AS last_message,
                        COALESCE(unread.unread_count,0) AS unread_count
                 FROM conversations c
@@ -225,6 +245,12 @@ public class ChatService {
         return conversation;
     }
     private Map<String, Object> conversationByBooking(long bookingId) { return one("SELECT * FROM conversations WHERE booking_id=?", bookingId); }
+    private Map<String,Object> conversationResponse(Map<String,Object> conversation) {
+        Map<String,Object> response = new java.util.LinkedHashMap<>(conversation);
+        response.put("bookingId", conversation.get("booking_id"));
+        response.put("conversationType", conversation.get("conversation_type"));
+        return response;
+    }
     private void ensureReadState(long conversationId, long profileId) { db.update("INSERT IGNORE INTO conversation_read_states(conversation_id,profile_id) VALUES(?,?)", conversationId, profileId); }
     private long otherParticipant(Map<String, Object> conversation, long sender) { long customer=((Number) conversation.get("customer_profile_id")).longValue(); return sender == customer ? ((Number) conversation.get("provider_profile_id")).longValue() : customer; }
     private void requireAdmin(CurrentPrincipal principal) { if (!"ADMIN".equals(principal.role())) throw new ApiException(403, "Admin account required"); }
@@ -243,4 +269,7 @@ public class ChatService {
     private long lastId() { Long id=db.queryForObject("SELECT LAST_INSERT_ID()", Long.class); return id == null ? 0L : id; }
     private Object[] prepend(Object first, List<Object> rest) { List<Object> values=new ArrayList<>(); values.add(first); values.addAll(rest); return values.toArray(); }
     private String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
+    private boolean isActive(Object value) {
+        return Boolean.TRUE.equals(value) || value instanceof Number number && number.intValue() == 1;
+    }
 }

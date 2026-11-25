@@ -25,6 +25,8 @@ public class ChatController {
 
     @PostMapping("/bookings/{bookingId}/conversation")
     public Map<String,Object> createOrGet(@CurrentUser CurrentPrincipal principal, @PathVariable long bookingId) { return chat.createOrGet(principal, bookingId); }
+    @PostMapping("/providers/{providerId}/conversation")
+    public Map<String,Object> createDirect(@CurrentUser CurrentPrincipal principal, @PathVariable long providerId) { return chat.createDirect(principal, providerId); }
     @GetMapping("/conversations")
     public List<Map<String,Object>> conversations(@CurrentUser CurrentPrincipal principal, @RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="20") int size) { return chat.list(principal, page, size); }
     @GetMapping("/conversations/{id}/messages")

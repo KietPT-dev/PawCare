@@ -3,11 +3,15 @@
 ## Boundary
 
 The Public API and MySQL are the canonical source of conversations and messages.
-Each conversation is tied one-to-one with a booking. Bonita does not receive a
-workflow event for messages and must not update their state.
+`BOOKING` conversations are tied one-to-one with a booking; `DIRECT`
+conversations are one Customer-to-Provider contact thread and have no booking
+requirement. Bonita does not receive a workflow event for messages and must not
+update their state.
 
-Only the booking Customer and the Provider owner may open, list, read, send or
-report a conversation. v1 accepts text/emoji only; it deliberately excludes
+Only the booking Customer and the Provider owner may open a booking conversation.
+Only a Customer may initiate a direct conversation with an approved active
+Provider; its Provider owner may reply once it exists. Participants alone may
+list, read, send or report either conversation type. v1 accepts text/emoji only; it deliberately excludes
 attachments, images, voice notes and live-location sharing.
 
 ## Delivery model

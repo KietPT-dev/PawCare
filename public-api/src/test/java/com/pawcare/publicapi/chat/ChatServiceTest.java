@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -77,7 +78,7 @@ class ChatServiceTest {
                 new UpdateConversationReportRequest("REVIEWED", "Handled"));
 
         assertEquals("REVIEWED", result.get("status"));
-        verify(db).update(anyString(), any(Object[].class));
+        verify(db, atLeastOnce()).update(anyString(), any(Object[].class));
         verify(audit).record(org.mockito.ArgumentMatchers.eq(1L),
                 org.mockito.ArgumentMatchers.eq("CONVERSATION_REPORT_MODERATED"),
                 org.mockito.ArgumentMatchers.eq("CONVERSATION_REPORT"), org.mockito.ArgumentMatchers.eq(4L),
@@ -100,6 +101,30 @@ class ChatServiceTest {
         assertEquals(true, result.get("idempotent"));
         verify(db, never()).update(anyString(), any(Object[].class));
         verifyNoInteractions(audit);
+    }
+
+    @Test
+    void customerCanCreateDirectConversationWithApprovedProvider() {
+        JdbcTemplate db = mock(JdbcTemplate.class);
+        Map<String,Object> provider = Map.of("id", 8L, "owner_profile_id", 22L, "status", "APPROVED", "is_active", 1);
+        Map<String,Object> conversation = Map.of("id", 12L, "conversation_type", "DIRECT", "customer_profile_id", 11L, "provider_profile_id", 22L);
+        when(db.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(provider), List.of(conversation));
+        ChatService service = service(db);
+
+        Map<String,Object> result = service.createDirect(CUSTOMER, 8L);
+
+        assertEquals("DIRECT", result.get("conversationType"));
+        verify(db, atLeastOnce()).update(anyString(), any(Object[].class));
+    }
+
+    @Test
+    void providerCannotStartDirectConversationForArbitraryCustomer() {
+        ChatService service = service(mock(JdbcTemplate.class));
+        CurrentPrincipal provider = new CurrentPrincipal(22L, "PROVIDER", "provider@pawcare.test");
+
+        ApiException error = assertThrows(ApiException.class, () -> service.createDirect(provider, 8L));
+
+        assertEquals(403, error.status());
     }
 
     private ChatService service(JdbcTemplate db) {

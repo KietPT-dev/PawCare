@@ -122,14 +122,16 @@ is the idempotency key. Never put the token or bank account in client code.
 
 ## Booking chat
 
-Chat v1 is text/emoji only and is scoped to exactly one booking. A Customer or
-the Provider owner of that booking creates or retrieves the same conversation
-idempotently with `POST /api/v1/bookings/{bookingId}/conversation`. Chat is
+Chat v1 is text/emoji only. A `BOOKING` conversation is scoped to one booking;
+a `DIRECT` conversation lets a Customer contact an approved active Provider
+before or after a booking. Existing booking conversations are retained and are
+never merged or deleted when a direct conversation is created. Booking chat is
 available from `PENDING_APPROVAL` through `COMPLETED`/`DISPUTED`; it is never
 available for unpaid, rejected or cancelled bookings.
 
 | Endpoint | Contract |
 | --- | --- |
+| `POST /api/v1/providers/{providerId}/conversation` | Customer-only, creates or returns the same `DIRECT` conversation for an approved active Provider. Provider owners can only reply after it exists. |
 | `GET /api/v1/conversations?page=0&size=20` | Current participant's inbox with unread count and last-message preview. |
 | `GET /api/v1/conversations/{id}/messages?beforeId=&size=50` | Participant-only history, returned oldest to newest within the page. |
 | `POST /api/v1/conversations/{id}/messages` | `{ "content": "…", "clientMessageId": "client-generated-id" }`; 1–2000 characters, idempotent per sender/conversation/client id. |
@@ -142,6 +144,11 @@ content. Clients poll only while a conversation is visible (recommended every
 five seconds), stop when backgrounded, and retry a failed send using the same
 `clientMessageId`. A non-participant receives `403`; unavailable booking/chat
 state receives `409`.
+
+The conversation list returns `conversationType` (`BOOKING` or `DIRECT`) and
+`bookingId` (nullable for `DIRECT`) in addition to its legacy snake-case fields.
+Both participants use the same message, read, report and moderation rules for
+either type. No Bonita workflow event is created for direct chat.
 
 Admin moderation is intentionally narrow. `GET /api/v1/admin/conversations/reports`
 accepts `status=OPEN|REVIEWED|DISMISSED`, `page` and `size`, and returns:
