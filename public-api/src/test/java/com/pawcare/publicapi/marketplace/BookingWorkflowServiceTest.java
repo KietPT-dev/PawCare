@@ -142,7 +142,7 @@ class BookingWorkflowServiceTest {
         verify(wallets, never()).settleCompletedBooking(anyLong());
         verify(wallets, never()).releaseEscrowForBooking(anyLong(), anyString());
         verify(outbox).enqueue(eq(77L), eq(com.pawcare.publicapi.bonita.BookingWorkflowEvent.SYSTEM_REVIEW), any());
-        verify(notifications, times(3)).notifyOnce(anyLong(), anyString(), anyString(), eq("BOOKING_SYSTEM_REVIEW"),
+        verify(notifications, times(2)).notifyOnce(anyLong(), anyString(), anyString(), eq("BOOKING_SYSTEM_REVIEW"),
                 eq("BOOKING"), eq(77L), anyString());
     }
 

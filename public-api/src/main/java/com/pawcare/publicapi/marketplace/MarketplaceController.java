@@ -10,6 +10,8 @@ import com.pawcare.publicapi.marketplace.dto.DisputeRequest;
 import com.pawcare.publicapi.marketplace.dto.ReviewReplyRequest;
 import com.pawcare.publicapi.wallet.PaymentMethod;
 import com.pawcare.publicapi.wallet.WalletService;
+import com.pawcare.publicapi.location.LocationService;
+import com.pawcare.publicapi.media.ProviderCoverService;
 import com.pawcare.publicapi.web.ApiException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -19,6 +21,9 @@ import jakarta.validation.Valid;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -27,18 +32,80 @@ public class MarketplaceController {
     private final WalletService wallets;
     private final BookingWorkflowService workflow;
     private final BookingWorkflowOutbox workflowOutbox;
-    public MarketplaceController(JdbcTemplate db, WalletService wallets, BookingWorkflowService workflow, BookingWorkflowOutbox workflowOutbox) {
+    private final LocationService locations;
+    private final ProviderCoverService covers;
+    public MarketplaceController(JdbcTemplate db, WalletService wallets, BookingWorkflowService workflow, BookingWorkflowOutbox workflowOutbox,
+                                 LocationService locations, ProviderCoverService covers) {
         this.db = db;
         this.wallets = wallets;
         this.workflow = workflow;
         this.workflowOutbox = workflowOutbox;
+        this.locations = locations;
+        this.covers = covers;
     }
 
     // Public catalogue --------------------------------------------------------
     @GetMapping("/providers")
-    public List<Map<String,Object>> providers(@RequestParam(required=false) String status) {
-        String s = status == null ? "APPROVED" : status;
-        return db.queryForList("SELECT id,name,provider_type,phone,email,address,service_area,description,average_rating FROM providers WHERE status=? AND is_active=1 ORDER BY id DESC", s);
+    public List<Map<String,Object>> providers(@RequestParam(required=false) String status,
+                                               @RequestParam(defaultValue="DEFAULT") String sort,
+                                               @RequestParam(defaultValue="0") int page,
+                                               @RequestParam(defaultValue="20") int size,
+                                               HttpServletRequest request, HttpServletResponse response) {
+        CurrentPrincipal principal = request == null ? null : (CurrentPrincipal) request.getAttribute("pawcare.principal");
+        List<Map<String,Object>> result = providerCatalogue(status, sort, page, size, principal);
+        response.setHeader("X-Page", String.valueOf(Math.max(page, 0)));
+        response.setHeader("X-Page-Size", String.valueOf(Math.min(Math.max(size, 1), 100)));
+        return result;
+    }
+
+    /** Backward-compatible helper for direct consumers/tests that need the default catalogue. */
+    public List<Map<String,Object>> providers(String status) {
+        return providerCatalogue(status, "DEFAULT", 0, 20, null);
+    }
+
+    private List<Map<String,Object>> providerCatalogue(String status, String requestedSort, int page, int size, CurrentPrincipal principal) {
+        String s = status == null || status.isBlank() ? "APPROVED" : status.trim().toUpperCase(Locale.ROOT);
+        if (!"APPROVED".equals(s)) throw new ApiException(400, "Only APPROVED providers are public");
+        String sort = requestedSort == null ? "DEFAULT" : requestedSort.trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("DEFAULT", "RATING", "NEWEST", "NEAREST").contains(sort)) throw new ApiException(400, "sort must be DEFAULT, RATING, NEWEST or NEAREST");
+        int safePage = Math.max(page, 0), safeSize = Math.min(Math.max(size, 1), 100);
+        List<Object> args = new ArrayList<>();
+        String distance = "NULL AS distance_km";
+        String nearestWhere = "";
+        String order;
+        if ("NEAREST".equals(sort)) {
+            if (principal == null || !"CUSTOMER".equals(principal.role())) throw new ApiException(401, "Customer location is required for NEAREST sort");
+            Map<String,Object> location = one("SELECT latitude,longitude,geocode_status FROM user_profiles WHERE id=?", principal.profileId());
+            if (location == null || location.get("latitude") == null || location.get("longitude") == null || !"RESOLVED".equals(String.valueOf(location.get("geocode_status")))) {
+                throw new ApiException(409, "Customer address must be geocoded before using NEAREST sort");
+            }
+            distance = "ROUND(6371 * ACOS(LEAST(1, GREATEST(-1, COS(RADIANS(?)) * COS(RADIANS(p.latitude)) * COS(RADIANS(p.longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(p.latitude))))), 2) AS distance_km";
+            args.add(location.get("latitude")); args.add(location.get("longitude")); args.add(location.get("latitude"));
+            nearestWhere = " AND p.latitude IS NOT NULL AND p.longitude IS NOT NULL AND p.geocode_status='RESOLVED'";
+            order = "distance_km ASC, p.created_at DESC";
+        } else if ("RATING".equals(sort)) order = "average_rating DESC, review_count DESC, p.created_at DESC";
+        else order = "p.created_at DESC, p.id DESC";
+        args.add(s); args.add(safeSize); args.add((long) safePage * safeSize);
+        return db.queryForList("""
+                SELECT p.id, p.name, p.provider_type, p.phone, p.email, p.address,
+                       p.service_area, p.description, p.cover_image_url,
+                       COALESCE(review_metrics.average_rating, 0) AS average_rating,
+                       COALESCE(review_metrics.review_count, 0) AS review_count,
+                       DATE_FORMAT(p.created_at, '%%Y-%%m-%%dT%%H:%%i:%%s') AS created_at,
+                       %s
+                FROM providers p
+                LEFT JOIN (
+                    SELECT r.provider_id,
+                           ROUND(AVG(r.rating), 2) AS average_rating,
+                           COUNT(*) AS review_count
+                    FROM reviews r
+                    WHERE r.is_visible = 1
+                    GROUP BY r.provider_id
+                ) review_metrics ON review_metrics.provider_id = p.id
+                WHERE p.status = ? AND p.is_active = 1%s
+                ORDER BY %s
+                LIMIT ? OFFSET ?
+                """.formatted(distance, nearestWhere, order), args.toArray());
     }
     @GetMapping("/categories")
     public List<Map<String,Object>> categories() {
@@ -81,10 +148,18 @@ public class MarketplaceController {
     @PutMapping("/provider/me")
     public Map<String,Object> updateProvider(@CurrentUser CurrentPrincipal p,@RequestBody Map<String,Object>b) {
         Map<String,Object> provider=providerFor(p);
-        db.update("UPDATE providers SET name=COALESCE(?,name),phone=COALESCE(?,phone),email=COALESCE(?,email),address=COALESCE(?,address),service_area=COALESCE(?,service_area),description=COALESCE(?,description),business_hours=COALESCE(?,business_hours) WHERE id=?",
-            text(b,"name"),text(b,"phone"),text(b,"email"),text(b,"address"),text(b,"serviceArea"),text(b,"description"),text(b,"businessHours"),provider.get("id"));
+        String address = address(b);
+        db.update("UPDATE providers SET name=COALESCE(?,name),phone=COALESCE(?,phone),email=COALESCE(?,email),address=COALESCE(?,address),address_line1=COALESCE(?,address_line1),ward=COALESCE(?,ward),district=COALESCE(?,district),province=COALESCE(?,province),service_area=COALESCE(?,service_area),description=COALESCE(?,description),business_hours=COALESCE(?,business_hours) WHERE id=?",
+            text(b,"name"),text(b,"phone"),text(b,"email"),address,text(b,"addressLine1"),text(b,"ward"),text(b,"district"),text(b,"province"),text(b,"serviceArea"),text(b,"description"),text(b,"businessHours"),provider.get("id"));
+        if (address != null && !address.equals(provider.get("address"))) locations.queueProvider(((Number) provider.get("id")).longValue());
         return Map.of("success",true,"id",provider.get("id"));
     }
+    @PostMapping(value="/provider/me/cover", consumes="multipart/form-data")
+    public Map<String,Object> uploadProviderCover(@CurrentUser CurrentPrincipal p, @RequestPart("file") MultipartFile file) {
+        return covers.replace(providerId(p), file);
+    }
+    @DeleteMapping("/provider/me/cover")
+    public Map<String,Object> deleteProviderCover(@CurrentUser CurrentPrincipal p) { return covers.remove(providerId(p)); }
     @GetMapping("/provider/services")
     public List<Map<String,Object>> providerServices(@CurrentUser CurrentPrincipal p) {
         return db.queryForList("SELECT * FROM services WHERE provider_id=? ORDER BY id DESC",providerId(p));
@@ -323,6 +398,11 @@ public class MarketplaceController {
     private Map<String,Object> one(String q,Object...args){List<Map<String,Object>>r=db.queryForList(q,args);return r.isEmpty()?null:r.get(0);}
     private long lastId(){return db.queryForObject("SELECT LAST_INSERT_ID()",Long.class);}
     private String text(Map<String,Object>b,String k){Object v=b.get(k);return v==null?null:v.toString().trim();}
+    private String address(Map<String,Object> body) {
+        String joined = java.util.stream.Stream.of(text(body,"addressLine1"),text(body,"ward"),text(body,"district"),text(body,"province"))
+                .filter(Objects::nonNull).filter(value -> !value.isBlank()).collect(java.util.stream.Collectors.joining(", "));
+        return joined.isBlank() ? text(body,"address") : joined;
+    }
     private String required(Map<String,Object>b,String k){String v=text(b,k);if(v==null||v.isBlank())throw new ApiException(400,k+" is required");return v;}
     private long number(Map<String,Object>b,String k){try{return Long.parseLong(String.valueOf(b.get(k)));}catch(Exception e){throw new ApiException(400,k+" is required");}}
     private Integer integer(Map<String,Object>b,String k){try{return b.get(k)==null?null:Integer.valueOf(String.valueOf(b.get(k)));}catch(Exception e){throw new ApiException(400,k+" must be an integer");}}

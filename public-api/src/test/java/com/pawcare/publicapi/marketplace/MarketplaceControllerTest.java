@@ -2,6 +2,7 @@ package com.pawcare.publicapi.marketplace;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -10,6 +11,8 @@ import static org.mockito.Mockito.when;
 
 import com.pawcare.publicapi.auth.CurrentPrincipal;
 import com.pawcare.publicapi.bonita.BookingWorkflowOutbox;
+import com.pawcare.publicapi.location.LocationService;
+import com.pawcare.publicapi.media.ProviderCoverService;
 import com.pawcare.publicapi.marketplace.dto.BookingStatusRequest;
 import com.pawcare.publicapi.marketplace.dto.ReviewReplyRequest;
 import com.pawcare.publicapi.wallet.WalletService;
@@ -18,7 +21,10 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 
 class MarketplaceControllerTest {
     private JdbcTemplate db;
@@ -30,7 +36,40 @@ class MarketplaceControllerTest {
         db = mock(JdbcTemplate.class);
         wallets = mock(WalletService.class);
         controller = new MarketplaceController(db, wallets, mock(BookingWorkflowService.class),
-                mock(BookingWorkflowOutbox.class));
+                mock(BookingWorkflowOutbox.class), mock(LocationService.class), mock(ProviderCoverService.class));
+    }
+
+    @Test
+    void providerCatalogueExposesVisibleReviewMetricsAndCreationTime() {
+        when(db.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
+
+        controller.providers(null);
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(db).queryForList(sql.capture(), any(Object[].class));
+        assertTrue(sql.getValue().contains("r.is_visible = 1"));
+        assertTrue(sql.getValue().contains("review_count"));
+        assertTrue(sql.getValue().contains("DATE_FORMAT(p.created_at"));
+    }
+
+    @Test
+    void nearestCatalogueUsesCustomerCoordinatesAndReturnsDistance() {
+        when(db.queryForList(anyString(), any(Object[].class))).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0, String.class);
+            if (sql.startsWith("SELECT latitude,longitude")) {
+                return List.of(Map.of("latitude", 10.7769, "longitude", 106.7009, "geocode_status", "RESOLVED"));
+            }
+            return List.of();
+        });
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setAttribute("pawcare.principal", customer());
+
+        controller.providers(null, "NEAREST", 0, 20, request, new MockHttpServletResponse());
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(db, org.mockito.Mockito.times(2)).queryForList(sql.capture(), any(Object[].class));
+        assertTrue(sql.getAllValues().get(1).contains("distance_km"));
+        assertTrue(sql.getAllValues().get(1).contains("p.geocode_status='RESOLVED'"));
     }
 
     @Test

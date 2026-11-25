@@ -58,12 +58,124 @@ and deliberately cannot contact a bank.
 The deployment database is configured in `Asia/Ho_Chi_Minh`; clients must send
 an IANA timezone name so the requested reporting context is explicit.
 
+## Marketplace discovery
+
+`GET /api/v1/providers?status=APPROVED&sort=DEFAULT&page=0&size=20` returns
+active Providers. `size` is capped at 100; `X-Page` and `X-Page-Size` echo the
+effective page. Allowed `sort` values are `DEFAULT`, `RATING`, `NEWEST` and
+`NEAREST`.
+
+`NEAREST` requires an authenticated Customer whose saved address has
+`geocodeStatus: RESOLVED`; otherwise the API returns `409`. It orders with the
+server-side Haversine distance and includes scalar `distance_km`. The API never
+pretends an un-geocoded address is a valid location.
+
+Each Provider includes:
+
+- `average_rating`: an average calculated from visible reviews;
+- `review_count`: the number of visible reviews;
+- `created_at`: scalar timestamp formatted `yyyy-MM-ddTHH:mm:ss`.
+- `cover_image_url`: optional public Provider cover image;
+- `distance_km`: present for `NEAREST` only.
+
+Providers without visible reviews return `average_rating: 0` and
+`review_count: 0`; the client must show “Chưa có đánh giá” rather than treat
+`0` as a real score.
+
+“Gần tôi” needs Provider coordinates and a granted device location permission.
+Until both exist, clients must show the unavailable/fallback state rather than
+pretending a geographical filter ran.
+
+## Addresses and Provider cover images
+
+`PUT /api/v1/auth/me` accepts the existing `address` string and optional
+`addressLine1`, `ward`, `district`, `province`. `PUT /api/v1/provider/me`
+accepts the same fields. A structured address is joined into the legacy
+`address` field for compatibility. Both responses expose `latitude`,
+`longitude` and `geocodeStatus` once migration 015 has run.
+
+Address updates clear previous coordinates and queue geocoding. By default the
+status becomes `NOT_CONFIGURED`, which is deliberate and safe. To enable real
+geocoding set `PAWCARE_GEOCODING_PROVIDER=MAPBOX` and keep
+`PAWCARE_GEOCODING_API_KEY` only in deployment secrets. The built-in Mapbox
+adapter uses its forward-geocoding API; no secret is committed and no fallback
+coordinates are fabricated.
+
+Authenticated Providers manage their cover through:
+
+- `POST /api/v1/provider/me/cover` with multipart field `file` (JPEG, PNG or
+  WebP, maximum 5 MiB by default); and
+- `DELETE /api/v1/provider/me/cover`.
+
+Local development stores files outside source assets in
+`PAWCARE_PROVIDER_COVER_DIRECTORY` and serves them under
+`PAWCARE_PROVIDER_COVER_PUBLIC_PATH`. Production should supply an object-store
+implementation of `ProviderCoverStorage` and its credentials as deployment
+secrets.
+
 ## Payments
 
 `POST /api/v1/payments/webhook` accepts SePay/PayOS-shaped JSON. Send
 `Authorization: Apikey <token>` or `Authorization: Bearer <token>`. The code
 recognises `PAW<depositId>` inside `content`/`transferContent`; `bank_tran_id`
 is the idempotency key. Never put the token or bank account in client code.
+
+## Booking chat
+
+Chat v1 is text/emoji only. A `BOOKING` conversation is scoped to one booking;
+a `DIRECT` conversation lets a Customer contact an approved active Provider
+before or after a booking. Existing booking conversations are retained and are
+never merged or deleted when a direct conversation is created. Booking chat is
+available from `PENDING_APPROVAL` through `COMPLETED`/`DISPUTED`; it is never
+available for unpaid, rejected or cancelled bookings.
+
+| Endpoint | Contract |
+| --- | --- |
+| `POST /api/v1/providers/{providerId}/conversation` | Customer-only, creates or returns the same `DIRECT` conversation for an approved active Provider. Provider owners can only reply after it exists. |
+| `GET /api/v1/conversations?page=0&size=20` | Current participant's inbox with unread count and last-message preview. |
+| `GET /api/v1/conversations/{id}/messages?beforeId=&size=50` | Participant-only history, returned oldest to newest within the page. |
+| `POST /api/v1/conversations/{id}/messages` | `{ "content": "…", "clientMessageId": "client-generated-id" }`; 1–2000 characters, idempotent per sender/conversation/client id. |
+| `POST /api/v1/conversations/{id}/read` | Marks the current participant's messages read. |
+| `POST /api/v1/conversations/{id}/reports` | Participant report body `{ "category": "…", "note": "…" }`. |
+
+Each new message creates a deduplicated notification with
+`referenceType=CONVERSATION`; its text deliberately does not include message
+content. Clients poll only while a conversation is visible (recommended every
+five seconds), stop when backgrounded, and retry a failed send using the same
+`clientMessageId`. A non-participant receives `403`; unavailable booking/chat
+state receives `409`.
+
+The conversation list returns `conversationType` (`BOOKING` or `DIRECT`) and
+`bookingId` (nullable for `DIRECT`) in addition to its legacy snake-case fields.
+Both participants use the same message, read, report and moderation rules for
+either type. No Bonita workflow event is created for direct chat.
+
+Admin moderation is intentionally narrow. `GET /api/v1/admin/conversations/reports`
+accepts `status=OPEN|REVIEWED|DISMISSED`, `page` and `size`, and returns:
+
+```json
+{
+  "content": [{
+    "report_id": 17, "conversation_id": 9, "booking_id": 42,
+    "status": "OPEN", "category": "ABUSE", "note": "…",
+    "reporter_profile_id": 11, "reporter_name": "Customer A", "reporter_role": "CUSTOMER",
+    "customer_profile_id": 11, "customer_name": "Customer A",
+    "provider_profile_id": 22, "provider_name": "PawCare Clinic",
+    "created_at": "2026-11-25T10:00:00", "reviewed_at": null,
+    "reviewer_profile_id": null, "reviewer_name": null, "reviewer_note": null
+  }],
+  "page": 0, "size": 20, "totalElements": 1, "totalPages": 1
+}
+```
+
+Only an Admin can change a report, with
+`PUT /api/v1/admin/conversations/reports/{reportId}` and body
+`{ "status": "OPEN|REVIEWED|DISMISSED", "reviewerNote": "…" }`.
+Retrying the same status/note is idempotent. Moving a report back to `OPEN`
+clears its reviewer identity/time; this endpoint never edits, recalls or deletes
+chat messages. `GET /api/v1/admin/conversations/{id}/messages` only works for a
+reported conversation. Reads and state changes are audited with metadata only;
+raw message content is never written to audit logs.
 
 ## Account recovery and verification
 

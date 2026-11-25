@@ -8,6 +8,7 @@ import '../../../core/widgets/ui.dart';
 import '../../activity/presentation/activity_screen.dart';
 import '../../activity/presentation/booking_detail_screen.dart';
 import '../../wallet/presentation/wallet_screen.dart';
+import '../../chat/presentation/conversation_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen(
@@ -193,7 +194,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       } catch (error) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(ApiMessages.friendly(error))),
+                            SnackBar(
+                                content: Text(ApiMessages.friendly(error))),
                           );
                         }
                       }
@@ -232,8 +234,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               Text(
                                 '${item['title'] ?? 'Thông báo'}',
                                 style: TextStyle(
-                                  fontWeight:
-                                      unread ? FontWeight.w800 : FontWeight.w600,
+                                  fontWeight: unread
+                                      ? FontWeight.w800
+                                      : FontWeight.w600,
                                   fontSize: 14.5,
                                   color: onSurface,
                                 ),
@@ -252,8 +255,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                AppFormatters.relativeTime(item['created_at'] ??
-                                    item['createdAt']),
+                                AppFormatters.relativeTime(
+                                    item['created_at'] ?? item['createdAt']),
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w500,
@@ -315,6 +318,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } else if (type == 'DISPUTE' || type == 'COMPLAINT') {
       await Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => ActivityScreen(api: widget.api)));
+    } else if (type == 'CONVERSATION' && id != null) {
+      await Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) =>
+              ConversationScreen(api: widget.api, conversation: {'id': id})));
     }
     if (mounted) await _refresh();
   }

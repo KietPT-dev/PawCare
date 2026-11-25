@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/app_formatters.dart';
 import '../../../core/widgets/ui.dart';
 import '../../booking/presentation/booking_checkout_screen.dart';
+import '../../chat/presentation/conversation_screen.dart';
 
 class BookingDetailScreen extends StatefulWidget {
   const BookingDetailScreen(
@@ -138,7 +139,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 'Mô tả chi tiết vấn đề bạn gặp phải để PawCare hỗ trợ xử lý tranh chấp và bảo vệ tiền Escrow.',
                 style: TextStyle(
                   fontSize: 13,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  color: isDark
+                      ? const Color(0xFF94A3B8)
+                      : const Color(0xFF64748B),
                 ),
               ),
               const SizedBox(height: 16),
@@ -167,7 +170,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 child: const Text('Gửi khiếu nại',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                    style:
+                        TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               ),
             ],
           ),
@@ -248,6 +252,25 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     }
   }
 
+  Future<void> _openChat(Map<String, dynamic> booking) async {
+    try {
+      final raw =
+          await widget.api.post('/bookings/${booking['id']}/conversation', {});
+      if (!mounted) return;
+      await Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => ConversationScreen(
+              api: widget.api,
+              conversation: Map<String, dynamic>.from(raw as Map))));
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is PawCareApiException && error.statusCode == 409
+          ? 'Chưa thể nhắn tin: cuộc trò chuyện chỉ mở khi lịch hẹn đã được thanh toán và chưa bị hủy.'
+          : ApiMessages.friendly(error);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -313,6 +336,15 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               'PENDING_PAYMENT',
               'CONFIRMED',
               'CHECKED_IN'
+            }.contains(status);
+            final canChat = {
+              'PENDING_APPROVAL',
+              'CONFIRMED',
+              'CHECKED_IN',
+              'IN_SERVICE',
+              'SERVICE_DONE',
+              'COMPLETED',
+              'DISPUTED'
             }.contains(status);
 
             return RefreshIndicator(
@@ -385,7 +417,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                             const Icon(Icons.storefront_rounded,
                                 size: 16, color: AppColors.cyan),
                             const SizedBox(width: 6),
-                            Text(
+                            Expanded(
+                                child: Text(
                               'Provider: ${b['provider_name'] ?? 'PawCare'}',
                               style: TextStyle(
                                 fontSize: 13.5,
@@ -393,7 +426,15 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                                     ? const Color(0xFF94A3B8)
                                     : const Color(0xFF64748B),
                               ),
-                            ),
+                            )),
+                            if (canChat)
+                              TextButton.icon(
+                                onPressed: () => _openChat(b),
+                                icon: const Icon(
+                                    Icons.chat_bubble_outline_rounded,
+                                    size: 16),
+                                label: const Text('Nhắn tin'),
+                              ),
                           ],
                         ),
                         const Divider(height: 28),
@@ -432,8 +473,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
-                              color: AppColors.teal.withValues(
-                                  alpha: isDark ? .16 : .08),
+                              color: AppColors.teal
+                                  .withValues(alpha: isDark ? .16 : .08),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
                                   color: AppColors.teal.withValues(alpha: .25)),
@@ -465,7 +506,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: isDark
-                                  ? const Color(0xFF334155).withValues(alpha: .5)
+                                  ? const Color(0xFF334155)
+                                      .withValues(alpha: .5)
                                   : const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -591,7 +633,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: AppColors.coral,
                                 side: BorderSide(
-                                    color: AppColors.coral.withValues(alpha: .5)),
+                                    color:
+                                        AppColors.coral.withValues(alpha: .5)),
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14)),
                               ),

@@ -16,8 +16,72 @@ import 'package:pawcare_customer_mobile/features/activity/presentation/booking_d
 import 'package:pawcare_customer_mobile/features/home/presentation/home_screen.dart';
 import 'package:pawcare_customer_mobile/features/profile/presentation/profile_screen.dart';
 import 'package:pawcare_customer_mobile/features/notifications/presentation/notifications_screen.dart';
+import 'package:pawcare_customer_mobile/features/discovery/presentation/discovery_screen.dart';
+import 'package:pawcare_customer_mobile/features/discovery/presentation/discovery_state.dart';
 
 void main() {
+  test('provider rating mapper accepts API field variants and no reviews', () {
+    expect(
+        ProviderRating.fromMap(
+            {'id': 1, 'averageRating': 4.8, 'reviewCount': 12}).label,
+        '4.8 (12)');
+    expect(ProviderRating.fromMap({'id': 2, 'average_rating': 0}).label,
+        'Chưa có đánh giá');
+  });
+
+  testWidgets('discover filter state searches and sorts providers',
+      (tester) async {
+    final state = DiscoveryState()..open(query: 'spa');
+    final api = PawCareApi(
+        baseUrl: 'http://pawcare.test/api/v1',
+        client: MockClient((request) async {
+          if (request.url.path.endsWith('/providers'))
+            return _jsonResponse([
+              {'id': 1, 'name': 'Spa Mây', 'average_rating': 4.2},
+              {'id': 2, 'name': 'Spa Sao', 'average_rating': 4.9},
+            ]);
+          if (request.url.path.endsWith('/services')) return _jsonResponse([]);
+          if (request.url.path.endsWith('/reviews'))
+            return _jsonResponse([
+              {'provider_id': 1, 'rating': 4},
+              {'provider_id': 2, 'rating': 5},
+            ]);
+          return _jsonResponse([]);
+        }));
+    addTearDown(api.close);
+    await tester.pumpWidget(MaterialApp(
+        theme: buildTheme(), home: DiscoveryScreen(api: api, state: state)));
+    await tester.pumpAndSettle();
+    expect(find.text('Spa Mây'), findsOneWidget);
+    await tester.tap(find.text('Đánh giá cao'));
+    await tester.pump();
+    final first = tester.widget<Text>(find.text('Spa Sao').first);
+    expect(first.data, 'Spa Sao');
+  });
+
+  testWidgets('Home search and category hand off to shared discovery state',
+      (tester) async {
+    String? capturedCategory;
+    final api = PawCareApi(
+        baseUrl: 'http://pawcare.test/api/v1',
+        client: MockClient((_) async => _jsonResponse([])));
+    addTearDown(api.close);
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: Scaffold(
+        body: HomeScreen(
+          profile: const {'fullName': 'An'},
+          api: api,
+          onExplore: ({query, category}) => capturedCategory = category,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(TextField).first);
+    expect(capturedCategory, isNull);
+    await tester.tap(find.text('Tắm & Spa'));
+    expect(capturedCategory, 'Tắm & Spa');
+  });
   test('persists dark mode and customer session', () async {
     SharedPreferences.setMockInitialValues({});
     final store = SessionStore();

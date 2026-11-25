@@ -13,3 +13,8 @@ request and `{ "success": true, "updated": number }` response.
   “Sắp hỗ trợ”, rather than pretending that a local switch has updated the
   server. Expected request: `{ "bookingUpdates": true, "careReminders": true
   }`; expected response: the saved preference object.
+
+- `GET /api/v1/providers` now returns `average_rating` and `review_count`.
+  It still does not return `approved_at` or `created_at`, so the Customer app
+  transparently keeps “Mới” unavailable instead of claiming a false sort.
+  Expected additional field: `{ "approved_at": "2026-11-24T10:30:00" }`.

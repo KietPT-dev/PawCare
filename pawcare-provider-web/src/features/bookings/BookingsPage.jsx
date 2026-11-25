@@ -15,7 +15,7 @@ const STATUS_GROUPS = [
   { id: 'CANCELLED', label: 'Đã hủy' },
 ]
 
-export default function BookingsPage({ token, onMutated }) {
+export default function BookingsPage({ token, onMutated, onOpenMessages }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -114,6 +114,13 @@ export default function BookingsPage({ token, onMutated }) {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function openConversation() {
+    try {
+      await api(`/bookings/${detail.id}/conversation`, { method: 'POST' }, token)
+      onOpenMessages?.()
+    } catch (e) { setError(e.message) }
   }
 
   return (
@@ -507,6 +514,9 @@ export default function BookingsPage({ token, onMutated }) {
 
             {/* Modal Actions */}
             <div className="modal-actions-footer">
+              <button type="button" className="btn-secondary" onClick={openConversation} disabled={submitting}>
+                Nhắn tin với khách
+              </button>
               <button
                 type="button"
                 className="btn-secondary"

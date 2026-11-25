@@ -12,6 +12,8 @@ import WalletPage from './features/wallet/WalletPage'
 import ReportsPage from './features/reports/ReportsPage'
 import Notifications from './features/notifications/Notifications'
 import ReviewsPage from './features/reviews/ReviewsPage'
+import ProviderStoreSettings from './features/profile/ProviderStoreSettings'
+import MessagesPage from './features/messages/MessagesPage'
 
 const storage = {
   token: 'pawcareProviderToken',
@@ -29,6 +31,7 @@ const menu = [
   { key: 'reports', icon: <Icons.Reports size={18} />, label: 'Báo cáo' },
   { key: 'reviews', icon: <Icons.Reviews size={18} />, label: 'Đánh giá' },
   { key: 'notifications', icon: <Icons.Bell size={18} />, label: 'Thông báo' },
+  { key: 'messages', icon: <Icons.Chat size={18} />, label: 'Tin nhắn' },
 ]
 
 function App() {
@@ -151,7 +154,7 @@ function App() {
 
   const content = {
     dashboard: <Dashboard bookings={bookings} dashboard={dashboard} onNavigate={setPage} onRefresh={reload} />,
-    bookings: <BookingsPage token={token} onMutated={reload} />,
+    bookings: <BookingsPage token={token} onMutated={reload} onOpenMessages={() => setPage('messages')} />,
     services: <OperationsPage kind="services" token={token} />,
     staff: <OperationsPage kind="staff" token={token} />,
     schedules: <OperationsPage kind="schedules" token={token} />,
@@ -159,6 +162,7 @@ function App() {
     reports: <ReportsPage token={token} />,
     notifications: <Notifications token={token} onBooking={() => setPage('bookings')} />,
     reviews: <ReviewsPage token={token} />,
+    messages: <MessagesPage token={token} />,
   }[page]
 
   return (
@@ -430,6 +434,8 @@ function App() {
               </button>
             </div>
             <div className="modal-body">
+              <ProviderStoreSettings token={token} onClose={() => setSettingsModalOpen(false)} />
+              <div className="legacy-settings" aria-hidden="true">
               <div className="form-grid">
                 <div className="form-group form-full">
                   <label className="form-label">Tên cơ sở / Đối tác</label>
@@ -455,6 +461,7 @@ function App() {
                 <button type="button" className="btn-secondary" onClick={() => setSettingsModalOpen(false)}>
                   Đóng
                 </button>
+              </div>
               </div>
             </div>
           </div>

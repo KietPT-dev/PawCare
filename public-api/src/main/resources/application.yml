@@ -37,6 +37,18 @@ pawcare:
     service-done-confirmation-hours: ${PAWCARE_SERVICE_DONE_CONFIRMATION_HOURS:72}
     service-done-reminder-hours-before: ${PAWCARE_SERVICE_DONE_REMINDER_HOURS_BEFORE:24}
     service-done-check-ms: ${PAWCARE_SERVICE_DONE_CHECK_MS:900000}
+  geocoding:
+    # Disabled by default: never derive or fabricate a location from text.
+    # Set PAWCARE_GEOCODING_PROVIDER=MAPBOX and a real API key to enable.
+    provider: ${PAWCARE_GEOCODING_PROVIDER:DISABLED}
+    api-key: ${PAWCARE_GEOCODING_API_KEY:}
+    retry-delay-ms: ${PAWCARE_GEOCODING_RETRY_MS:60000}
+  media:
+    # Local development adapter. Production should provide an object-storage
+    # implementation of ProviderCoverStorage and keep its credentials in env.
+    provider-cover-directory: ${PAWCARE_PROVIDER_COVER_DIRECTORY:./data/provider-covers}
+    provider-cover-public-path: ${PAWCARE_PROVIDER_COVER_PUBLIC_PATH:/api/v1/media/provider-covers/}
+    provider-cover-max-bytes: ${PAWCARE_PROVIDER_COVER_MAX_BYTES:5242880}
   bonita:
     workflow:
       # Keep false until BookingService v2 is deployed and the technical
@@ -47,3 +59,15 @@ pawcare:
       password: ${PAWCARE_BONITA_PASSWORD:}
       process-name: ${PAWCARE_BONITA_BOOKING_PROCESS:BookingService}
       retry-delay-ms: ${PAWCARE_BONITA_WORKFLOW_RETRY_MS:15000}
+    provider-approval:
+      # Enable only after ProviderApproval 1.1 is deployed and its two service
+      # tasks have REST connectors configured as documented in docs/.
+      enabled: ${PAWCARE_BONITA_PROVIDER_APPROVAL_ENABLED:false}
+      base-url: ${PAWCARE_BONITA_PROVIDER_APPROVAL_URL:http://127.0.0.1:62666/bonita}
+      username: ${PAWCARE_BONITA_PROVIDER_APPROVAL_USERNAME:}
+      password: ${PAWCARE_BONITA_PROVIDER_APPROVAL_PASSWORD:}
+      process-name: ${PAWCARE_BONITA_PROVIDER_APPROVAL_PROCESS:ProviderApproval}
+      retry-delay-ms: ${PAWCARE_BONITA_PROVIDER_APPROVAL_RETRY_MS:15000}
+      # Must be configured as an environment secret in production. Empty means
+      # Bonita callbacks are intentionally rejected.
+      bridge-token: ${PAWCARE_BONITA_PROVIDER_APPROVAL_BRIDGE_TOKEN:}

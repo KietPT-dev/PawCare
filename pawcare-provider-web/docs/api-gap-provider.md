@@ -1,10 +1,13 @@
 # Provider API gaps
 
-## Review reply
+## Provider location and cover status
 
-Resolved on backend migration `011_review_replies.sql`:
+Resolved on backend migration `015_provider_location_and_cover.sql`:
 
-- `POST /api/v1/provider/reviews/{reviewId}/reply`
-- Body: `{ "content": "..." }`
-- The API verifies that the review belongs to the authenticated Provider and
-  returns the persisted reply, author profile id and timestamp.
+- `GET/PUT /api/v1/provider/me` exposes structured address and geocode state.
+- `POST /api/v1/provider/me/cover` accepts multipart field `file` (JPEG, PNG,
+  WebP; maximum 5 MiB by default) and returns `coverImageUrl`.
+- `DELETE /api/v1/provider/me/cover` clears the stored cover.
+
+There is no current Provider Web API gap for address, geocoding status or cover
+management.
