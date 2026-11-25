@@ -1,1 +1,209 @@
-<style>.pc-module{font-family:Arial,sans-serif;background:#f5f8fc;min-height:640px;padding:28px;color:#163b5a}.pc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}.pc-over{font-size:11px;font-weight:bold;color:#6d8ca5;letter-spacing:1px}.pc-head h1{margin:6px 0 0;font-size:30px}.pc-panel,.pc-stat{background:#fff;border-radius:14px;padding:20px;box-shadow:0 4px 14px rgba(8,58,94,.08)}.pc-table{width:100%;border-collapse:collapse;font-size:14px}.pc-table th,.pc-table td{padding:13px 8px;text-align:left;border-bottom:1px solid #e9f0f5;vertical-align:top}.pc-table th{font-size:11px;color:#708ba0}.pc-sub{display:block;color:#8096a8;font-size:12px;margin-top:4px}.pc-btn{border:0;border-radius:7px;padding:8px 11px;margin:2px;background:#e6f5f0;color:#08765b;font-weight:bold;cursor:pointer}.pc-btn.primary{background:#1677b5;color:#fff}.pc-btn.danger{background:#fff0ed;color:#c45234}.pc-input,.pc-select,.pc-area{border:1px solid #cbdce9;border-radius:7px;padding:8px;background:#fff;max-width:100%}.pc-area{min-height:58px;width:190px}.pc-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.pc-toolbar .pc-input{min-width:190px;flex:1}.pc-alert{padding:11px 13px;border-radius:9px;margin-bottom:14px;background:#e5f7ee;color:#11795b}.pc-alert.error{background:#fff0ed;color:#c54f36}.pc-tag{display:inline-block;padding:5px 8px;border-radius:12px;background:#e9f4ff;color:#2673a2;font-size:11px;font-weight:bold}.pc-tag.pending{background:#fff3d9;color:#9b6900}.pc-tag.ok{background:#e4f7ee;color:#137e5c}.pc-empty{padding:38px;text-align:center;color:#8096a8}.pc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.pc-stat small{color:#718b9e;font-weight:bold}.pc-stat b{display:block;font-size:34px;margin-top:10px}@media(max-width:760px){.pc-module{padding:16px}.pc-stats{grid-template-columns:repeat(2,1fr)}.pc-table{display:block;overflow-x:auto}}</style><div class="pc-module"><header class="pc-head"><div><div class="pc-over">PAWCARE · QUẢN TRỊ NỘI BỘ</div><h1>Khiếu nại</h1></div><button class="pc-btn" ng-click="ctrl.load()">Làm mới</button></header><div class="pc-alert" ng-if="ctrl.message" ng-class="{error:ctrl.error}">{{ctrl.message}}</div><section class="pc-panel"><table class="pc-table"><thead><tr><th>ID</th><th>Khách hàng</th><th>Nội dung</th><th>Xử lý</th></tr></thead><tbody><tr ng-repeat="c in ctrl.rows"><td>#{{c.id}}</td><td><b>{{c.customer_name}}</b><span class="pc-sub">{{c.provider_name}}</span></td><td>{{c.content}}<span class="pc-sub">{{c.status}}</span></td><td><textarea class="pc-area" ng-model="c.admin_response" placeholder="Phản hồi khách hàng"></textarea><br><button class="pc-btn" ng-click="ctrl.save(c,'IN_PROGRESS')">Đang xử lý</button><button class="pc-btn primary" ng-click="ctrl.save(c,'RESOLVED')">Giải quyết</button></td></tr></tbody></table><div class="pc-empty" ng-if="!ctrl.rows.length">Chưa có khiếu nại.</div></section></div>
+<div class="pc-page">
+  <header class="pc-page-head">
+    <div class="pc-page-head-main">
+      <div class="pc-eyebrow">PAWCARE · CHĂM SÓC &amp; HỖ TRỢ</div>
+      <h1 class="pc-page-title">Quản lý Khiếu nại</h1>
+      <p class="pc-page-desc">Tiếp nhận, phản hồi và cập nhật tiến độ xử lý khiếu nại từ khách hàng đối với dịch vụ trên sàn.</p>
+    </div>
+    <div class="pc-page-actions">
+      <button type="button" class="pc-btn" ng-click="ctrl.load()" ng-disabled="ctrl.loading">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ng-style="ctrl.loading ? {'animation':'pc-spin 0.7s linear infinite'} : {}"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+        <span>{{ctrl.loading ? 'Đang tải…' : 'Làm mới'}}</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="pc-alert" ng-if="ctrl.message" ng-class="{'pc-alert--error': ctrl.error}">
+    <span>{{ctrl.message}}</span>
+    <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.message=''">Đóng</button>
+  </div>
+
+  <!-- Summary KPIs -->
+  <section class="pc-kpi-grid">
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Tổng khiếu nại</span>
+        <span class="pc-kpi-icon pc-kpi-icon--blue">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.stats.total}}</div>
+      <div class="pc-kpi-hint">Từ chối: {{ctrl.stats.rejected}}</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Mới tiếp nhận (OPEN)</span>
+        <span class="pc-kpi-icon pc-kpi-icon--amber">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.stats.open}}</div>
+      <div class="pc-kpi-hint">Cần phản hồi sớm</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Đang xử lý</span>
+        <span class="pc-kpi-icon pc-kpi-icon--teal">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.stats.inProgress}}</div>
+      <div class="pc-kpi-hint">Đang phối hợp xác minh</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Đã giải quyết</span>
+        <span class="pc-kpi-icon pc-kpi-icon--success">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.stats.resolved}}</div>
+      <div class="pc-kpi-hint">Hoàn tất phản hồi</div>
+    </div>
+  </section>
+
+  <!-- Filters & Table -->
+  <section class="pc-panel" style="margin-bottom:0;">
+    <div class="pc-toolbar">
+      <div class="pc-search-box">
+        <span class="pc-search-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
+        <input type="text" class="pc-input" ng-model="ctrl.query" ng-change="ctrl.applyFilter(true)" placeholder="Tìm #ID, Booking, khách hàng, Provider, nội dung…">
+        <button type="button" class="pc-search-clear" ng-if="ctrl.query" ng-click="ctrl.query='';ctrl.applyFilter(true)">×</button>
+      </div>
+
+      <div class="pc-pills">
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.statusFilter === ''}" ng-click="ctrl.statusFilter='';ctrl.applyFilter(true)">Tất cả ({{ctrl.stats.total}})</button>
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.statusFilter === 'OPEN'}" ng-click="ctrl.statusFilter='OPEN';ctrl.applyFilter(true)">Mới ({{ctrl.stats.open}})</button>
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.statusFilter === 'IN_PROGRESS'}" ng-click="ctrl.statusFilter='IN_PROGRESS';ctrl.applyFilter(true)">Đang xử lý ({{ctrl.stats.inProgress}})</button>
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.statusFilter === 'RESOLVED'}" ng-click="ctrl.statusFilter='RESOLVED';ctrl.applyFilter(true)">Đã giải quyết ({{ctrl.stats.resolved}})</button>
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.statusFilter === 'REJECTED'}" ng-click="ctrl.statusFilter='REJECTED';ctrl.applyFilter(true)">Từ chối ({{ctrl.stats.rejected}})</button>
+      </div>
+
+      <button type="button" class="pc-btn pc-btn--sm" ng-if="ctrl.query || ctrl.statusFilter" ng-click="ctrl.clearFilters()">Xóa lọc</button>
+    </div>
+
+    <div class="pc-loading" ng-if="ctrl.loading">
+      <span class="pc-spinner"></span>
+      <span>Đang tải danh sách khiếu nại…</span>
+    </div>
+
+    <div class="pc-table-wrap" ng-if="!ctrl.loading && ctrl.paged.items.length > 0">
+      <table class="pc-table">
+        <thead>
+          <tr>
+            <th>Khiếu nại / Booking</th>
+            <th>Khách hàng</th>
+            <th>Cơ sở Provider</th>
+            <th>Nội dung &amp; Phản hồi</th>
+            <th>Thời gian tạo</th>
+            <th>Trạng thái</th>
+            <th class="pc-text-right">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr ng-repeat="c in ctrl.paged.items track by c.id">
+            <td>
+              <span class="pc-cell-primary pc-num">#{{c.id}}</span>
+              <span class="pc-cell-sub" ng-if="c.booking_id">Booking #{{c.booking_id}}</span>
+            </td>
+            <td>
+              <span class="pc-cell-primary">{{c.customer_name || '—'}}</span>
+              <span class="pc-cell-sub">{{c.customer_email || ('Profile #' + (c.customer_profile_id || '—'))}}</span>
+            </td>
+            <td>
+              <span class="pc-cell-primary">{{c.provider_name || ('Provider #' + (c.provider_id || '—'))}}</span>
+            </td>
+            <td style="max-width:340px;">
+              <span class="pc-cell-primary" style="font-weight:500;">{{c.content || '—'}}</span>
+              <span class="pc-cell-sub" ng-if="c.admin_response">Phản hồi Admin: {{c.admin_response}}</span>
+            </td>
+            <td style="white-space:nowrap;">
+              <span class="pc-cell-primary">{{ctrl.formatDateTime(c.created_at)}}</span>
+              <span class="pc-cell-sub" ng-if="c.resolved_at">Xử lý: {{ctrl.formatDateTime(c.resolved_at)}}</span>
+            </td>
+            <td>
+              <span ng-class="ctrl.statusClass(c.status)"><span class="pc-badge-dot"></span>{{ctrl.statusLabel(c.status)}}</span>
+            </td>
+            <td class="pc-text-right">
+              <button type="button" class="pc-btn pc-btn--sm pc-btn--primary" ng-click="ctrl.openDetail(c)">Xử lý</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pc-empty" ng-if="!ctrl.loading && ctrl.paged.items.length === 0">
+      <div class="pc-empty-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <p class="pc-empty-title">Không có khiếu nại phù hợp</p>
+      <p class="pc-empty-desc">Hiện chưa có khiếu nại nào khớp với từ khóa hoặc bộ lọc trạng thái đã chọn.</p>
+      <button type="button" class="pc-btn pc-btn--sm" ng-if="ctrl.query || ctrl.statusFilter" ng-click="ctrl.clearFilters()">Xóa bộ lọc</button>
+    </div>
+
+    <div class="pc-pagination" ng-if="ctrl.paged.total > ctrl.paged.size">
+      <span>Hiển thị {{ctrl.paged.from}}–{{ctrl.paged.to}} / {{ctrl.paged.total}} khiếu nại</span>
+      <div class="pc-pagination-controls">
+        <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.page = ctrl.page - 1; ctrl.updatePage()" ng-disabled="ctrl.paged.page === 0">← Trước</button>
+        <span>Trang {{ctrl.paged.page + 1}} / {{ctrl.paged.totalPages}}</span>
+        <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.page = ctrl.page + 1; ctrl.updatePage()" ng-disabled="ctrl.paged.page + 1 >= ctrl.paged.totalPages">Sau →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal: Complaint Detail & Response -->
+  <div class="pc-modal-backdrop" ng-if="ctrl.selected" ng-click="ctrl.closeDetail()">
+    <div class="pc-modal" ng-click="$event.stopPropagation()">
+      <div class="pc-modal-head">
+        <div>
+          <h3 class="pc-modal-title">Xử lý Khiếu nại #{{ctrl.selected.id}}</h3>
+          <p class="pc-modal-sub">Gửi lúc {{ctrl.formatDateTime(ctrl.selected.created_at)}}</p>
+        </div>
+        <button type="button" class="pc-modal-close" ng-click="ctrl.closeDetail()" aria-label="Đóng">×</button>
+      </div>
+      <div class="pc-modal-body">
+        <div class="pc-desc-grid" style="margin-bottom:14px;">
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Khách hàng</div>
+            <div class="pc-desc-val">{{ctrl.selected.customer_name || '—'}}</div>
+            <div class="pc-cell-sub" ng-if="ctrl.selected.customer_email">{{ctrl.selected.customer_email}}</div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Cơ sở Provider</div>
+            <div class="pc-desc-val">{{ctrl.selected.provider_name || ('Provider #' + (ctrl.selected.provider_id || '—'))}}</div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Mã Booking liên quan</div>
+            <div class="pc-desc-val pc-num">{{ctrl.selected.booking_id ? ('#' + ctrl.selected.booking_id) : 'Không gắn Booking'}}</div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Trạng thái hiện tại</div>
+            <div class="pc-desc-val"><span ng-class="ctrl.statusClass(ctrl.selected.status)"><span class="pc-badge-dot"></span>{{ctrl.statusLabel(ctrl.selected.status)}}</span></div>
+          </div>
+          <div class="pc-desc-item pc-desc-item--full">
+            <div class="pc-desc-label">Nội dung khiếu nại</div>
+            <div class="pc-desc-val" style="font-weight:500;white-space:pre-wrap;">{{ctrl.selected.content || '—'}}</div>
+          </div>
+        </div>
+
+        <div class="pc-form-group" style="margin-bottom:0;">
+          <label class="pc-form-label" for="complaint-response">Phản hồi của Admin</label>
+          <textarea id="complaint-response" class="pc-textarea" ng-model="ctrl.draftResponse" placeholder="Nhập nội dung phản hồi gửi khách hàng hoặc ghi chú phương án xử lý…"></textarea>
+        </div>
+      </div>
+      <div class="pc-modal-foot" style="flex-wrap:wrap;justify-content:space-between;">
+        <button type="button" class="pc-btn" ng-click="ctrl.closeDetail()" ng-disabled="ctrl.saving">Đóng</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="pc-btn pc-btn--danger" ng-click="ctrl.save('REJECTED')" ng-disabled="ctrl.saving">Từ chối</button>
+          <button type="button" class="pc-btn pc-btn--navy" ng-click="ctrl.save('IN_PROGRESS')" ng-disabled="ctrl.saving">Đang xử lý</button>
+          <button type="button" class="pc-btn pc-btn--primary" ng-click="ctrl.save('RESOLVED')" ng-disabled="ctrl.saving">{{ctrl.saving ? 'Đang lưu…' : 'Giải quyết'}}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

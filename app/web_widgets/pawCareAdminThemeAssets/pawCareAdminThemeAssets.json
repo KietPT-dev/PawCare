@@ -1,0 +1,31 @@
+{
+  "id": "pawCareAdminThemeAssets",
+  "name": "PawCareAdminThemeAssets",
+  "type": "widget",
+  "custom": true,
+  "modelVersion": "2.6",
+  "description": "Shared PawCare Admin Design System CSS and JS utilities for all Bonita Admin pages.",
+  "template": "@pawCareAdminThemeAssets.tpl.html",
+  "controller": "@pawCareAdminThemeAssets.ctrl.js",
+  "properties": [],
+  "assets": [
+    {
+      "id": "b1a91001-7c24-4a91-9e10-100000000001",
+      "name": "pawcare-admin.css",
+      "type": "css",
+      "order": 1,
+      "external": false
+    },
+    {
+      "id": "b1a91001-7c24-4a91-9e10-100000000002",
+      "name": "pawcare-admin-utils.js",
+      "type": "js",
+      "order": 2,
+      "external": false
+    }
+  ],
+  "requiredModules": [],
+  "webResources": [],
+  "order": 1,
+  "hasHelp": false
+}

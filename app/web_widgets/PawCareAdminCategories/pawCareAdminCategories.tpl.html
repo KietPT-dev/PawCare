@@ -1,1 +1,176 @@
-<style>.pc-module{font-family:Arial,sans-serif;background:#f5f8fc;min-height:640px;padding:28px;color:#163b5a}.pc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}.pc-over{font-size:11px;font-weight:bold;color:#6d8ca5;letter-spacing:1px}.pc-head h1{margin:6px 0 0;font-size:30px}.pc-panel,.pc-stat{background:#fff;border-radius:14px;padding:20px;box-shadow:0 4px 14px rgba(8,58,94,.08)}.pc-table{width:100%;border-collapse:collapse;font-size:14px}.pc-table th,.pc-table td{padding:13px 8px;text-align:left;border-bottom:1px solid #e9f0f5;vertical-align:top}.pc-table th{font-size:11px;color:#708ba0}.pc-sub{display:block;color:#8096a8;font-size:12px;margin-top:4px}.pc-btn{border:0;border-radius:7px;padding:8px 11px;margin:2px;background:#e6f5f0;color:#08765b;font-weight:bold;cursor:pointer}.pc-btn.primary{background:#1677b5;color:#fff}.pc-btn.danger{background:#fff0ed;color:#c45234}.pc-input,.pc-select,.pc-area{border:1px solid #cbdce9;border-radius:7px;padding:8px;background:#fff;max-width:100%}.pc-area{min-height:58px;width:190px}.pc-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.pc-toolbar .pc-input{min-width:190px;flex:1}.pc-alert{padding:11px 13px;border-radius:9px;margin-bottom:14px;background:#e5f7ee;color:#11795b}.pc-alert.error{background:#fff0ed;color:#c54f36}.pc-tag{display:inline-block;padding:5px 8px;border-radius:12px;background:#e9f4ff;color:#2673a2;font-size:11px;font-weight:bold}.pc-tag.pending{background:#fff3d9;color:#9b6900}.pc-tag.ok{background:#e4f7ee;color:#137e5c}.pc-empty{padding:38px;text-align:center;color:#8096a8}.pc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.pc-stat small{color:#718b9e;font-weight:bold}.pc-stat b{display:block;font-size:34px;margin-top:10px}@media(max-width:760px){.pc-module{padding:16px}.pc-stats{grid-template-columns:repeat(2,1fr)}.pc-table{display:block;overflow-x:auto}}</style><div class="pc-module"><header class="pc-head"><div><div class="pc-over">PAWCARE · QUẢN TRỊ NỘI BỘ</div><h1>Danh mục dịch vụ</h1></div><button class="pc-btn" ng-click="ctrl.load()">Làm mới</button></header><div class="pc-alert" ng-if="ctrl.message" ng-class="{error:ctrl.error}">{{ctrl.message}}</div><section class="pc-panel"><form class="pc-toolbar" ng-submit="ctrl.save()"><input class="pc-input" ng-model="ctrl.draft.name" placeholder="Tên danh mục" required><input class="pc-input" ng-model="ctrl.draft.description" placeholder="Mô tả"><button class="pc-btn primary" type="submit">{{ctrl.draft.id ? 'Lưu chỉnh sửa' : 'Thêm danh mục'}}</button></form><table class="pc-table"><thead><tr><th>ID</th><th>Tên</th><th>Mô tả</th><th></th></tr></thead><tbody><tr ng-repeat="c in ctrl.rows"><td>#{{c.id}}</td><td><b>{{c.name}}</b></td><td>{{c.description}}</td><td><button class="pc-btn" ng-click="ctrl.edit(c)">Sửa</button><button class="pc-btn danger" ng-click="ctrl.remove(c)">Xóa</button></td></tr></tbody></table></section></div>
+<div class="pc-page">
+  <header class="pc-page-head">
+    <div class="pc-page-head-main">
+      <div class="pc-eyebrow">PAWCARE · CẤU HÌNH DỊCH VỤ</div>
+      <h1 class="pc-page-title">Danh mục dịch vụ</h1>
+      <p class="pc-page-desc">Quản lý nhóm dịch vụ chuẩn trên toàn sàn để các Provider phân loại dịch vụ chăm sóc thú cưng.</p>
+    </div>
+    <div class="pc-page-actions">
+      <button type="button" class="pc-btn" ng-click="ctrl.load()" ng-disabled="ctrl.loading">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ng-style="ctrl.loading ? {'animation':'pc-spin 0.7s linear infinite'} : {}"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+        <span>{{ctrl.loading ? 'Đang tải…' : 'Làm mới'}}</span>
+      </button>
+      <button type="button" class="pc-btn pc-btn--primary" ng-click="ctrl.openCreate()">+ Thêm danh mục</button>
+    </div>
+  </header>
+
+  <div class="pc-alert" ng-if="ctrl.message" ng-class="{'pc-alert--error': ctrl.error}">
+    <span>{{ctrl.message}}</span>
+    <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.message=''">Đóng</button>
+  </div>
+
+  <!-- Overview KPIs -->
+  <section class="pc-kpi-grid pc-kpi-grid--3">
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Tổng danh mục</span>
+        <span class="pc-kpi-icon pc-kpi-icon--blue">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.rows.length}}</div>
+      <div class="pc-kpi-hint">Các nhóm dịch vụ toàn hệ thống</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Đang kích hoạt</span>
+        <span class="pc-kpi-icon pc-kpi-icon--success">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.activeCount}}</div>
+      <div class="pc-kpi-hint">Khả dụng để Provider gán dịch vụ</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Đang tạm ẩn</span>
+        <span class="pc-kpi-icon pc-kpi-icon--amber">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.rows.length - ctrl.activeCount}}</div>
+      <div class="pc-kpi-hint">Danh mục ngừng hiển thị mới</div>
+    </div>
+  </section>
+
+  <!-- Table Panel -->
+  <section class="pc-panel" style="margin-bottom:0;">
+    <div class="pc-toolbar">
+      <div class="pc-search-box">
+        <span class="pc-search-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
+        <input type="text" class="pc-input" ng-model="ctrl.query" ng-change="ctrl.applyFilter(true)" placeholder="Tìm theo tên hoặc mô tả danh mục…">
+        <button type="button" class="pc-search-clear" ng-if="ctrl.query" ng-click="ctrl.query='';ctrl.applyFilter(true)">×</button>
+      </div>
+    </div>
+
+    <div class="pc-loading" ng-if="ctrl.loading">
+      <span class="pc-spinner"></span>
+      <span>Đang tải danh mục…</span>
+    </div>
+
+    <div class="pc-table-wrap" ng-if="!ctrl.loading && ctrl.paged.items.length > 0">
+      <table class="pc-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Tên danh mục</th>
+            <th>Mô tả</th>
+            <th>Trạng thái</th>
+            <th class="pc-text-right">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr ng-repeat="c in ctrl.paged.items">
+            <td class="pc-num">#{{c.id}}</td>
+            <td><span class="pc-cell-primary">{{c.name}}</span></td>
+            <td><span class="pc-truncate-2" title="{{c.description}}">{{c.description || '—'}}</span></td>
+            <td>
+              <span ng-class="(c.is_active === 1 || c.is_active === true || c.is_active === undefined) ? 'pc-badge pc-badge--success' : 'pc-badge pc-badge--neutral'">
+                <span class="pc-badge-dot"></span>{{(c.is_active === 1 || c.is_active === true || c.is_active === undefined) ? 'Hoạt động' : 'Tạm ẩn'}}
+              </span>
+            </td>
+            <td class="pc-text-right" style="white-space:nowrap;">
+              <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.openEdit(c)">Sửa</button>
+              <button type="button" class="pc-btn pc-btn--danger pc-btn--sm" ng-click="ctrl.askRemove(c)">Xóa</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pc-empty" ng-if="!ctrl.loading && ctrl.paged.items.length === 0">
+      <div class="pc-empty-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/></svg>
+      </div>
+      <p class="pc-empty-title">Chưa có danh mục nào</p>
+      <p class="pc-empty-desc">Bấm "+ Thêm danh mục" để tạo danh mục dịch vụ đầu tiên cho hệ thống.</p>
+      <button type="button" class="pc-btn pc-btn--primary pc-btn--sm" ng-click="ctrl.openCreate()">+ Thêm danh mục</button>
+    </div>
+
+    <div class="pc-pagination" ng-if="ctrl.paged.total > ctrl.paged.size">
+      <span>Hiển thị {{ctrl.paged.from}}–{{ctrl.paged.to}} / {{ctrl.paged.total}} danh mục</span>
+      <div class="pc-pagination-controls">
+        <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.page = ctrl.page - 1; ctrl.updatePage()" ng-disabled="ctrl.paged.page === 0">← Trước</button>
+        <span>Trang {{ctrl.paged.page + 1}} / {{ctrl.paged.totalPages}}</span>
+        <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.page = ctrl.page + 1; ctrl.updatePage()" ng-disabled="ctrl.paged.page + 1 >= ctrl.paged.totalPages">Sau →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal: Create / Edit Category -->
+  <div class="pc-modal-backdrop" ng-if="ctrl.formOpen" ng-click="ctrl.formOpen=false">
+    <form class="pc-modal" ng-click="$event.stopPropagation()" ng-submit="ctrl.save()" style="max-width:480px;">
+      <div class="pc-modal-head">
+        <div>
+          <h3 class="pc-modal-title">{{ctrl.draft.id ? ('Chỉnh sửa danh mục #' + ctrl.draft.id) : 'Thêm danh mục dịch vụ mới'}}</h3>
+          <p class="pc-modal-sub">Nhập tên danh mục và mô tả ngắn gọn</p>
+        </div>
+        <button type="button" class="pc-modal-close" ng-click="ctrl.formOpen=false" aria-label="Đóng">×</button>
+      </div>
+      <div class="pc-modal-body">
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:12.5px;font-weight:600;color:#0B3557;margin-bottom:5px;">Tên danh mục <span style="color:#BE123C;">*</span></label>
+          <input class="pc-input" style="width:100%;" ng-model="ctrl.draft.name" placeholder="VD: Spa &amp; Tắm sấy" required>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:12.5px;font-weight:600;color:#0B3557;margin-bottom:5px;">Mô tả</label>
+          <textarea class="pc-textarea" ng-model="ctrl.draft.description" placeholder="Mô tả phạm vi dịch vụ thuộc danh mục này…"></textarea>
+        </div>
+        <label style="display:inline-flex;align-items:center;gap:8px;margin:0;font-weight:500;cursor:pointer;">
+          <input type="checkbox" ng-model="ctrl.draft.is_active" ng-true-value="true" ng-false-value="false">
+          <span>Kích hoạt sử dụng danh mục</span>
+        </label>
+      </div>
+      <div class="pc-modal-foot">
+        <button type="button" class="pc-btn" ng-click="ctrl.formOpen=false">Hủy</button>
+        <button type="submit" class="pc-btn pc-btn--primary" ng-disabled="ctrl.saving">{{ctrl.saving ? 'Đang lưu…' : (ctrl.draft.id ? 'Lưu chỉnh sửa' : 'Tạo danh mục')}}</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal: Delete Confirmation -->
+  <div class="pc-modal-backdrop" ng-if="ctrl.deleteTarget" ng-click="ctrl.deleteTarget=null">
+    <div class="pc-modal" ng-click="$event.stopPropagation()" style="max-width:440px;">
+      <div class="pc-modal-head">
+        <div>
+          <h3 class="pc-modal-title">Xác nhận xóa danh mục</h3>
+          <p class="pc-modal-sub">Thao tác không thể hoàn tác</p>
+        </div>
+        <button type="button" class="pc-modal-close" ng-click="ctrl.deleteTarget=null" aria-label="Đóng">×</button>
+      </div>
+      <div class="pc-modal-body">
+        <p style="margin:0;color:#334E68;font-size:13.5px;">
+          Bạn chắc chắn muốn xóa danh mục <strong>{{ctrl.deleteTarget.name}}</strong> (#{{ctrl.deleteTarget.id}})?
+        </p>
+      </div>
+      <div class="pc-modal-foot">
+        <button type="button" class="pc-btn" ng-click="ctrl.deleteTarget=null">Hủy</button>
+        <button type="button" class="pc-btn pc-btn--danger" ng-click="ctrl.confirmRemove()" ng-disabled="ctrl.saving">{{ctrl.saving ? 'Đang xóa…' : 'Xóa danh mục'}}</button>
+      </div>
+    </div>
+  </div>
+</div>

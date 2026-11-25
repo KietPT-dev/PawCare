@@ -1,1 +1,150 @@
-function PawCareAdminDisputesCtrl($http){var vm=this;vm.rows=[];vm.histories=[];vm.loading=false;vm.errorText=function(r){var d=r&&r.data;return(d&&(d.error||d.message))||('HTTP '+((r&&r.status)||'unknown')+': Không thể tải tranh chấp.')};vm.fail=function(r){vm.error=true;vm.message=vm.errorText(r)};vm.load=function(){vm.loading=true;$http.get('/bonita/API/extension/finance?status=PENDING').then(function(r){vm.error=false;vm.message='';vm.rows=(r.data&&r.data.disputes)||[];vm.histories=(r.data&&r.data.histories)||[]},vm.fail).finally(function(){vm.loading=false})};vm.history=function(id){return vm.histories.filter(function(h){return String(h.booking_id)===String(id)})};vm.resolve=function(d,action){var label=action==='REFUND_TO_CUSTOMER'?'hoàn escrow về ví Customer':'giải ngân 90% cho Provider và 10% phí sàn';if(!window.confirm('Xác nhận '+label+' cho Booking #'+d.booking_id+'?'))return;var note=window.prompt('Ghi chú quyết định:',d.admin_response||'');if(note===null)return;$http.post('/bonita/API/extension/finance',{complaint_id:d.complaint_id,action:action,admin_note:note}).then(function(){vm.message='Đã xử lý tranh chấp. Số dư, ledger và booking đã được tải lại.';vm.load()},vm.fail)};vm.load();}
+function PawCareAdminDisputesCtrl($scope, $http) {
+  var vm = this;
+  var U = window.PawCareAdmin || {};
+
+  vm.rows = [];
+  vm.histories = [];
+  vm.filtered = [];
+  vm.paged = { items: [], page: 0, size: 15, total: 0, totalPages: 1, from: 0, to: 0 };
+  vm.query = '';
+  vm.scopeFilter = '';
+  vm.page = 0;
+  vm.loading = false;
+  vm.saving = false;
+  vm.message = '';
+  vm.error = false;
+  vm.selected = null;
+  vm.adminNote = '';
+  vm.pendingAction = '';
+  vm.stats = { total: 0, disputed: 0, activeComplaints: 0, frozenEscrow: 0 };
+
+  vm.money = function (v) { return U.formatMoney ? U.formatMoney(v) : (Number(v || 0).toLocaleString('vi-VN') + ' ₫'); };
+  vm.formatDateTime = function (v) { return U.formatDateTime ? U.formatDateTime(v) : String(v || '—'); };
+  vm.statusLabel = function (s) { return U.statusLabel ? U.statusLabel(s) : (s || '—'); };
+  vm.statusClass = function (s) { return U.statusClass ? U.statusClass(s) : 'pc-badge'; };
+
+  function notifyBadgesDirty() {
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(JSON.stringify({ message: 'pawcareBadgesDirty' }), '*');
+      }
+    } catch (e) {}
+  }
+
+  function err(r) {
+    vm.error = true;
+    vm.message = U.errorText ? U.errorText(r, 'Không thể tải tranh chấp.') : 'Không thể tải tranh chấp.';
+  }
+
+  function computeStats() {
+    var disputed = 0, activeComplaints = 0, frozenEscrow = 0;
+    vm.rows.forEach(function (d) {
+      var bst = String(d.booking_status || '').toUpperCase();
+      var cst = String(d.complaint_status || '').toUpperCase();
+      if (bst === 'DISPUTED') {
+        disputed++;
+        frozenEscrow += Number(d.escrow_amount || d.estimated_price || 0);
+      }
+      if (cst === 'OPEN' || cst === 'IN_PROGRESS') {
+        activeComplaints++;
+      }
+    });
+    vm.stats = {
+      total: vm.rows.length,
+      disputed: disputed,
+      activeComplaints: activeComplaints,
+      frozenEscrow: frozenEscrow
+    };
+  }
+
+  vm.updatePage = function () {
+    vm.paged = U.paginate ? U.paginate(vm.filtered, vm.page, 15) : {
+      items: vm.filtered, page: 0, size: 15, total: vm.filtered.length, totalPages: 1, from: 1, to: vm.filtered.length
+    };
+    vm.page = vm.paged.page;
+  };
+
+  vm.applyFilter = function (resetPage) {
+    if (resetPage) vm.page = 0;
+    var q = (vm.query || '').toLowerCase().trim();
+    vm.filtered = vm.rows.filter(function (d) {
+      var bst = String(d.booking_status || '').toUpperCase();
+      if (vm.scopeFilter === 'DISPUTED' && bst !== 'DISPUTED') return false;
+      if (vm.scopeFilter === 'OTHER' && bst === 'DISPUTED') return false;
+      if (q) {
+        var hay = [
+          d.booking_id, d.complaint_id, d.customer_name, d.provider_name,
+          d.content, d.booking_status, d.complaint_status, d.escrow_status
+        ].join(' ').toLowerCase();
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+    vm.updatePage();
+  };
+
+  vm.clearFilters = function () {
+    vm.query = '';
+    vm.scopeFilter = '';
+    vm.applyFilter(true);
+  };
+
+  vm.history = function (bookingId) {
+    return vm.histories.filter(function (h) {
+      return String(h.booking_id) === String(bookingId);
+    });
+  };
+
+  vm.load = function () {
+    vm.loading = true;
+    $http.get('/bonita/API/extension/finance?status=PENDING').then(function (r) {
+      vm.error = false;
+      vm.rows = (r.data && r.data.disputes) || [];
+      vm.histories = (r.data && r.data.histories) || [];
+      computeStats();
+      vm.applyFilter(false);
+    }, err).finally(function () { vm.loading = false; });
+  };
+
+  vm.openDetail = function (d) {
+    vm.selected = d;
+    vm.adminNote = d.admin_response || '';
+    vm.pendingAction = '';
+  };
+
+  vm.closeDetail = function () {
+    vm.selected = null;
+    vm.adminNote = '';
+    vm.pendingAction = '';
+  };
+
+  vm.chooseAction = function (action) {
+    vm.pendingAction = action;
+  };
+
+  vm.cancelAction = function () {
+    vm.pendingAction = '';
+  };
+
+  vm.executeResolve = function () {
+    if (!vm.selected || !vm.pendingAction) return;
+    vm.saving = true;
+    var bookingId = vm.selected.booking_id;
+    $http.post('/bonita/API/extension/finance', {
+      complaint_id: vm.selected.complaint_id,
+      action: vm.pendingAction,
+      admin_note: vm.adminNote || ''
+    }).then(function () {
+      vm.error = false;
+      vm.message = 'Đã xử lý tranh chấp Booking #' + bookingId + '. Số dư ví, ledger và trạng thái booking đã được cập nhật.';
+      vm.closeDetail();
+      vm.load();
+      notifyBadgesDirty();
+    }, err).finally(function () { vm.saving = false; });
+  };
+
+  if (U.bindShellRefresh) {
+    U.bindShellRefresh($scope, vm.load);
+  }
+  vm.load();
+}

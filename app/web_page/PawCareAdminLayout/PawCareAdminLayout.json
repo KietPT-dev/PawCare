@@ -1,0 +1,51 @@
+{
+  "id": "PawCareAdminLayout",
+  "name": "PawCareAdminLayout",
+  "displayName": "PawCare Admin Layout",
+  "type": "layout",
+  "uuid": "5e7b31a9-3e66-4c92-9f41-810e0a4d0101",
+  "modelVersion": "2.6",
+  "lastUpdate": 1795500000000,
+  "description": "Custom Enterprise Sidebar + Topbar layout for PawCare Admin synchronized with PawCare Provider and Mobile.",
+  "rows": [
+    [
+      {
+        "type": "component",
+        "dimension": { "xs": 12, "sm": 12, "md": 12, "lg": 12 },
+        "propertyValues": {
+          "cssClasses": { "type": "constant", "value": "" },
+          "hidden": { "type": "constant", "value": false }
+        },
+        "reference": "pawCareAdminThemeAssets",
+        "id": "pawCareAdminThemeAssets",
+        "hasValidationError": false
+      }
+    ],
+    [
+      {
+        "type": "component",
+        "dimension": { "xs": 12, "sm": 12, "md": 12, "lg": 12 },
+        "propertyValues": {
+          "cssClasses": { "type": "constant", "value": "" },
+          "hidden": { "type": "constant", "value": false }
+        },
+        "reference": "pawCareAdminShell",
+        "id": "pawCareAdminShell",
+        "hasValidationError": false
+      }
+    ]
+  ],
+  "variables": {},
+  "assets": [],
+  "inactiveAssets": [],
+  "webResources": [
+    { "method": "get", "value": "system/session" },
+    { "method": "get", "value": "system/i18nlocale" },
+    { "method": "get", "value": "identity/user" },
+    { "method": "get", "value": "living/application" },
+    { "method": "get", "value": "living/application-page" },
+    { "method": "get", "value": "living/application-menu" },
+    { "method": "get", "value": "API/avatars" }
+  ],
+  "hasValidationError": false
+}

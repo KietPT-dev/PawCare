@@ -1,4 +1,217 @@
-<style>
-.pc-cr{font-family:Arial;background:#f5f8fc;color:#163b5a;padding:28px;min-height:640px}.pc-cr-box{background:#fff;border-radius:12px;padding:18px;box-shadow:0 3px 13px #083a5e17}.pc-cr-bar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:0 0 14px}.pc-cr-select,.pc-cr-note{border:1px solid #cbdce9;border-radius:7px;padding:8px;background:#fff}.pc-cr-note{width:100%;min-height:70px}.pc-cr-btn{border:0;border-radius:7px;padding:8px 11px;font-weight:bold;background:#e6f5f0;color:#08765b}.pc-cr-btn.primary{background:#1677b5;color:#fff}.pc-cr-btn.danger{background:#fff0ed;color:#bd4d34}.pc-cr-btn:disabled{opacity:.55}.pc-cr-table{width:100%;border-collapse:collapse;font-size:13px}.pc-cr-table th,.pc-cr-table td{padding:10px 7px;border-bottom:1px solid #e8eef3;text-align:left;vertical-align:top}.pc-cr-tag{display:inline-block;background:#eef5fb;border-radius:10px;padding:4px 7px;font-size:11px}.pc-cr-alert{padding:11px;border-radius:8px;background:#e5f7ee;color:#11795b;margin:10px 0}.pc-cr-alert.err{background:#fff0ed;color:#c54f36}.pc-cr-muted{color:#718b9e;font-size:12px}.pc-cr-modal{position:fixed;inset:0;background:#0a233686;z-index:1000;display:flex;align-items:center;justify-content:center}.pc-cr-modal-body{background:#fff;max-width:760px;width:92%;max-height:88vh;overflow:auto;border-radius:14px;padding:22px}.pc-cr-message{border-bottom:1px solid #e8eef3;padding:9px 0;white-space:pre-wrap}.pc-cr-message:last-child{border-bottom:0}@media(max-width:800px){.pc-cr-table{display:block;overflow-x:auto}}
-</style>
-<div class="pc-cr"><div class="pc-cr-muted">PAWCARE · KIỂM DUYỆT NỘI BỘ</div><h1>Báo cáo hội thoại</h1><div class="pc-cr-box"><div class="pc-cr-bar"><label>Trạng thái <select class="pc-cr-select" ng-model="ctrl.status" ng-change="ctrl.load(0)"><option value="OPEN">OPEN</option><option value="REVIEWED">REVIEWED</option><option value="DISMISSED">DISMISSED</option></select></label><button class="pc-cr-btn primary" ng-click="ctrl.load(0)" ng-disabled="ctrl.loading">{{ctrl.loading ? 'Đang tải…' : 'Làm mới'}}</button><span class="pc-cr-muted">Chỉ mở nội dung khi chọn một report đã được ghi nhận.</span></div><div class="pc-cr-alert" ng-if="ctrl.message" ng-class="{err:ctrl.error}">{{ctrl.message}}</div><table class="pc-cr-table"><thead><tr><th>Report</th><th>Booking</th><th>Customer / Provider</th><th>Category</th><th>Trạng thái</th><th>Ngày tạo</th><th>Người duyệt</th><th></th></tr></thead><tbody><tr ng-repeat="r in ctrl.data.content"><td>#{{r.report_id}}<br><span class="pc-cr-muted">Người báo: {{r.reporter_name}}</span></td><td>#{{r.booking_id}}</td><td><b>{{r.customer_name}}</b><br>{{r.provider_name}}</td><td><span class="pc-cr-tag">{{r.category}}</span></td><td><span class="pc-cr-tag">{{r.status}}</span></td><td>{{r.created_at}}</td><td>{{r.reviewer_name || '—'}}<br><span class="pc-cr-muted" ng-if="r.reviewed_at">{{r.reviewed_at}}</span></td><td><button class="pc-cr-btn" ng-click="ctrl.select(r)">Mở report</button></td></tr></tbody></table><p class="pc-cr-muted" ng-if="!ctrl.loading && !ctrl.data.content.length">Không có report phù hợp.</p><div class="pc-cr-bar" style="margin-top:14px"><button class="pc-cr-btn" ng-click="ctrl.previous()" ng-disabled="ctrl.page===0 || ctrl.loading">← Trước</button><span class="pc-cr-muted">Trang {{ctrl.page + 1}} / {{ctrl.data.totalPages || 0}} · {{ctrl.data.totalElements || 0}} report</span><button class="pc-cr-btn" ng-click="ctrl.next()" ng-disabled="ctrl.page + 1 >= (ctrl.data.totalPages || 0) || ctrl.loading">Sau →</button></div></div><div class="pc-cr-modal" ng-if="ctrl.selected"><div class="pc-cr-modal-body"><div class="pc-cr-bar"><h2 style="margin:0;flex:1">Report #{{ctrl.selected.report_id}} · Booking #{{ctrl.selected.booking_id}}</h2><button class="pc-cr-btn" ng-click="ctrl.close()">Đóng</button></div><p><b>{{ctrl.selected.customer_name}}</b> / {{ctrl.selected.provider_name}} · <span class="pc-cr-tag">{{ctrl.selected.category}}</span></p><p class="pc-cr-muted" ng-if="ctrl.selected.note">Lý do báo: {{ctrl.selected.note}}</p><div class="pc-cr-alert err" ng-if="ctrl.messagesError">{{ctrl.messagesError}}</div><p ng-if="ctrl.messagesLoading">Đang tải nội dung đã được audit…</p><div ng-if="!ctrl.messagesLoading && !ctrl.messagesError"><div class="pc-cr-message" ng-repeat="m in ctrl.messages"><b>{{m.sender_name}}</b> <span class="pc-cr-muted">{{m.sent_at}}</span><br>{{m.recalled_at ? 'Tin nhắn đã thu hồi' : m.content}}</div><p class="pc-cr-muted" ng-if="!ctrl.messages.length">Không có tin nhắn.</p></div><hr><label>Ghi chú người duyệt<textarea class="pc-cr-note" ng-model="ctrl.reviewerNote" placeholder="Ghi chú xử lý report (không bắt buộc)"></textarea></label><p><button class="pc-cr-btn primary" ng-click="ctrl.update('REVIEWED')" ng-disabled="ctrl.saving">Đánh dấu REVIEWED</button><button class="pc-cr-btn danger" ng-click="ctrl.update('DISMISSED')" ng-disabled="ctrl.saving">DISMISSED</button></p></div></div></div>
+<div class="pc-page">
+  <header class="pc-page-head">
+    <div class="pc-page-head-main">
+      <div class="pc-eyebrow">PAWCARE · KIỂM DUYỆT HỘI THOẠI (AUDIT)</div>
+      <h1 class="pc-page-title">Báo cáo hội thoại</h1>
+      <p class="pc-page-desc">Kiểm duyệt nội dung chat bị tố cáo giữa Customer và Provider. Mọi lượt mở xem lịch sử hội thoại đều được ghi log kiểm toán.</p>
+    </div>
+    <div class="pc-page-actions">
+      <button type="button" class="pc-btn" ng-click="ctrl.load(ctrl.page)" ng-disabled="ctrl.loading">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ng-style="ctrl.loading ? {'animation':'pc-spin 0.7s linear infinite'} : {}"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+        <span>{{ctrl.loading ? 'Đang tải…' : 'Làm mới'}}</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="pc-alert" ng-if="ctrl.message" ng-class="{'pc-alert--error': ctrl.error}">
+    <span>{{ctrl.message}}</span>
+    <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.message=''">Đóng</button>
+  </div>
+
+  <!-- Summary KPIs -->
+  <section class="pc-kpi-grid pc-kpi-grid--3">
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Tổng số ở mục {{ctrl.statusLabel(ctrl.status)}}</span>
+        <span class="pc-kpi-icon pc-kpi-icon--amber">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.data.totalElements || 0}}</div>
+      <div class="pc-kpi-hint">Trang {{ctrl.page + 1}} / {{ctrl.data.totalPages || 1}}</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Bản ghi đang hiển thị</span>
+        <span class="pc-kpi-icon pc-kpi-icon--blue">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.filteredRows.length}}</div>
+      <div class="pc-kpi-hint">Trong trang hiện tại (tối đa {{ctrl.size}})</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Cơ chế truy cập nội dung</span>
+        <span class="pc-kpi-icon pc-kpi-icon--teal">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value" style="font-size:17px;">Audit On-Demand</div>
+      <div class="pc-kpi-hint">Chỉ mở lịch sử chat khi chọn một report</div>
+    </div>
+  </section>
+
+  <!-- Filters & Table -->
+  <section class="pc-panel" style="margin-bottom:0;">
+    <div class="pc-toolbar">
+      <div class="pc-search-box">
+        <span class="pc-search-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
+        <input type="text" class="pc-input" ng-model="ctrl.query" ng-change="ctrl.applyLocalSearch()" placeholder="Lọc nhanh #Report, #Booking, người báo, Customer, Provider…">
+        <button type="button" class="pc-search-clear" ng-if="ctrl.query" ng-click="ctrl.query='';ctrl.applyLocalSearch()">×</button>
+      </div>
+
+      <div class="pc-pills">
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.status === 'OPEN'}" ng-click="ctrl.switchStatus('OPEN')">Chờ duyệt (OPEN)</button>
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.status === 'REVIEWED'}" ng-click="ctrl.switchStatus('REVIEWED')">Đã duyệt (REVIEWED)</button>
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.status === 'DISMISSED'}" ng-click="ctrl.switchStatus('DISMISSED')">Đã bỏ qua (DISMISSED)</button>
+      </div>
+    </div>
+
+    <div class="pc-loading" ng-if="ctrl.loading">
+      <span class="pc-spinner"></span>
+      <span>Đang tải báo cáo hội thoại…</span>
+    </div>
+
+    <div class="pc-table-wrap" ng-if="!ctrl.loading && ctrl.filteredRows.length > 0">
+      <table class="pc-table">
+        <thead>
+          <tr>
+            <th>Report</th>
+            <th>Booking</th>
+            <th>Customer / Provider</th>
+            <th>Phân loại</th>
+            <th>Trạng thái</th>
+            <th>Ngày tạo</th>
+            <th>Người duyệt</th>
+            <th class="pc-text-right">Kiểm tra</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr ng-repeat="r in ctrl.filteredRows track by r.report_id">
+            <td>
+              <span class="pc-cell-primary pc-num">#{{r.report_id}}</span>
+              <span class="pc-cell-sub">Người báo: {{r.reporter_name || '—'}}</span>
+            </td>
+            <td class="pc-num" style="font-weight:600;">#{{r.booking_id || '—'}}</td>
+            <td>
+              <span class="pc-cell-primary">{{r.customer_name || '—'}}</span>
+              <span class="pc-cell-sub">Provider: {{r.provider_name || '—'}}</span>
+            </td>
+            <td><span class="pc-badge pc-badge--info">{{r.category || 'KHÁC'}}</span></td>
+            <td><span ng-class="ctrl.statusClass(r.status)"><span class="pc-badge-dot"></span>{{ctrl.statusLabel(r.status)}}</span></td>
+            <td style="white-space:nowrap;">{{ctrl.formatDateTime(r.created_at)}}</td>
+            <td>
+              <span class="pc-cell-primary" style="font-weight:500;">{{r.reviewer_name || '—'}}</span>
+              <span class="pc-cell-sub" ng-if="r.reviewed_at">{{ctrl.formatDateTime(r.reviewed_at)}}</span>
+            </td>
+            <td class="pc-text-right">
+              <button type="button" class="pc-btn pc-btn--sm pc-btn--primary" ng-click="ctrl.select(r)">Mở report</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pc-empty" ng-if="!ctrl.loading && ctrl.filteredRows.length === 0">
+      <div class="pc-empty-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <p class="pc-empty-title">Không có report phù hợp</p>
+      <p class="pc-empty-desc">Hiện chưa có báo cáo hội thoại nào ở trạng thái {{ctrl.statusLabel(ctrl.status)}}.</p>
+      <button type="button" class="pc-btn pc-btn--sm" ng-if="ctrl.query" ng-click="ctrl.query='';ctrl.applyLocalSearch()">Xóa lọc</button>
+    </div>
+
+    <div class="pc-pagination" ng-if="(ctrl.data.totalPages || 0) > 1">
+      <span>Tổng {{ctrl.data.totalElements || 0}} report · Trang {{ctrl.page + 1}} / {{ctrl.data.totalPages || 0}}</span>
+      <div class="pc-pagination-controls">
+        <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.previous()" ng-disabled="ctrl.page === 0 || ctrl.loading">← Trước</button>
+        <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.next()" ng-disabled="ctrl.page + 1 >= (ctrl.data.totalPages || 0) || ctrl.loading">Sau →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal: Audited Chat Thread & Moderation -->
+  <div class="pc-modal-backdrop" ng-if="ctrl.selected" ng-click="ctrl.close()">
+    <div class="pc-modal pc-modal--lg" ng-click="$event.stopPropagation()">
+      <div class="pc-modal-head">
+        <div>
+          <h3 class="pc-modal-title">Report #{{ctrl.selected.report_id}} · Booking #{{ctrl.selected.booking_id}}</h3>
+          <p class="pc-modal-sub">{{ctrl.selected.customer_name || 'Customer'}} / {{ctrl.selected.provider_name || 'Provider'}} · Tạo lúc {{ctrl.formatDateTime(ctrl.selected.created_at)}}</p>
+        </div>
+        <button type="button" class="pc-modal-close" ng-click="ctrl.close()" aria-label="Đóng">×</button>
+      </div>
+
+      <div class="pc-modal-body">
+        <div class="pc-desc-grid" style="margin-bottom:14px;">
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Người báo cáo</div>
+            <div class="pc-desc-val">{{ctrl.selected.reporter_name || '—'}} <span class="pc-badge pc-badge--neutral" ng-if="ctrl.selected.reporter_role" style="margin-left:4px;">{{ctrl.selected.reporter_role}}</span></div>
+          </div>
+          <div class="pc-desc-item">
+            <div class="pc-desc-label">Nhóm vi phạm &amp; Trạng thái</div>
+            <div class="pc-desc-val" style="display:flex;gap:6px;flex-wrap:wrap;">
+              <span class="pc-badge pc-badge--info">{{ctrl.selected.category || 'KHÁC'}}</span>
+              <span ng-class="ctrl.statusClass(ctrl.selected.status)"><span class="pc-badge-dot"></span>{{ctrl.statusLabel(ctrl.selected.status)}}</span>
+            </div>
+          </div>
+          <div class="pc-desc-item pc-desc-item--full" ng-if="ctrl.selected.note">
+            <div class="pc-desc-label">Lý do báo cáo</div>
+            <div class="pc-desc-val" style="font-weight:500;">{{ctrl.selected.note}}</div>
+          </div>
+        </div>
+
+        <h4 style="margin:0 0 8px;font-size:13px;font-weight:700;color:#0B3557;">Lịch sử tin nhắn (Audit Log)</h4>
+        <div class="pc-alert pc-alert--error" ng-if="ctrl.messagesError">{{ctrl.messagesError}}</div>
+        <div class="pc-loading" ng-if="ctrl.messagesLoading">
+          <span class="pc-spinner"></span>
+          <span>Đang tải nội dung đã được audit…</span>
+        </div>
+
+        <div class="pc-chat-thread" ng-if="!ctrl.messagesLoading && !ctrl.messagesError">
+          <div class="pc-chat-msg" ng-repeat="m in ctrl.messages track by m.id">
+            <div class="pc-chat-msg-head">
+              <strong style="color:#0B3557;">{{m.sender_name || ('Profile #' + m.sender_profile_id)}}</strong>
+              <span class="pc-cell-sub" style="margin-top:0;">{{ctrl.formatDateTime(m.sent_at)}}</span>
+            </div>
+            <div class="pc-chat-msg-body" ng-if="!m.recalled_at">{{m.content}}</div>
+            <div class="pc-chat-msg-body" ng-if="m.recalled_at">
+              <span class="pc-badge pc-badge--neutral">Tin nhắn đã thu hồi</span>
+            </div>
+          </div>
+          <p class="pc-cell-sub" ng-if="!ctrl.messages.length" style="margin:0;text-align:center;">Không có tin nhắn nào trong cuộc hội thoại này.</p>
+        </div>
+
+        <div class="pc-form-group" style="margin-bottom:0;">
+          <label class="pc-form-label" for="report-reviewer-note">Ghi chú người duyệt</label>
+          <textarea id="report-reviewer-note" class="pc-textarea" ng-model="ctrl.reviewerNote" placeholder="Ghi chú xử lý report (không bắt buộc)…"></textarea>
+        </div>
+
+        <!-- Two-step In-Modal Confirmation -->
+        <div class="pc-alert" ng-if="ctrl.pendingDecision" style="margin-top:14px;margin-bottom:0;flex-wrap:wrap;">
+          <div style="flex:1;min-width:220px;">
+            <strong>Xác nhận chuyển Report #{{ctrl.selected.report_id}} sang trạng thái {{ctrl.pendingDecision}}?</strong>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.cancelDecision()" ng-disabled="ctrl.saving">Hủy</button>
+            <button type="button" class="pc-btn pc-btn--sm" ng-class="ctrl.pendingDecision === 'DISMISSED' ? 'pc-btn--danger' : 'pc-btn--primary'" ng-click="ctrl.update()" ng-disabled="ctrl.saving">
+              {{ctrl.saving ? 'Đang lưu…' : 'Xác nhận'}}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="pc-modal-foot" style="flex-wrap:wrap;justify-content:space-between;">
+        <button type="button" class="pc-btn" ng-click="ctrl.close()" ng-disabled="ctrl.saving">Đóng</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;" ng-if="!ctrl.pendingDecision">
+          <button type="button" class="pc-btn pc-btn--danger" ng-click="ctrl.confirmDecision('DISMISSED')" ng-disabled="ctrl.saving">Bỏ qua (DISMISSED)</button>
+          <button type="button" class="pc-btn pc-btn--primary" ng-click="ctrl.confirmDecision('REVIEWED')" ng-disabled="ctrl.saving">Đánh dấu REVIEWED</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
