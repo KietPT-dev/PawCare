@@ -18,6 +18,7 @@ import 'package:pawcare_customer_mobile/features/profile/presentation/profile_sc
 import 'package:pawcare_customer_mobile/features/notifications/presentation/notifications_screen.dart';
 import 'package:pawcare_customer_mobile/features/discovery/presentation/discovery_screen.dart';
 import 'package:pawcare_customer_mobile/features/discovery/presentation/discovery_state.dart';
+import 'package:pawcare_customer_mobile/features/profile/presentation/address_location_screen.dart';
 
 void main() {
   test('provider rating mapper accepts API field variants and no reviews', () {
@@ -54,7 +55,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Spa Mây'), findsOneWidget);
     await tester.tap(find.text('Đánh giá cao'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     final first = tester.widget<Text>(find.text('Spa Sao').first);
     expect(first.data, 'Spa Sao');
   });
@@ -81,6 +82,40 @@ void main() {
     expect(capturedCategory, isNull);
     await tester.tap(find.text('Tắm & Spa'));
     expect(capturedCategory, 'Tắm & Spa');
+  });
+
+  testWidgets('address form loads profile and saves address payload',
+      (tester) async {
+    Map<String, dynamic>? saved;
+    final api = PawCareApi(
+        baseUrl: 'http://pawcare.test/api/v1',
+        client: MockClient((request) async {
+          if (request.method == 'GET' && request.url.path.endsWith('/auth/me'))
+            return _jsonResponse({
+              'addressLine1': '12 Lê Lợi',
+              'ward': 'Bến Nghé',
+              'district': 'Quận 1',
+              'province': 'TP.HCM',
+              'geocodeStatus': 'RESOLVED'
+            });
+          if (request.method == 'PUT' &&
+              request.url.path.endsWith('/auth/me')) {
+            saved = jsonDecode(request.body) as Map<String, dynamic>;
+            return _jsonResponse({...saved!, 'geocodeStatus': 'PENDING'});
+          }
+          return _jsonResponse({'error': 'Not found'}, 404);
+        }));
+    addTearDown(api.close);
+    await tester.pumpWidget(MaterialApp(
+        theme: buildTheme(),
+        home: AddressLocationScreen(
+            api: api, profile: const {}, onUpdated: (_) {})));
+    await tester.pumpAndSettle();
+    expect(find.text('12 Lê Lợi'), findsOneWidget);
+    await tester.tap(find.text('Lưu địa chỉ'));
+    await tester.pumpAndSettle();
+    expect(saved?['addressLine1'], '12 Lê Lợi');
+    expect(saved?['province'], 'TP.HCM');
   });
   test('persists dark mode and customer session', () async {
     SharedPreferences.setMockInitialValues({});
