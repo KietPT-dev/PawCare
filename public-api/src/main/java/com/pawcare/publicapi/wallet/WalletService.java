@@ -403,6 +403,7 @@ public class WalletService {
                     provider.get("owner_profile_id"), "Booking chờ duyệt", "Booking #" + bookingId + " đã thanh toán và chờ bạn duyệt.", "BOOKING_STATUS", "BOOKING", bookingId);
         }
         workflowOutbox.enqueue(bookingId, BookingWorkflowEvent.START, Map.of("bookingId", bookingId));
+        if (aiOutbox != null) aiOutbox.enqueue("BOOKING", bookingId, "BOOKING_FUNDED", Map.of("paymentState","FUNDED"));
     }
 
     private Map<String, Object> lockWallet(String ownerType, long ownerId) {
@@ -431,8 +432,10 @@ public class WalletService {
                              BigDecimal before, BigDecimal after, String description) {
         db.update("INSERT INTO wallet_transactions(wallet_id,booking_id,type,amount,balance_before,balance_after,description) VALUES(?,?,?,?,?,?,?)",
                 wallet.get("id"), bookingId, type, money(amount), money(before), money(after), description);
-        long id=lastId();
-        if (aiOutbox != null) aiOutbox.enqueue("WALLET_TRANSACTION", id, type, Map.of("transactionType",type,"hasBooking",bookingId!=null));
+        if (aiOutbox != null) {
+            long id=lastId();
+            aiOutbox.enqueue("WALLET_TRANSACTION", id, type, Map.of("transactionType",type,"hasBooking",bookingId!=null));
+        }
     }
 
     private Map<String, Object> walletView(Map<String, Object> wallet) {
