@@ -20,6 +20,14 @@ pawcare:
     secret: ${PAWCARE_JWT_SECRET:CHANGE_ME_GENERATE_A_RANDOM_BASE64_SECRET_AT_LEAST_32_BYTES}
     access-token-minutes: ${PAWCARE_ACCESS_TOKEN_MINUTES:15}
     refresh-token-days: ${PAWCARE_REFRESH_TOKEN_DAYS:30}
+  mail:
+    # Disabled unless explicitly configured. Never place provider credentials in
+    # source control; local values belong in the ignored .env.local file.
+    provider: ${PAWCARE_MAIL_PROVIDER:DISABLED}
+    resend-api-key: ${PAWCARE_RESEND_API_KEY:}
+    from: ${PAWCARE_MAIL_FROM:}
+    reply-to: ${PAWCARE_MAIL_REPLY_TO:}
+    app-deep-link-base: ${PAWCARE_APP_DEEP_LINK_BASE:pawcare://auth}
   wallet:
     # SePay sends Authorization: Apikey <token> (or Bearer <token>). This
     # local fallback prevents a blank token; production must override it with

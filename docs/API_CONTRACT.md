@@ -187,7 +187,16 @@ always returns an accepted response so an attacker cannot enumerate accounts.
 Tokens are stored only as hashes, expire after 30 minutes, are single-use and
 revoke prior tokens of the same purpose. The deployment still needs an actual
 mail sender to deliver the raw token; PawCare deliberately does not log or
-return it.
+return it. When transactional email is enabled, the message contains one of
+these app deep links (with its URL-encoded token):
+
+- `pawcare://auth/verify-email?token=...`
+- `pawcare://auth/reset-password?token=...`
+
+`PUT /api/v1/auth/password` continues to require the current password. On a
+successful change, PawCare revokes existing refresh tokens and may send a
+security notification. Mail delivery failure never changes the generic reset
+response and never makes a completed password change fail.
 
 ## Frontend responsibilities
 

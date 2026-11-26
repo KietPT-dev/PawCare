@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class AuthService {
@@ -23,18 +25,21 @@ public class AuthService {
     private final long refreshDays;
     private final ProviderApprovalWorkflowOutbox providerApprovalOutbox;
     private final LocationService locations;
+    private final TransactionalEmailSender emails;
 
     public AuthService(
             JdbcTemplate db,
             JwtService jwt,
             ProviderApprovalWorkflowOutbox providerApprovalOutbox,
             LocationService locations,
+            TransactionalEmailSender emails,
             @Value("${pawcare.auth.refresh-token-days}") long refreshDays
     ) {
         this.db = db;
         this.jwt = jwt;
         this.providerApprovalOutbox = providerApprovalOutbox;
         this.locations = locations;
+        this.emails = emails;
         this.refreshDays = refreshDays;
     }
 
@@ -200,6 +205,7 @@ public class AuthService {
         validatePassword(newPassword);
         db.update("UPDATE user_profiles SET password_hash=?,password_updated_at=CURRENT_TIMESTAMP WHERE id=?", passwords.hash(newPassword), principal.profileId());
         db.update("UPDATE refresh_tokens SET revoked_at=CURRENT_TIMESTAMP WHERE profile_id=? AND revoked_at IS NULL", principal.profileId());
+        sendAfterCommit(AccountEmailFactory.passwordChanged(current.get("email").toString(), current.get("full_name").toString()));
         return Map.of("success", true);
     }
 
@@ -208,8 +214,12 @@ public class AuthService {
     public Map<String, Object> requestPasswordReset(String rawEmail) {
         String email = normalizeEmail(rawEmail);
         requireNotRateLimited("PASSWORD_RESET", email);
-        Map<String, Object> account = one("SELECT id FROM user_profiles WHERE email=? AND is_active=1", email);
-        if (account != null) issueActionToken(((Number) account.get("id")).longValue(), "PASSWORD_RESET");
+        Map<String, Object> account = one("SELECT id,email,full_name FROM user_profiles WHERE email=? AND is_active=1", email);
+        if (account != null) {
+            String token = issueActionToken(((Number) account.get("id")).longValue(), "PASSWORD_RESET");
+            sendAfterCommit(AccountEmailFactory.passwordReset(
+                    account.get("email").toString(), account.get("full_name").toString(), actionLinkBase(), token));
+        }
         recordAttempt("PASSWORD_RESET", email);
         // Do not disclose whether an account exists, or return/log the raw token.
         return Map.of("accepted", true, "message", "If the account exists, reset instructions will be sent.");
@@ -226,7 +236,10 @@ public class AuthService {
 
     @Transactional
     public Map<String, Object> requestEmailVerification(CurrentPrincipal principal) {
-        issueActionToken(principal.profileId(), "EMAIL_VERIFY");
+        Map<String, Object> account = profile(principal.profileId());
+        String token = issueActionToken(principal.profileId(), "EMAIL_VERIFY");
+        sendAfterCommit(AccountEmailFactory.verification(
+                account.get("email").toString(), account.get("full_name").toString(), actionLinkBase(), token));
         return Map.of("accepted", true, "message", "Verification instructions will be sent.");
     }
 
@@ -367,14 +380,27 @@ public class AuthService {
         }
     }
 
-    private void issueActionToken(long profileId, String purpose) {
+    private String issueActionToken(long profileId, String purpose) {
         db.update("UPDATE auth_action_tokens SET revoked_at=CURRENT_TIMESTAMP WHERE profile_id=? AND purpose=? AND used_at IS NULL AND revoked_at IS NULL",
                 profileId, purpose);
         String token = randomToken();
         db.update("INSERT INTO auth_action_tokens(profile_id,purpose,token_hash,expires_at) VALUES(?,?,?,DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 30 MINUTE))",
                 profileId, purpose, hash(token));
-        // A mail provider must receive `token` here in a production profile.
-        // It is intentionally neither logged nor returned by the HTTP API.
+        return token;
+    }
+
+    @Value("${pawcare.mail.app-deep-link-base:pawcare://auth}")
+    private String mailAppDeepLinkBase;
+
+    private String actionLinkBase() {
+        String value = mailAppDeepLinkBase == null ? "" : mailAppDeepLinkBase.trim();
+        return value.isBlank() ? "pawcare://auth" : value.replaceAll("/+$", "");
+    }
+
+    private void sendAfterCommit(TransactionalEmail message) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() { emails.send(message); }
+        });
     }
 
     private long consumeActionToken(String rawToken, String purpose) {
