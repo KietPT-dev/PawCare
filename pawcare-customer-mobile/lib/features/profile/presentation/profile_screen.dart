@@ -4,6 +4,8 @@ import '../../../core/network/api_messages.dart';
 import '../../../core/network/pawcare_api.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
+import '../../auth/password_validation.dart';
+import '../../auth/presentation/forgot_password_screen.dart';
 import '../../notifications/presentation/notifications_screen.dart';
 import '../../chat/presentation/chat_inbox_screen.dart';
 import '../../pets/presentation/pets_screen.dart';
@@ -43,6 +45,8 @@ class ProfileScreen extends StatelessWidget {
   }
 
   String get _email => (profile['email'] ?? '').toString();
+  bool get _emailVerified =>
+      profile['emailVerified'] == true || profile['email_verified'] == true;
 
   String get _initials => _name
       .split(RegExp(r'\s+'))
@@ -255,12 +259,19 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     const _MenuDivider(),
                     _ProfileMenuTile(
-                      icon: Icons.mark_email_read_outlined,
+                      icon: _emailVerified
+                          ? Icons.verified_rounded
+                          : Icons.mark_email_read_outlined,
                       iconColor: AppColors.success,
                       iconBg: AppColors.success.withValues(alpha: .12),
-                      title: 'Xác minh email',
-                      subtitle: 'Gửi hoặc nhập mã xác minh từ email',
-                      onTap: () => _verifyEmail(context),
+                      title: _emailVerified
+                          ? 'Email đã xác minh'
+                          : 'Xác minh email',
+                      subtitle: _emailVerified
+                          ? 'Tài khoản của bạn đã được xác thực'
+                          : 'Gửi liên kết xác minh đến email',
+                      onTap:
+                          _emailVerified ? null : () => _verifyEmail(context),
                     ),
                   ],
                 ),
@@ -338,7 +349,11 @@ class ProfileScreen extends StatelessWidget {
                       iconBg: const Color(0xFF64748B).withValues(alpha: .12),
                       title: 'Quên mật khẩu',
                       subtitle: 'Yêu cầu liên kết đặt lại qua email',
-                      onTap: () => _resetPassword(context),
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => ForgotPasswordScreen(
+                                  initialEmail: _email, api: api))),
                     ),
                   ],
                 ),
@@ -466,6 +481,8 @@ class ProfileScreen extends StatelessWidget {
   void _changePassword(BuildContext context) {
     final current = TextEditingController();
     final next = TextEditingController();
+    final confirm = TextEditingController();
+    final form = GlobalKey<FormState>();
 
     showModalBottomSheet(
       context: context,
@@ -475,77 +492,99 @@ class ProfileScreen extends StatelessWidget {
         title: 'Đổi mật khẩu',
         subtitle: 'Bảo vệ tài khoản PawCare an toàn hơn',
         child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: current,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Mật khẩu hiện tại',
-                  prefixIcon:
-                      Icon(Icons.lock_outline_rounded, color: AppColors.teal),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: next,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Mật khẩu mới',
-                  hintText: 'Tối thiểu 10 ký tự gồm chữ và số',
-                  prefixIcon: Icon(Icons.lock_rounded, color: AppColors.teal),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.mint,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline_rounded,
-                        size: 16, color: AppColors.teal),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Mật khẩu mới cần ít nhất 10 ký tự, bao gồm cả chữ và số.',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.navy,
-                            fontWeight: FontWeight.w600),
-                      ),
+          child: Form(
+              key: form,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextFormField(
+                    controller: current,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Mật khẩu hiện tại',
+                      prefixIcon: Icon(Icons.lock_outline_rounded,
+                          color: AppColors.teal),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: () async {
-                  try {
-                    await api.put('/auth/password', {
-                      'currentPassword': current.text,
-                      'newPassword': next.text,
-                    });
-                    if (sheetContext.mounted) {
-                      Navigator.pop(sheetContext);
-                      _unavailable(context,
-                          'Đổi mật khẩu thành công. Hãy đăng nhập lại.');
-                    }
-                  } catch (e) {
-                    if (sheetContext.mounted) {
-                      _unavailable(sheetContext, ApiMessages.friendly(e));
-                    }
-                  }
-                },
-                child: const Text('Cập nhật mật khẩu'),
-              ),
-            ],
-          ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: next,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Mật khẩu mới',
+                      hintText: 'Tối thiểu 10 ký tự gồm chữ và số',
+                      prefixIcon:
+                          Icon(Icons.lock_rounded, color: AppColors.teal),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: confirm,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                        labelText: 'Xác nhận mật khẩu mới',
+                        prefixIcon:
+                            Icon(Icons.lock_rounded, color: AppColors.teal)),
+                    validator: (value) => value == next.text
+                        ? null
+                        : 'Mật khẩu xác nhận chưa khớp.',
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.mint,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded,
+                            size: 16, color: AppColors.teal),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Mật khẩu mới cần ít nhất 10 ký tự, bao gồm cả chữ và số.',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.navy,
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    onPressed: () async {
+                      if (!(form.currentState?.validate() ?? false) ||
+                          !isValidPassword(next.text)) {
+                        _unavailable(sheetContext,
+                            'Mật khẩu mới cần ít nhất 10 ký tự, gồm chữ và số.');
+                        return;
+                      }
+                      try {
+                        await api.put('/auth/password', {
+                          'currentPassword': current.text,
+                          'newPassword': next.text,
+                        });
+                        if (sheetContext.mounted) {
+                          Navigator.pop(sheetContext);
+                          onLogout();
+                          _unavailable(context,
+                              'Đổi mật khẩu thành công. Hãy đăng nhập lại.');
+                        }
+                      } catch (e) {
+                        if (sheetContext.mounted) {
+                          _unavailable(sheetContext, ApiMessages.friendly(e));
+                        }
+                      }
+                    },
+                    child: const Text('Cập nhật mật khẩu'),
+                  ),
+                ],
+              )),
         ),
       ),
     );
@@ -553,8 +592,7 @@ class ProfileScreen extends StatelessWidget {
 
   // ── Sheet: Xác minh email ──
   void _verifyEmail(BuildContext context) {
-    final token = TextEditingController();
-
+    final busy = ValueNotifier(false);
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -562,179 +600,70 @@ class ProfileScreen extends StatelessWidget {
       builder: (sheet) => LiquidModalSheet(
         title: 'Xác minh email',
         subtitle: 'Xác thực tài khoản để nhận đầy đủ quyền lợi thành viên',
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.teal.withValues(alpha: .10),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.mark_email_read_rounded,
-                        color: AppColors.teal, size: 24),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Nhấn nút để nhận mã 6 số qua email đăng ký.',
-                        style: TextStyle(
-                            fontSize: 13,
-                            height: 1.35,
-                            fontWeight: FontWeight.w500),
+        child: ValueListenableBuilder<bool>(
+            valueListenable: busy,
+            builder: (sheet, sending, _) => SingleChildScrollView(
+                    child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.teal.withValues(alpha: .10),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.mark_email_read_rounded,
+                                color: AppColors.teal, size: 24),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Chúng tôi sẽ gửi một liên kết xác minh đến email đăng ký của bạn.',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    height: 1.35,
+                                    fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: sending
+                                  ? null
+                                  : () async {
+                                      busy.value = true;
+                                      try {
+                                        await api.requestEmailVerification();
+                                        if (sheet.mounted) {
+                                          _unavailable(sheet,
+                                              'Đã gửi email xác minh. Hãy mở liên kết trên thiết bị này.');
+                                        }
+                                      } catch (e) {
+                                        if (sheet.mounted) {
+                                          _unavailable(
+                                              sheet, ApiMessages.friendly(e));
+                                        }
+                                      } finally {
+                                        busy.value = false;
+                                      }
+                                    },
+                              style: TextButton.styleFrom(
+                                backgroundColor: AppColors.teal,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: Text(sending ? 'Đang gửi' : 'Gửi email',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13)),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        try {
-                          await api.requestEmailVerification();
-                          if (sheet.mounted) {
-                            _unavailable(
-                                sheet, 'Đã gửi mã xác minh vào email của bạn.');
-                          }
-                        } catch (e) {
-                          if (sheet.mounted) {
-                            _unavailable(sheet, ApiMessages.friendly(e));
-                          }
-                        }
-                      },
-                      style: TextButton.styleFrom(
-                        backgroundColor: AppColors.teal,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: const Text('Gửi mã',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 13)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: token,
-                decoration: const InputDecoration(
-                  labelText: 'Mã xác minh (OTP)',
-                  hintText: 'Nhập mã nhận được từ email',
-                  prefixIcon: Icon(Icons.key_rounded, color: AppColors.teal),
-                ),
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: () async {
-                  try {
-                    await api.confirmEmailVerification(token.text.trim());
-                    if (sheet.mounted) {
-                      Navigator.pop(sheet);
-                      _unavailable(
-                          context, 'Chúc mừng! Email đã được xác minh.');
-                    }
-                  } catch (e) {
-                    if (sheet.mounted) {
-                      _unavailable(sheet, ApiMessages.friendly(e));
-                    }
-                  }
-                },
-                child: const Text('Xác minh ngay'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Sheet: Đặt lại mật khẩu ──
-  void _resetPassword(BuildContext context) {
-    final email = TextEditingController(text: _email);
-    final token = TextEditingController();
-    final password = TextEditingController();
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheet) => LiquidModalSheet(
-        title: 'Đặt lại mật khẩu',
-        subtitle: 'Yêu cầu mã đặt lại và tạo mật khẩu mới',
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: email,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  prefixIcon: const Icon(Icons.mail_outline_rounded,
-                      color: AppColors.teal),
-                  suffixIcon: TextButton(
-                    onPressed: () async {
-                      try {
-                        await api.requestPasswordReset(email.text.trim());
-                        if (sheet.mounted) {
-                          _unavailable(sheet,
-                              'Nếu email hợp lệ, mã đặt lại đã được gửi.');
-                        }
-                      } catch (e) {
-                        if (sheet.mounted) {
-                          _unavailable(sheet, ApiMessages.friendly(e));
-                        }
-                      }
-                    },
-                    child: const Text('Gửi mã',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: token,
-                decoration: const InputDecoration(
-                  labelText: 'Mã từ email',
-                  hintText: 'Nhập mã xác nhận nhận được',
-                  prefixIcon:
-                      Icon(Icons.vpn_key_outlined, color: AppColors.teal),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: password,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Mật khẩu mới',
-                  hintText: 'Tối thiểu 10 ký tự',
-                  prefixIcon:
-                      Icon(Icons.lock_outline_rounded, color: AppColors.teal),
-                ),
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: () async {
-                  try {
-                    await api.resetPassword(token.text.trim(), password.text);
-                    if (sheet.mounted) {
-                      Navigator.pop(sheet);
-                      _unavailable(context, 'Đã đặt lại mật khẩu thành công.');
-                    }
-                  } catch (e) {
-                    if (sheet.mounted) {
-                      _unavailable(sheet, ApiMessages.friendly(e));
-                    }
-                  }
-                },
-                child: const Text('Cập nhật mật khẩu mới'),
-              ),
-            ],
-          ),
-        ),
+                    ]))),
       ),
     );
   }
@@ -849,7 +778,7 @@ class _ProfileMenuTile extends StatelessWidget {
   final String title;
   final String? subtitle;
   final Widget? badge;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

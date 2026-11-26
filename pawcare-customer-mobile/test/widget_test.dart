@@ -19,6 +19,9 @@ import 'package:pawcare_customer_mobile/features/notifications/presentation/noti
 import 'package:pawcare_customer_mobile/features/discovery/presentation/discovery_screen.dart';
 import 'package:pawcare_customer_mobile/features/discovery/presentation/discovery_state.dart';
 import 'package:pawcare_customer_mobile/features/profile/presentation/address_location_screen.dart';
+import 'package:pawcare_customer_mobile/features/auth/auth_deep_link.dart';
+import 'package:pawcare_customer_mobile/features/auth/password_validation.dart';
+import 'package:pawcare_customer_mobile/features/auth/presentation/forgot_password_screen.dart';
 
 void main() {
   test('provider rating mapper accepts API field variants and no reviews', () {
@@ -324,52 +327,84 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('forgot password flow navigates from login and completes reset',
+  test('parses only valid PawCare auth deep links and validates passwords', () {
+    expect(
+        AuthDeepLink.parse(
+                Uri.parse('pawcare://auth/reset-password?token=secret'))
+            ?.kind,
+        AuthDeepLinkKind.resetPassword);
+    expect(
+        AuthDeepLink.parse(
+                Uri.parse('pawcare://auth/verify-email?token=secret'))
+            ?.kind,
+        AuthDeepLinkKind.verifyEmail);
+    expect(
+        AuthDeepLink.parse(Uri.parse('pawcare://auth/reset-password')), isNull);
+    expect(isValidPassword('abc1234567'), isTrue);
+    expect(isValidPassword('abcdefghij'), isFalse);
+  });
+
+  testWidgets(
+      'password reset request calls the real API and shows neutral state',
       (tester) async {
+    var requestedEmail = '';
+    final api = PawCareApi(
+        baseUrl: 'http://pawcare.test/api/v1',
+        client: MockClient((request) async {
+          requestedEmail = (jsonDecode(request.body) as Map)['email'] as String;
+          return _jsonResponse({});
+        }));
+    addTearDown(api.close);
+    await tester.pumpWidget(
+        MaterialApp(theme: buildTheme(), home: ForgotPasswordScreen(api: api)));
+    await tester.enterText(
+        find.byKey(const ValueKey('reset-email')), 'test@pawcare.vn');
+    await tester.tap(find.text('Gửi hướng dẫn'));
+    await tester.pumpAndSettle();
+    expect(requestedEmail, 'test@pawcare.vn');
+    expect(
+        find.text(
+            'Nếu email tồn tại, PawCare đã gửi hướng dẫn đặt lại mật khẩu.'),
+        findsOneWidget);
+  });
+
+  testWidgets('changing password revokes local session through logout callback',
+      (tester) async {
+    var changed = false;
+    var loggedOut = false;
+    final api = PawCareApi(
+        baseUrl: 'http://pawcare.test/api/v1',
+        client: MockClient((request) async {
+          if (request.method == 'PUT' &&
+              request.url.path.endsWith('/auth/password')) {
+            changed = true;
+            return _jsonResponse({});
+          }
+          return _jsonResponse({});
+        }));
+    addTearDown(api.close);
     await tester.pumpWidget(MaterialApp(
-      theme: buildTheme(),
-      home: AuthScreen(onAuthenticated: (_, __) async {}),
-    ));
-
-    expect(find.text('Quên mật khẩu?'), findsOneWidget);
-
-    final emailField = find.byKey(const ValueKey('auth-email'));
-    await tester.enterText(emailField, 'test@pawcare.vn');
-    await tester.pump();
-
-    await tester.tap(find.text('Quên mật khẩu?'));
+        theme: buildTheme(),
+        home: ProfileScreen(
+            profile: const {'fullName': 'An', 'email': 'an@pawcare.vn'},
+            api: api,
+            darkMode: false,
+            onThemeChanged: (_) {},
+            onProfileUpdated: (_) {},
+            onLogout: () => loggedOut = true)));
+    final changePassword = find.text('Đổi mật khẩu');
+    await tester.drag(find.byType(ListView), const Offset(0, -500));
     await tester.pumpAndSettle();
-
-    expect(find.text('Quên mật khẩu?'), findsOneWidget);
-    expect(find.text('Xác thực tài khoản'), findsOneWidget);
-    expect(find.text('test@pawcare.vn'), findsOneWidget);
-
-    // Tap Tiếp tục
-    await tester.tap(find.text('Tiếp tục'));
+    await tester.tap(changePassword);
     await tester.pumpAndSettle();
-
-    expect(find.text('Tạo mật khẩu mới'), findsOneWidget);
-    expect(find.text('Cập nhật mật khẩu'), findsOneWidget);
-
-    final textFields = find.byType(TextFormField);
-    await tester.enterText(textFields.at(0), '123456');
-    await tester.enterText(textFields.at(1), '123456');
-    await tester.pump();
-
-    final updateBtn = find.text('Cập nhật mật khẩu');
-    await tester.ensureVisible(updateBtn);
-    await tester.tap(updateBtn);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 700));
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'old-password');
+    await tester.enterText(fields.at(1), 'newpass1234');
+    await tester.enterText(fields.at(2), 'newpass1234');
+    await tester.tap(find.text('Cập nhật mật khẩu'));
     await tester.pumpAndSettle();
-
-    expect(find.text('Đặt lại mật khẩu thành công! 🎉'), findsOneWidget);
-
-    await tester.tap(find.text('Đăng nhập ngay'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Quên mật khẩu?'), findsOneWidget);
-    expect(find.text('test@pawcare.vn'), findsOneWidget);
+    expect(changed, isTrue);
+    expect(loggedOut, isTrue);
   });
 
   testWidgets(

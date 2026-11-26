@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import '../features/auth/presentation/auth_screen.dart';
+import '../features/auth/auth_deep_link.dart';
+import '../features/auth/presentation/reset_password_screen.dart';
 import '../core/network/pawcare_api.dart';
 import '../core/storage/session_store.dart';
 import 'customer_shell.dart';
@@ -18,12 +22,64 @@ class _PawCareAppState extends State<PawCareApp> {
   bool _darkMode = false;
   bool _ready = false;
   final _store = SessionStore();
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  late final AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
+  AuthDeepLink? _pendingLink;
 
   @override
   void initState() {
     super.initState();
     _api = widget.api ?? PawCareApi();
+    _appLinks = AppLinks();
+    _linkSubscription = _appLinks.uriLinkStream.listen(_receiveLink);
     _restore();
+    _readInitialLink();
+  }
+
+  Future<void> _readInitialLink() async {
+    final uri = await _appLinks.getInitialLink();
+    if (uri != null) _receiveLink(uri);
+  }
+
+  void _receiveLink(Uri uri) {
+    final link = AuthDeepLink.parse(uri);
+    if (link == null)
+      return _showMessage('Liên kết không hợp lệ hoặc đã thiếu thông tin.');
+    _pendingLink = link;
+    _openPendingLink();
+  }
+
+  Future<void> _openPendingLink() async {
+    if (!_ready || _pendingLink == null) return;
+    final link = _pendingLink!;
+    _pendingLink = null;
+    if (link.kind == AuthDeepLinkKind.resetPassword) {
+      final result = await _navigatorKey.currentState?.push<bool>(
+          MaterialPageRoute(
+              builder: (_) =>
+                  ResetPasswordScreen(api: _api, token: link.token)));
+      if (result == true)
+        _showMessage('Đặt lại mật khẩu thành công. Hãy đăng nhập.');
+      return;
+    }
+    if (_session == null)
+      return _showMessage('Hãy đăng nhập để xác minh email của bạn.');
+    try {
+      await _api.confirmEmailVerification(link.token);
+      _profileUpdated(
+          Map<String, dynamic>.from(await _api.get('/auth/me') as Map));
+      _showMessage('Email của bạn đã được xác minh.');
+    } catch (_) {
+      _showMessage('Liên kết xác minh không hợp lệ hoặc đã hết hạn.');
+    }
+  }
+
+  void _showMessage(String message) {
+    final context = _navigatorKey.currentContext;
+    if (context != null)
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _restore() async {
@@ -41,6 +97,7 @@ class _PawCareAppState extends State<PawCareApp> {
         _ready = true;
       });
       if (renewed != null) await _store.saveSession(renewed, _api.baseUrl);
+      _openPendingLink();
     } catch (_) {
       if (mounted) setState(() => _ready = true);
     }
@@ -48,6 +105,7 @@ class _PawCareAppState extends State<PawCareApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
+      navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'PawCare',
       theme: buildTheme(dark: _darkMode),
@@ -81,6 +139,7 @@ class _PawCareAppState extends State<PawCareApp> {
       } catch (_) {}
     }
     if (mounted) setState(() => _session = null);
+    _api.useToken(null);
     await _store.clearSession();
   }
 
@@ -101,6 +160,7 @@ class _PawCareAppState extends State<PawCareApp> {
 
   @override
   void dispose() {
+    _linkSubscription?.cancel();
     _api.close();
     super.dispose();
   }
