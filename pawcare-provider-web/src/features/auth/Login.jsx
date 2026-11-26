@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { api } from '../../shared/api'
 import { Icons } from '../../shared/icons'
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, onForgotPassword }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -81,7 +81,7 @@ export default function Login({ onLogin }) {
               <button
                 type="button"
                 className="btn-text-link"
-                onClick={() => alert('Vui lòng liên hệ Admin PawCare (hotline: 1900-PAWCARE) hoặc ứng dụng PawCare Mobile để đặt lại mật khẩu.')}
+                onClick={onForgotPassword}
               >
                 Quên mật khẩu?
               </button>

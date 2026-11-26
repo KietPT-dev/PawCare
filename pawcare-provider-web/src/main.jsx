@@ -5,6 +5,7 @@ import { api, rowsOf } from './shared/api'
 import { dateTime } from './shared/format'
 import { Icons } from './shared/icons'
 import Login from './features/auth/Login'
+import { ChangePassword, ForgotPassword, ResetPassword } from './features/auth/AuthRecovery'
 import Dashboard from './features/dashboard/Dashboard'
 import BookingsPage from './features/bookings/BookingsPage'
 import OperationsPage from './features/operations/OperationsPage'
@@ -42,6 +43,10 @@ function App() {
   const [dashboard, setDashboard] = useState({})
   const [notifications, setNotifications] = useState([])
   const [notice, setNotice] = useState('')
+  const [account, setAccount] = useState(null)
+  const [authScreen, setAuthScreen] = useState(() => window.location.pathname === '/reset-password' ? 'reset' : 'login')
+  const [verificationBusy, setVerificationBusy] = useState(false)
+  const [verificationCooldown, setVerificationCooldown] = useState(0)
   const [syncing, setSyncing] = useState(false)
   const [lastSyncTime, setLastSyncTime] = useState('')
 
@@ -64,6 +69,7 @@ function App() {
     Object.values(storage).forEach(k => localStorage.removeItem(k))
     setToken('')
     setRefresh('')
+    setAccount(null)
   }
 
   const login = s => {
@@ -78,14 +84,16 @@ function App() {
     if (!token) return
     setSyncing(true)
     try {
-      const [b, d, n] = await Promise.all([
+      const [b, d, n, currentAccount] = await Promise.all([
         api('/bookings', {}, token),
         api('/provider/dashboard', {}, token),
-        api('/notifications', {}, token).catch(() => [])
+        api('/notifications', {}, token).catch(() => []),
+        api('/auth/me', {}, token).catch(() => null)
       ])
       setBookings(rowsOf(b))
       setDashboard(d)
       setNotifications(rowsOf(n))
+      if (currentAccount) setAccount(currentAccount)
       setNotice('')
       const now = new Date()
       setLastSyncTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`)
@@ -108,6 +116,41 @@ function App() {
   useEffect(() => {
     reload()
   }, [token])
+
+  useEffect(() => {
+    if (!verificationCooldown) return
+    const interval = window.setInterval(() => setVerificationCooldown(value => Math.max(0, value - 1)), 1000)
+    return () => window.clearInterval(interval)
+  }, [verificationCooldown])
+
+  const requestVerification = async () => {
+    setVerificationBusy(true)
+    try {
+      await api('/auth/email-verification/request', { method: 'POST' }, token)
+      setVerificationCooldown(60)
+      setNotice('Đã gửi email xác minh. Vui lòng kiểm tra hộp thư của bạn.')
+    } catch (error) {
+      setNotice(error.message || 'Không thể gửi email xác minh. Vui lòng thử lại.')
+    } finally {
+      setVerificationBusy(false)
+    }
+  }
+
+  const handlePasswordChanged = () => {
+    setSettingsModalOpen(false)
+    setNotice('Đổi mật khẩu thành công. Vui lòng đăng nhập lại.')
+    logout()
+  }
+
+  const exitReset = () => {
+    window.history.replaceState({}, '', '/')
+    setAuthScreen('login')
+  }
+
+  const resetSucceeded = () => {
+    exitReset()
+    setNotice('Đặt lại mật khẩu thành công. Bạn có thể đăng nhập.')
+  }
 
   // Token auto refresh
   useEffect(() => {
@@ -141,9 +184,12 @@ function App() {
   }, [])
 
   if (!token) {
+    const resetToken = new URLSearchParams(window.location.search).get('token') || ''
     return (
       <>
-        <Login onLogin={login} />
+        {authScreen === 'forgot' && <ForgotPassword onBack={() => setAuthScreen('login')} />}
+        {authScreen === 'reset' && <ResetPassword token={resetToken} onBack={exitReset} onSuccess={resetSucceeded} />}
+        {authScreen === 'login' && <Login onLogin={login} onForgotPassword={() => setAuthScreen('forgot')} />}
         {notice && <p className="session-notice">{notice}</p>}
       </>
     )
@@ -416,6 +462,14 @@ function App() {
         {/* Content Body */}
         <div className="content">
           {notice && <div className="error-alert">⚠ {notice}</div>}
+          {(account?.emailVerified === false || account?.emailVerified === 0) && (
+            <div className="approval email-verification-banner" role="status">
+              <div><strong>Email chưa được xác minh</strong><span>Xác minh email để tăng độ an toàn cho tài khoản Provider.</span></div>
+              <button type="button" className="btn-secondary" disabled={verificationBusy || verificationCooldown > 0} onClick={requestVerification}>
+                {verificationBusy ? 'Đang gửi…' : verificationCooldown > 0 ? `Gửi lại sau ${verificationCooldown}s` : 'Gửi email xác minh'}
+              </button>
+            </div>
+          )}
           {content}
         </div>
       </main>
@@ -435,6 +489,7 @@ function App() {
             </div>
             <div className="modal-body">
               <ProviderStoreSettings token={token} onClose={() => setSettingsModalOpen(false)} />
+              <ChangePassword token={token} onSuccess={handlePasswordChanged} />
               <div className="legacy-settings" aria-hidden="true">
               <div className="form-grid">
                 <div className="form-group form-full">
