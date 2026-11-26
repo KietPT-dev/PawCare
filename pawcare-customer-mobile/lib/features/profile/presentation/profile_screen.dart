@@ -10,6 +10,7 @@ import '../../pets/presentation/pets_screen.dart';
 import '../../wallet/presentation/wallet_screen.dart';
 import 'help_center_screen.dart';
 import 'settings_screen.dart';
+import 'address_location_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({
@@ -171,6 +172,22 @@ class ProfileScreen extends StatelessWidget {
                       title: 'Thông tin cá nhân',
                       subtitle: 'Tên và email đăng ký',
                       onTap: () => _profileInfo(context),
+                    ),
+                    const _MenuDivider(),
+                    _ProfileMenuTile(
+                      icon: Icons.location_on_outlined,
+                      iconColor: AppColors.coral,
+                      iconBg: AppColors.coral.withValues(alpha: .12),
+                      title: 'Địa chỉ & vị trí',
+                      subtitle:
+                          '${profile['address'] ?? profile['addressLine1'] ?? 'Chưa thiết lập địa chỉ'}',
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => AddressLocationScreen(
+                                  api: api,
+                                  profile: profile,
+                                  onUpdated: onProfileUpdated))),
                     ),
                     const _MenuDivider(),
                     _ProfileMenuTile(

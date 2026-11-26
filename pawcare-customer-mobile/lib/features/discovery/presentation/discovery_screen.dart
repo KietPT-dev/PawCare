@@ -8,6 +8,7 @@ import '../../../core/network/pawcare_api.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ui.dart';
 import '../../chat/presentation/conversation_screen.dart';
+import '../../profile/presentation/address_location_screen.dart';
 import 'discovery_state.dart';
 import 'provider_detail_screen.dart';
 
@@ -64,7 +65,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
   Future<_DiscoveryData> _load(int token) async {
     final values = await Future.wait([
-      widget.api.list('/providers'),
+      widget.api.list(widget.state.filter == DiscoveryFilter.nearby
+          ? '/providers?status=APPROVED&sort=NEAREST'
+          : '/providers'),
       widget.api.list('/services'),
       widget.api.list('/reviews'),
     ]);
@@ -86,13 +89,20 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     });
   }
 
-  void _chooseFilter(DiscoveryFilter value) {
+  Future<void> _chooseFilter(DiscoveryFilter value) async {
     if (value == DiscoveryFilter.nearby) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Chưa có quyền vị trí. Đang hiển thị tất cả đối tác.'),
-        ),
-      );
+      try {
+        final raw = await widget.api.get('/auth/me');
+        final profile = Map<String, dynamic>.from(raw as Map);
+        if ('${profile['geocodeStatus']}' != 'RESOLVED') {
+          if (mounted) _addressCta(profile);
+          return;
+        }
+        widget.state.setFilter(value);
+        if (mounted) setState(_reload);
+      } catch (error) {
+        if (mounted) _addressCta({});
+      }
       return;
     }
     if (value == DiscoveryFilter.newest) {
@@ -105,6 +115,32 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       return;
     }
     widget.state.setFilter(value);
+    if (mounted) setState(_reload);
+  }
+
+  void _addressCta(Map<String, dynamic> profile) {
+    showDialog<void>(
+        context: context,
+        builder: (dialog) => AlertDialog(
+              title: const Text('Cần địa chỉ đã xác định vị trí'),
+              content: const Text(
+                  'Hãy cập nhật địa chỉ để PawCare tìm cơ sở gần bạn.'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(dialog),
+                    child: const Text('Để sau')),
+                FilledButton(
+                    onPressed: () {
+                      Navigator.pop(dialog);
+                      Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => AddressLocationScreen(
+                              api: widget.api,
+                              profile: profile,
+                              onUpdated: (_) {})));
+                    },
+                    child: const Text('Cập nhật địa chỉ'))
+              ],
+            ));
   }
 
   @override
