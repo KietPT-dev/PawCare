@@ -58,6 +58,21 @@ and deliberately cannot contact a bank.
 The deployment database is configured in `Asia/Ho_Chi_Minh`; clients must send
 an IANA timezone name so the requested reporting context is explicit.
 
+## AI risk review
+
+The backend remains canonical. `PAWCARE_AI_ENABLED` defaults to `false`; when
+enabled, an internal worker authenticates only with `X-PawCare-AI-Token` using
+the environment-only `PAWCARE_AI_WORKER_TOKEN`. Internal endpoints are
+`GET /api/v1/internal/ai/scoring-events`, `POST /api/v1/internal/ai/scoring-events/{id}/result`,
+and `POST /api/v1/internal/ai/operational-recommendations`. Scores accept a
+0..1 risk score and `LOW`, `MEDIUM`, or `HIGH`; results are idempotent.
+
+Admins can list/read/review risk scores under `/api/v1/admin/ai/risk-scores`
+and review operational suggestions under `/api/v1/admin/ai/operational-recommendations`.
+These APIs never block a payment, alter a wallet or account, run DDL, or apply
+an index/partition recommendation. A HIGH score sends a deduplicated,
+non-sensitive notice to active Admins.
+
 ## Marketplace discovery
 
 `GET /api/v1/providers?status=APPROVED&sort=DEFAULT&page=0&size=20` returns

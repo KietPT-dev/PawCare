@@ -1,0 +1,23 @@
+# PawCare AI risk architecture
+
+PawCare uses MySQL 8 transactional outbox rows as the hand-off point for an
+external Python Isolation Forest worker. The worker has no MySQL credentials:
+it leases a minimal event over the internal HTTP API, returns a bounded score,
+and can submit an INDEX or CAPACITY_FORECAST recommendation. The API stores the
+result idempotently and makes the database state canonical.
+
+Only an authenticated Admin can mark a score or recommendation reviewed,
+dismissed, or (for recommendations) approved. Approval records review metadata
+only: it does not lock accounts, refund money, change any ledger/payment row,
+or execute DDL. Index Advisor output is a proposal, never a `CREATE INDEX` job.
+Forecast output is similarly advisory and never partitions tables.
+
+Outbox writes occur with payment, wallet, withdrawal, and funded-booking
+transactions. When AI is disabled or its tables are unavailable, the optional
+write cannot cause a money movement to fail. Leases, unique dedupe keys and a
+unique score-per-outbox-event make retries safe.
+
+Feature snapshots are constrained to coarse operational features (event type,
+amount bands where applicable, and booleans). Do not send raw PII, bank payloads,
+account numbers, payment tokens, passwords, or internal tokens. Simulated AI
+data must never be mixed into ledger or payment business records.
