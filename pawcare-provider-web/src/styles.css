@@ -3214,6 +3214,12 @@ main {
 .cover-preview span, .cover-api-note { font-size: 12px; }
 .cover-api-note { color: var(--text-muted); line-height: 1.5; }
 .success-banner { padding: 10px 12px; border-radius: var(--radius-md); color: var(--emerald-600); background: var(--emerald-50); border: 1px solid var(--emerald-100); font-size: 13px; }
+.checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--slate-600); cursor: pointer; }
+.settings-help { margin: -8px 0 4px; color: var(--slate-500); font-size: 13px; line-height: 1.5; }
+.email-verification-banner { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
+.email-verification-banner div { display: grid; gap: 3px; }
+.email-verification-banner span { color: var(--slate-600); font-size: 13px; }
+@media (max-width: 640px) { .email-verification-banner { align-items: flex-start; flex-direction: column; } }
 .cover-file-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .cover-preview { position: relative; cursor: pointer; transition: border-color var(--transition-fast), background var(--transition-fast); }
 .cover-preview.is-dragging { border-color: var(--teal-500); background: var(--teal-50); }

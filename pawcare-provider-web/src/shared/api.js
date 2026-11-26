@@ -7,10 +7,15 @@ export class ApiError extends Error {
 }
 
 export async function api(path, options = {}, token) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) }
-  })
+  let response
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) }
+    })
+  } catch (_) {
+    throw new ApiError('Không thể kết nối đến máy chủ. Vui lòng thử lại.')
+  }
   const body = await response.json().catch(() => ({}))
   if (response.status === 401) window.dispatchEvent(new Event('pawcare:unauthorized'))
   if (!response.ok) throw new ApiError(body.error || `Lỗi ${response.status}`, response.status)
