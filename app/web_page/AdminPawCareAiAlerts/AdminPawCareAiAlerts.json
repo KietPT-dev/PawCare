@@ -1,0 +1,27 @@
+{
+  "id": "AdminPawCareAiAlerts",
+  "name": "AdminPawCareAiAlerts",
+  "type": "page",
+  "uuid": "e3a7c8d1-5b92-4a41-8e60-11aa22bb3301",
+  "modelVersion": "2.6",
+  "lastUpdate": 0,
+  "description": "PawCare Admin – Cảnh báo AI",
+  "rows": [
+    [
+      {
+        "type": "fragment",
+        "dimension": { "xs": 12, "sm": 12, "md": 12, "lg": 12 },
+        "propertyValues": { "cssClasses": { "type": "constant", "value": "" }, "hidden": { "type": "constant", "value": false } },
+        "reference": "AdminPawCareAiAlertsFragment",
+        "hasValidationError": false,
+        "id": "AdminPawCareAiAlertsFragment",
+        "binding": {}
+      }
+    ]
+  ],
+  "variables": {},
+  "assets": [],
+  "inactiveAssets": [],
+  "webResources": [],
+  "hasValidationError": false
+}

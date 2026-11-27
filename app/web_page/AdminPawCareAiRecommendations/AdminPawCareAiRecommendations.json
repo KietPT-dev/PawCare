@@ -1,0 +1,27 @@
+{
+  "id": "AdminPawCareAiRecommendations",
+  "name": "AdminPawCareAiRecommendations",
+  "type": "page",
+  "uuid": "f4b8d9e2-6c03-4b52-9f71-22bb33cc4402",
+  "modelVersion": "2.6",
+  "lastUpdate": 0,
+  "description": "PawCare Admin – Khuyến nghị vận hành AI",
+  "rows": [
+    [
+      {
+        "type": "fragment",
+        "dimension": { "xs": 12, "sm": 12, "md": 12, "lg": 12 },
+        "propertyValues": { "cssClasses": { "type": "constant", "value": "" }, "hidden": { "type": "constant", "value": false } },
+        "reference": "AdminPawCareAiRecommendationsFragment",
+        "hasValidationError": false,
+        "id": "AdminPawCareAiRecommendationsFragment",
+        "binding": {}
+      }
+    ]
+  ],
+  "variables": {},
+  "assets": [],
+  "inactiveAssets": [],
+  "webResources": [],
+  "hasValidationError": false
+}

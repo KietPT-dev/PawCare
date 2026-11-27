@@ -39,6 +39,8 @@ function PawCareAdminShellCtrl($scope, $http, $window, $timeout, $sce) {
     finance: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>',
     disputes: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>',
     'conversation-reports': '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>',
+    'ai-alerts': '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>',
+    'ai-recommendations': '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>',
     defaultIcon: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/></svg>'
   };
 
@@ -116,23 +118,28 @@ function PawCareAdminShellCtrl($scope, $http, $window, $timeout, $sce) {
         { token: 'complaints', displayName: 'Khiếu nại' },
         { token: 'finance', displayName: 'Tài chính sàn' },
         { token: 'disputes', displayName: 'Tranh chấp' },
-        { token: 'conversation-reports', displayName: 'Báo cáo hội thoại' }
+        { token: 'conversation-reports', displayName: 'Báo cáo hội thoại' },
+        { token: 'ai-alerts', displayName: 'Cảnh báo AI' },
+        { token: 'ai-recommendations', displayName: 'Khuyến nghị vận hành AI' }
       ];
     }
 
     var overviewTokens = ['dashboard'];
     var opsTokens = ['users', 'providers', 'categories', 'bookings'];
     var financeTokens = ['finance', 'complaints', 'disputes', 'conversation-reports'];
+    var aiTokens = ['ai-alerts', 'ai-recommendations'];
 
     var overview = [];
     var ops = [];
     var finance = [];
+    var ai = [];
     var others = [];
 
     normalized.forEach(function (item) {
       if (overviewTokens.indexOf(item.token) !== -1) overview.push(item);
       else if (opsTokens.indexOf(item.token) !== -1) ops.push(item);
       else if (financeTokens.indexOf(item.token) !== -1) finance.push(item);
+      else if (aiTokens.indexOf(item.token) !== -1) ai.push(item);
       else others.push(item);
     });
 
@@ -140,6 +147,7 @@ function PawCareAdminShellCtrl($scope, $http, $window, $timeout, $sce) {
     if (overview.length) groups.push({ label: '', items: overview });
     if (ops.length) groups.push({ label: 'Vận hành & Đối tác', items: ops });
     if (finance.length) groups.push({ label: 'Tài chính & Kiểm soát', items: finance });
+    if (ai.length) groups.push({ label: 'Giám sát AI', items: ai });
     if (others.length) groups.push({ label: 'Mở rộng', items: others });
     vm.navGroups = groups;
   }
@@ -217,7 +225,8 @@ function PawCareAdminShellCtrl($scope, $http, $window, $timeout, $sce) {
   vm.openNotification = function (n) {
     vm.notifOpen = false;
     var refType = String((n && (n.reference_type || n.notification_type)) || '').toUpperCase();
-    if (refType.indexOf('BOOKING') !== -1) vm.displayPage('bookings');
+    if (refType.indexOf('AI_RISK') !== -1) vm.displayPage('ai-alerts');
+    else if (refType.indexOf('BOOKING') !== -1) vm.displayPage('bookings');
     else if (refType.indexOf('COMPLAINT') !== -1) vm.displayPage('complaints');
     else if (refType.indexOf('CONVERSATION') !== -1) vm.displayPage('conversation-reports');
     else if (refType.indexOf('PAYMENT') !== -1 || refType.indexOf('WITHDRAWAL') !== -1) vm.displayPage('finance');
@@ -249,6 +258,11 @@ function PawCareAdminShellCtrl($scope, $http, $window, $timeout, $sce) {
 
     $http.get('/bonita/API/extension/conversation-reports', { params: { status: 'OPEN', page: 0, size: 1 } }).then(function (r) {
       vm.badges['conversation-reports'] = (r.data && Number(r.data.totalElements || 0)) || 0;
+    }, function () {});
+
+    $http.get('/api/v1/admin/ai/risk-scores', { params: { reviewStatus: 'OPEN', page: 0, size: 50 }, withCredentials: true }).then(function (r) {
+      var items = (r.data && r.data.items) || [];
+      vm.badges['ai-alerts'] = items.length;
     }, function () {});
   }
 

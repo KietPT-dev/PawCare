@@ -1,0 +1,16 @@
+{
+  "id": "pawCareAdminAiAlerts",
+  "name": "PawCareAdminAiAlerts",
+  "type": "widget",
+  "custom": true,
+  "modelVersion": "2.6",
+  "description": "PawCare Admin AI risk alerts review widget (read-only advisory, human review only).",
+  "template": "@pawCareAdminAiAlerts.tpl.html",
+  "controller": "@pawCareAdminAiAlerts.ctrl.js",
+  "properties": [],
+  "assets": [],
+  "requiredModules": [],
+  "webResources": [],
+  "order": 100,
+  "hasHelp": false
+}

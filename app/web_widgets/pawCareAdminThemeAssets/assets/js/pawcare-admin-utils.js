@@ -203,6 +203,17 @@
     PROVIDER_PAYOUT: { label: 'Payout Provider', tone: 'success' },
     WITHDRAWAL: { label: 'Rút tiền', tone: 'neutral' },
 
+    // AI Risk & Operational Recommendations
+    LOW: { label: 'Thấp (LOW)', tone: 'success' },
+    MEDIUM: { label: 'Trung bình (MEDIUM)', tone: 'warning' },
+    HIGH: { label: 'Cao (HIGH)', tone: 'danger' },
+    PAYMENT_DEPOSIT: { label: 'Nạp tiền ví', tone: 'info' },
+    WALLET_TRANSACTION: { label: 'Giao dịch ví', tone: 'info' },
+    WITHDRAWAL_REQUEST: { label: 'Yêu cầu rút tiền', tone: 'warning' },
+    BOOKING: { label: 'Đặt lịch', tone: 'neutral' },
+    INDEX: { label: 'Đề xuất Index', tone: 'info' },
+    CAPACITY_FORECAST: { label: 'Dự báo dung lượng', tone: 'warning' },
+
     // Roles
     ADMIN: { label: 'ADMIN', tone: 'danger' },
     PROVIDER: { label: 'PROVIDER', tone: 'info' },
@@ -259,11 +270,76 @@
 
   function errorText(response, fallback) {
     var d = response && response.data;
-    if (d && (d.error || d.message)) return d.error || d.message;
+    if (d && (d.error || d.message)) {
+      var prefix = response && response.status && response.status > 0 ? ('HTTP ' + response.status + ': ') : '';
+      return prefix + (d.error || d.message);
+    }
+    if (response && response.status === 401) {
+      return 'HTTP 401: Chưa xác thực hoặc phiên Admin không có quyền truy cập API AI.';
+    }
+    if (response && response.status === 403) {
+      return 'HTTP 403: Tài khoản không có quyền Quản trị viên (ADMIN).';
+    }
+    if (response && response.status === 404) {
+      return 'HTTP 404: Không tìm thấy bản ghi hoặc đường dẫn API chưa được cấu hình trên máy chủ.';
+    }
     if (response && response.status && response.status > 0) {
       return 'HTTP ' + response.status + ': ' + (fallback || 'Không thể hoàn tất yêu cầu.');
     }
-    return fallback || 'Không thể tải dữ liệu từ máy chủ.';
+    return fallback || 'Không thể kết nối tới máy chủ. Vui lòng thử lại.';
+  }
+
+  function safeParseJson(val) {
+    if (!val) return null;
+    if (typeof val === 'object') return val;
+    if (typeof val === 'string') {
+      try {
+        var parsed = JSON.parse(val);
+        return typeof parsed === 'object' ? parsed : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  var SAFE_RISK_FEATURES = {
+    amount: 'Giá trị giao dịch',
+    hourOfDay: 'Giờ trong ngày',
+    dayOfWeek: 'Ngày trong tuần',
+    accountAgeDays: 'Tuổi tài khoản (ngày)',
+    transactionCount10m: 'Số GD trong 10 phút',
+    transactionCount1h: 'Số GD trong 1 giờ',
+    transactionCount24h: 'Số GD trong 24 giờ',
+    amountSum24h: 'Tổng tiền GD 24 giờ',
+    priorFailedAttempts: 'Số lần thất bại trước đó',
+    eventAgeSeconds: 'Độ trễ sự kiện (giây)'
+  };
+
+  function safeRiskFeatures(rawSnapshot) {
+    var obj = safeParseJson(rawSnapshot);
+    if (!obj || Array.isArray(obj)) return [];
+    var entries = [];
+    Object.keys(SAFE_RISK_FEATURES).forEach(function (key) {
+      if (obj[key] !== undefined && obj[key] !== null && typeof obj[key] !== 'object') {
+        entries.push({
+          key: key,
+          label: SAFE_RISK_FEATURES[key],
+          value: obj[key]
+        });
+      }
+    });
+    return entries;
+  }
+
+  function safeAiRef(type, id) {
+    var code = String(type || '').toUpperCase();
+    var prefix = 'REF';
+    if (code === 'PAYMENT_DEPOSIT') prefix = 'DEP';
+    else if (code === 'WALLET_TRANSACTION') prefix = 'WTX';
+    else if (code === 'WITHDRAWAL_REQUEST') prefix = 'WDR';
+    else if (code === 'BOOKING') prefix = 'BKG';
+    return id !== undefined && id !== null && id !== '' ? (prefix + '-#' + id) : '—';
   }
 
   function paginate(list, pageIndex, pageSize) {
@@ -328,6 +404,9 @@
     navigate: navigate,
     bindShellRefresh: bindShellRefresh,
     errorText: errorText,
+    safeParseJson: safeParseJson,
+    safeRiskFeatures: safeRiskFeatures,
+    safeAiRef: safeAiRef,
     paginate: paginate,
     presetDateRange: presetDateRange
   };
