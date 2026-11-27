@@ -87,6 +87,19 @@ These APIs never block a payment, alter a wallet or account, run DDL, or apply
 an index/partition recommendation. A HIGH score sends a deduplicated,
 non-sensitive notice to active Admins.
 
+Bonita Admin pages use the same authoritative records through session-bound
+extension adapters instead of embedding a Public API bearer token:
+
+- `GET|PUT /bonita/API/extension/ai-risk-scores` (list/filter and review; PUT
+  body includes `id`, `status`, optional `reviewerNote`);
+- `GET /bonita/API/extension/ai-risk-score?id={id}` (safe score detail);
+- `GET|PUT /bonita/API/extension/ai-operational-recommendations` (list/filter
+  and review; `payload` is returned for the structured recommendation).
+
+All extension routes require the Bonita `pawcare_api` permission and resolve the
+current Bonita Administrator to an ADMIN `user_profiles` record. They never
+expose the AI worker token or a public-API JWT to UI Designer code.
+
 ## Marketplace discovery
 
 `GET /api/v1/providers?status=APPROVED&sort=DEFAULT&page=0&size=20` returns

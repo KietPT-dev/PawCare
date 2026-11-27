@@ -14,7 +14,7 @@ PYTHONPATH=src python scripts/train_risk.py
 PYTHONPATH=src python scripts/evaluate_risk.py
 PYTHONPATH=src python scripts/operational_advice.py > recommendations.json
 PYTHONPATH=src python scripts/worker.py                 # dry run (default)
-PAWCARE_AI_ENABLED=true PAWCARE_API_BASE_URL=http://localhost:8080 PAWCARE_AI_WORKER_TOKEN=... PYTHONPATH=src python scripts/worker.py
+PAWCARE_AI_ENABLED=true PAWCARE_API_BASE_URL=http://127.0.0.1:8081 PAWCARE_AI_WORKER_TOKEN=... PYTHONPATH=src python scripts/worker.py
 pytest -q
 ```
 
@@ -22,7 +22,7 @@ The generator creates 85,000+ local rows; generated CSVs and joblib models are i
 
 ## Model behavior
 
-Isolation Forest uses amount, timing, account age, velocity, 24h amount and prior-failure features with robust scaling. Scores are normalized to 0–1; defaults are MEDIUM `>=.55`, HIGH `>=.75`. Evaluation reports precision, recall, and recall@high-risk against synthetic `scenario`.
+Isolation Forest uses amount, timing, account age, velocity, 24h amount and prior-failure features with robust scaling. Scores are calibrated from the training distribution, then normalized to 0–1; defaults are MEDIUM `>=.55`, HIGH `>=.75`. Retrain the local model after updating this module. Evaluation reports precision, recall, and recall@high-risk against synthetic `scenario`.
 
 Index Advisor M8 is a read-only Decision Tree that outputs only `NO_INDEX`, `BTREE_CANDIDATE`, or `COMPOSITE_BTREE_CANDIDATE` JSON. It never recommends partial indexes (unsupported in MySQL) and requires Admin/Dev review with `EXPLAIN ANALYZE`.
 

@@ -12,10 +12,13 @@ only: it does not lock accounts, refund money, change any ledger/payment row,
 or execute DDL. Index Advisor output is a proposal, never a `CREATE INDEX` job.
 Forecast output is similarly advisory and never partitions tables.
 
-Outbox writes occur with payment, wallet, withdrawal, and funded-booking
-transactions. When AI is disabled or its tables are unavailable, the optional
-write cannot cause a money movement to fail. Leases, unique dedupe keys and a
-unique score-per-outbox-event make retries safe.
+At present, scoreable outbox writes occur only with a successful
+`PAYMENT_DEPOSIT_PAID` payment event. This deliberately narrow v1 scope avoids
+claiming coverage for wallet, withdrawal, or booking events that do not yet
+have every safe feature required by the model. When AI is disabled or its
+tables are unavailable, the optional write cannot cause a money movement to
+fail. Leases, unique dedupe keys and a unique score-per-outbox-event make
+retries safe.
 
 Feature snapshots are constrained to real, coarse payment-deposit features:
 `amount`, `hourOfDay`, `dayOfWeek`, `accountAgeDays`, `transactionCount10m`,
@@ -25,3 +28,9 @@ The outbox stores only this allow-listed snapshot. Do not send raw PII, bank
 payloads, account numbers, payment tokens, passwords, or internal tokens.
 Aggregates that cannot provide every model feature are not enqueued. Simulated
 AI data must never be mixed into ledger or payment business records.
+
+The persisted Isolation Forest stores score calibration quantiles learned from
+its training set. The worker uses that calibration for every event, including a
+single leased event; it must never normalize against the current one-row batch.
+Retrain the local model after upgrading a model version or feature set before
+starting the worker.
