@@ -1,0 +1,34 @@
+{
+  "id": "AdminPawCareAiRecommendationsFragment",
+  "name": "AdminPawCareAiRecommendationsFragment",
+  "type": "fragment",
+  "modelVersion": "2.6",
+  "lastUpdate": 0,
+  "rows": [
+    [
+      {
+        "type": "component",
+        "dimension": { "xs": 12, "sm": 12, "md": 12, "lg": 12 },
+        "propertyValues": { "cssClasses": { "type": "constant", "value": "" }, "hidden": { "type": "constant", "value": false } },
+        "reference": "pawCareAdminThemeAssets",
+        "id": "pawCareAdminThemeAssets",
+        "hasValidationError": false
+      }
+    ],
+    [
+      {
+        "type": "component",
+        "dimension": { "xs": 12, "sm": 12, "md": 12, "lg": 12 },
+        "propertyValues": { "cssClasses": { "type": "constant", "value": "" }, "hidden": { "type": "constant", "value": false } },
+        "reference": "pawCareAdminAiRecommendations",
+        "id": "pawCareAdminAiRecommendations",
+        "hasValidationError": false
+      }
+    ]
+  ],
+  "variables": {},
+  "assets": [],
+  "inactiveAssets": [],
+  "webResources": [],
+  "hasValidationError": false
+}

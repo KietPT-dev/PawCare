@@ -1,0 +1,16 @@
+{
+  "id": "pawCareAdminAiRecommendations",
+  "name": "PawCareAdminAiRecommendations",
+  "type": "widget",
+  "custom": true,
+  "modelVersion": "2.6",
+  "description": "PawCare Admin AI operational recommendations widget (INDEX and CAPACITY_FORECAST advisory review only).",
+  "template": "@pawCareAdminAiRecommendations.tpl.html",
+  "controller": "@pawCareAdminAiRecommendations.ctrl.js",
+  "properties": [],
+  "assets": [],
+  "requiredModules": [],
+  "webResources": [],
+  "order": 100,
+  "hasHelp": false
+}

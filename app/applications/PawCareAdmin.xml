@@ -13,6 +13,8 @@
             <applicationPage customPage="custompage_AdminPawCareFinance" token="finance"/>
             <applicationPage customPage="custompage_AdminPawCareDisputes" token="disputes"/>
             <applicationPage customPage="custompage_AdminPawCareConversationReports" token="conversation-reports"/>
+            <applicationPage customPage="custompage_AdminPawCareAiAlerts" token="ai-alerts"/>
+            <applicationPage customPage="custompage_AdminPawCareAiRecommendations" token="ai-recommendations"/>
         </applicationPages>
         <applicationMenus>
             <applicationMenu applicationPage="dashboard"><displayName>Tổng quan</displayName></applicationMenu>
@@ -24,6 +26,8 @@
             <applicationMenu applicationPage="finance"><displayName>Tài chính sàn</displayName></applicationMenu>
             <applicationMenu applicationPage="disputes"><displayName>Tranh chấp</displayName></applicationMenu>
             <applicationMenu applicationPage="conversation-reports"><displayName>Báo cáo hội thoại</displayName></applicationMenu>
+            <applicationMenu applicationPage="ai-alerts"><displayName>Cảnh báo AI</displayName></applicationMenu>
+            <applicationMenu applicationPage="ai-recommendations"><displayName>Khuyến nghị vận hành AI</displayName></applicationMenu>
         </applicationMenus>
     </application>
 </applications>

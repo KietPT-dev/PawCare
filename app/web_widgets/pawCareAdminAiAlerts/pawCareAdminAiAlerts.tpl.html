@@ -1,0 +1,279 @@
+<div class="pc-page">
+  <header class="pc-page-head">
+    <div class="pc-page-head-main">
+      <div class="pc-eyebrow">PAWCARE · GIÁM SÁT RỦI RO AI (HỖ TRỢ QUYẾT ĐỊNH)</div>
+      <h1 class="pc-page-title">Cảnh báo AI</h1>
+      <p class="pc-page-desc">Rà soát các sự kiện thanh toán, ví và rút tiền được mô hình chấm điểm rủi ro. Chỉ hỗ trợ quyết định của Admin; không tự khóa tài khoản hay hoàn tiền.</p>
+    </div>
+    <div class="pc-page-actions">
+      <button type="button" class="pc-btn" ng-click="ctrl.go('ai-recommendations')">Khuyến nghị vận hành AI</button>
+      <button type="button" class="pc-btn" ng-click="ctrl.load(ctrl.page)" ng-disabled="ctrl.loading">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ng-style="ctrl.loading ? {'animation':'pc-spin 0.7s linear infinite'} : {}"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+        <span>{{ctrl.loading ? 'Đang tải…' : 'Làm mới'}}</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="pc-alert" style="background:#EFF6FF;border-color:#BFDBFE;color:#0B3557;">
+    <span><strong>Nguyên tắc vận hành:</strong> Điểm AI chỉ giúp Admin ưu tiên kiểm tra thủ công. Trang này không hiển thị số tài khoản ngân hàng, token hoặc payload giao dịch thô và không thực hiện khóa tài khoản/hoàn tiền tự động.</span>
+  </div>
+
+  <div class="pc-alert" ng-if="ctrl.message" ng-class="{'pc-alert--error': ctrl.error}">
+    <span>{{ctrl.message}}</span>
+    <div style="display:flex;gap:8px;flex-shrink:0;">
+      <button type="button" class="pc-btn pc-btn--sm" ng-if="ctrl.error" ng-click="ctrl.load(ctrl.page)">Thử lại</button>
+      <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.message=''">Đóng</button>
+    </div>
+  </div>
+
+  <!-- Summary KPIs -->
+  <section class="pc-kpi-grid">
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Cảnh báo OPEN (trang này)</span>
+        <span class="pc-kpi-icon pc-kpi-icon--amber">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.stats.open}}</div>
+      <div class="pc-kpi-hint">Đang chờ Admin rà soát</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Mức HIGH (trang này)</span>
+        <span class="pc-kpi-icon pc-kpi-icon--danger">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.stats.high}}</div>
+      <div class="pc-kpi-hint">Ưu tiên kiểm tra trước</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Đã duyệt (trang này)</span>
+        <span class="pc-kpi-icon pc-kpi-icon--success">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.stats.reviewed}}</div>
+      <div class="pc-kpi-hint">Trạng thái REVIEWED hoặc DISMISSED</div>
+    </div>
+
+    <div class="pc-kpi-card">
+      <div class="pc-kpi-top">
+        <span class="pc-kpi-label">Bản ghi trang {{ctrl.page + 1}}</span>
+        <span class="pc-kpi-icon pc-kpi-icon--blue">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+        </span>
+      </div>
+      <div class="pc-kpi-value">{{ctrl.stats.total}}</div>
+      <div class="pc-kpi-hint">Giới hạn {{ctrl.size}} dòng / trang</div>
+    </div>
+  </section>
+
+  <!-- Filters & Table -->
+  <section class="pc-panel" style="margin-bottom:0;">
+    <div class="pc-toolbar">
+      <div class="pc-pills">
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.filter.riskLevel === ''}" ng-click="ctrl.setRiskLevel('')">Tất cả mức</button>
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.filter.riskLevel === 'HIGH'}" ng-click="ctrl.setRiskLevel('HIGH')">HIGH</button>
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.filter.riskLevel === 'MEDIUM'}" ng-click="ctrl.setRiskLevel('MEDIUM')">MEDIUM</button>
+        <button type="button" class="pc-pill" ng-class="{'is-active': ctrl.filter.riskLevel === 'LOW'}" ng-click="ctrl.setRiskLevel('LOW')">LOW</button>
+      </div>
+
+      <select class="pc-select" ng-model="ctrl.filter.reviewStatus" ng-change="ctrl.load(0)" aria-label="Lọc trạng thái review">
+        <option value="">Tất cả trạng thái review</option>
+        <option value="OPEN">OPEN · Chờ rà soát</option>
+        <option value="REVIEWED">REVIEWED · Đã xem xét</option>
+        <option value="DISMISSED">DISMISSED · Đã bỏ qua</option>
+      </select>
+
+      <select class="pc-select" ng-model="ctrl.filter.type" ng-change="ctrl.load(0)" aria-label="Lọc loại sự kiện">
+        <option value="">Tất cả loại sự kiện</option>
+        <option value="PAYMENT_DEPOSIT">PAYMENT_DEPOSIT · Nạp tiền ví</option>
+        <option value="WALLET_TRANSACTION">WALLET_TRANSACTION · Giao dịch ví</option>
+        <option value="WITHDRAWAL_REQUEST">WITHDRAWAL_REQUEST · Yêu cầu rút tiền</option>
+        <option value="BOOKING">BOOKING · Đặt lịch</option>
+      </select>
+
+      <select class="pc-select" ng-model="ctrl.size" ng-change="ctrl.load(0)" aria-label="Số dòng mỗi trang">
+        <option ng-value="20">20 / trang</option>
+        <option ng-value="50">50 / trang</option>
+        <option ng-value="100">100 / trang</option>
+      </select>
+
+      <button type="button" class="pc-btn pc-btn--sm" ng-if="ctrl.filter.riskLevel || ctrl.filter.reviewStatus || ctrl.filter.type" ng-click="ctrl.clearFilters()">Xóa lọc</button>
+    </div>
+
+    <div class="pc-loading" ng-if="ctrl.loading">
+      <span class="pc-spinner"></span>
+      <span>Đang tải cảnh báo AI từ API…</span>
+    </div>
+
+    <div class="pc-table-wrap" ng-if="!ctrl.loading && ctrl.rows.length > 0">
+      <table class="pc-table">
+        <thead>
+          <tr>
+            <th>Thời điểm</th>
+            <th>Loại sự kiện</th>
+            <th>Tham chiếu an toàn</th>
+            <th>Điểm rủi ro</th>
+            <th>Mức rủi ro</th>
+            <th>Trạng thái review</th>
+            <th>Tóm tắt giải thích</th>
+            <th class="pc-text-right">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr ng-repeat="item in ctrl.rows track by item.id">
+            <td style="white-space:nowrap;">
+              <span class="pc-cell-primary">{{ctrl.formatDateTime(item.scored_at)}}</span>
+              <span class="pc-cell-sub pc-num">Score ID #{{item.id}}</span>
+            </td>
+            <td>
+              <span class="pc-cell-primary">{{ctrl.statusLabel(item.aggregate_type)}}</span>
+              <span class="pc-cell-sub">{{item.model_name}} · {{item.model_version}}</span>
+            </td>
+            <td>
+              <span class="pc-cell-primary pc-num">{{ctrl.safeRef(item.aggregate_type, item.aggregate_id)}}</span>
+              <span class="pc-cell-sub">Chỉ mã tham chiếu</span>
+            </td>
+            <td style="min-width:120px;">
+              <div class="pc-num" style="font-weight:700;color:#0B3557;">{{ctrl.formatScore(item.risk_score)}}</div>
+              <div class="pc-progress-track" style="margin-top:5px;">
+                <div class="pc-progress-fill" ng-style="{'width': ctrl.scorePercent(item.risk_score) + '%', 'background': ctrl.scoreBarColor(item.risk_level)}"></div>
+              </div>
+            </td>
+            <td>
+              <span ng-class="ctrl.statusClass(item.risk_level)"><span class="pc-badge-dot"></span>{{item.risk_level}}</span>
+            </td>
+            <td>
+              <span ng-class="ctrl.statusClass(item.review_status)"><span class="pc-badge-dot"></span>{{ctrl.statusLabel(item.review_status)}}</span>
+              <span class="pc-cell-sub" ng-if="item.reviewed_at">{{ctrl.formatDateTime(item.reviewed_at)}}</span>
+            </td>
+            <td style="max-width:280px;">
+              <span class="pc-truncate-2" title="{{item.explanation_summary}}">{{item.explanation_summary || 'Không có mô tả chi tiết.'}}</span>
+              <span class="pc-cell-sub" ng-if="item.reviewer_note">Ghi chú: {{item.reviewer_note}}</span>
+            </td>
+            <td class="pc-text-right">
+              <button type="button" class="pc-btn pc-btn--sm pc-btn--primary" ng-click="ctrl.openDetail(item)">Xem &amp; Duyệt</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pc-empty" ng-if="!ctrl.loading && ctrl.rows.length === 0">
+      <div class="pc-empty-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+      </div>
+      <p class="pc-empty-title">{{ctrl.error ? 'Chưa thể tải cảnh báo AI' : 'Không có cảnh báo AI phù hợp'}}</p>
+      <p class="pc-empty-desc">{{ctrl.error ? 'Vui lòng kiểm tra kết nối phiên Admin hoặc cấu hình endpoint /api/v1/admin/ai/risk-scores rồi thử lại.' : 'Chưa có cảnh báo rủi ro nào khớp với bộ lọc hiện tại.'}}</p>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        <button type="button" class="pc-btn pc-btn--sm" ng-if="ctrl.error" ng-click="ctrl.load(ctrl.page)">Thử lại</button>
+        <button type="button" class="pc-btn pc-btn--sm" ng-if="ctrl.filter.riskLevel || ctrl.filter.reviewStatus || ctrl.filter.type" ng-click="ctrl.clearFilters()">Xóa bộ lọc</button>
+      </div>
+    </div>
+
+    <div class="pc-pagination" ng-if="!ctrl.loading && (ctrl.page > 0 || ctrl.hasMore)">
+      <span>Trang {{ctrl.page + 1}} · Hiển thị {{ctrl.rows.length}} bản ghi</span>
+      <div class="pc-pagination-controls">
+        <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.prevPage()" ng-disabled="ctrl.page === 0">← Trước</button>
+        <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.nextPage()" ng-disabled="!ctrl.hasMore">Sau →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal: Risk Score Detail & Human Review -->
+  <div class="pc-modal-backdrop" ng-if="ctrl.selected" ng-click="ctrl.closeDetail()">
+    <div class="pc-modal pc-modal--lg" ng-click="$event.stopPropagation()">
+      <div class="pc-modal-head">
+        <div>
+          <h3 class="pc-modal-title">Chi tiết Cảnh báo AI #{{ctrl.selected.id}}</h3>
+          <p class="pc-modal-sub">{{ctrl.safeRef(ctrl.selected.aggregate_type, ctrl.selected.aggregate_id)}} · Chấm điểm lúc {{ctrl.formatDateTime((ctrl.selectedDetail && ctrl.selectedDetail.scored_at) || ctrl.selected.scored_at)}}</p>
+        </div>
+        <button type="button" class="pc-modal-close" ng-click="ctrl.closeDetail()" aria-label="Đóng">×</button>
+      </div>
+
+      <div class="pc-modal-body">
+        <div class="pc-loading" ng-if="ctrl.detailLoading">
+          <span class="pc-spinner"></span>
+          <span>Đang tải chi tiết risk score…</span>
+        </div>
+
+        <div class="pc-alert pc-alert--error" ng-if="ctrl.detailError">
+          <span>{{ctrl.detailError}}</span>
+          <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.loadDetail(ctrl.selected.id)">Thử lại</button>
+        </div>
+
+        <div ng-if="!ctrl.detailLoading && ctrl.selectedDetail">
+          <div class="pc-desc-grid" style="margin-bottom:14px;">
+            <div class="pc-desc-item">
+              <div class="pc-desc-label">Mô hình / Phiên bản</div>
+              <div class="pc-desc-val">{{ctrl.selectedDetail.model_name || '—'}} <span class="pc-badge pc-badge--neutral" style="margin-left:4px;">{{ctrl.selectedDetail.model_version || '—'}}</span></div>
+            </div>
+            <div class="pc-desc-item">
+              <div class="pc-desc-label">Điểm rủi ro &amp; Mức độ</div>
+              <div class="pc-desc-val" style="display:flex;align-items:center;gap:8px;">
+                <span class="pc-num" style="font-size:16px;">{{ctrl.formatScore(ctrl.selectedDetail.risk_score)}}</span>
+                <span ng-class="ctrl.statusClass(ctrl.selectedDetail.risk_level)"><span class="pc-badge-dot"></span>{{ctrl.selectedDetail.risk_level}}</span>
+              </div>
+            </div>
+            <div class="pc-desc-item">
+              <div class="pc-desc-label">Loại giao dịch &amp; Tham chiếu</div>
+              <div class="pc-desc-val">{{ctrl.statusLabel(ctrl.selectedDetail.aggregate_type)}} · <span class="pc-num">{{ctrl.safeRef(ctrl.selectedDetail.aggregate_type, ctrl.selectedDetail.aggregate_id)}}</span></div>
+            </div>
+            <div class="pc-desc-item">
+              <div class="pc-desc-label">Trạng thái review hiện tại</div>
+              <div class="pc-desc-val">
+                <span ng-class="ctrl.statusClass(ctrl.selectedDetail.review_status)"><span class="pc-badge-dot"></span>{{ctrl.statusLabel(ctrl.selectedDetail.review_status)}}</span>
+                <div class="pc-cell-sub" ng-if="ctrl.selectedDetail.reviewed_at">Duyệt lúc {{ctrl.formatDateTime(ctrl.selectedDetail.reviewed_at)}} <span ng-if="ctrl.selectedDetail.reviewer_profile_id">(Admin #{{ctrl.selectedDetail.reviewer_profile_id}})</span></div>
+              </div>
+            </div>
+            <div class="pc-desc-item pc-desc-item--full">
+              <div class="pc-desc-label">Tóm tắt giải thích (Explanation Summary)</div>
+              <div class="pc-desc-val" style="font-weight:500;white-space:pre-wrap;">{{ctrl.selectedDetail.explanation_summary || 'Không có tóm tắt giải thích.'}}</div>
+            </div>
+          </div>
+
+          <h4 style="margin:0 0 8px;font-size:13px;font-weight:700;color:#0B3557;">Metadata đầu vào an toàn (Allow-listed Features)</h4>
+          <div class="pc-desc-grid" ng-if="ctrl.safeFeatures.length > 0" style="margin-bottom:14px;">
+            <div class="pc-desc-item" ng-repeat="f in ctrl.safeFeatures track by f.key">
+              <div class="pc-desc-label">{{f.label}}</div>
+              <div class="pc-desc-val pc-num">{{f.value}}</div>
+            </div>
+          </div>
+          <p class="pc-cell-sub" ng-if="ctrl.safeFeatures.length === 0" style="margin:0 0 14px;">Không có metadata feature an toàn đi kèm bản ghi này.</p>
+
+          <div class="pc-form-group" style="margin-bottom:0;">
+            <label class="pc-form-label" for="ai-risk-reviewer-note">Ghi chú kiểm tra của Admin (tối đa 1000 ký tự)</label>
+            <textarea id="ai-risk-reviewer-note" class="pc-textarea" maxlength="1000" ng-model="ctrl.reviewerNote" placeholder="Ghi lại kết quả đối chiếu thủ công (ví dụ: Đã kiểm tra lịch sử giao dịch hợp lệ / Chờ xác minh thêm)…"></textarea>
+          </div>
+
+          <div class="pc-alert" ng-if="ctrl.pendingDecision" style="margin-top:14px;margin-bottom:0;flex-wrap:wrap;">
+            <div style="flex:1;min-width:220px;">
+              <strong>Xác nhận ghi nhận trạng thái {{ctrl.pendingDecision}} cho cảnh báo #{{ctrl.selectedDetail.id}}?</strong>
+              <div class="pc-cell-sub" style="margin-top:2px;">Chỉ lưu trạng thái duyệt và ghi chú kiểm toán; không thay đổi số dư hay trạng thái tài khoản.</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="pc-btn pc-btn--sm" ng-click="ctrl.cancelDecision()" ng-disabled="ctrl.saving">Hủy</button>
+              <button type="button" class="pc-btn pc-btn--sm" ng-class="ctrl.pendingDecision === 'DISMISSED' ? 'pc-btn--danger' : 'pc-btn--primary'" ng-click="ctrl.submitReview()" ng-disabled="ctrl.saving">
+                {{ctrl.saving ? 'Đang lưu…' : 'Xác nhận lưu'}}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pc-modal-foot" style="flex-wrap:wrap;justify-content:space-between;">
+        <button type="button" class="pc-btn" ng-click="ctrl.closeDetail()" ng-disabled="ctrl.saving">Đóng</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;" ng-if="ctrl.selectedDetail && !ctrl.pendingDecision">
+          <button type="button" class="pc-btn pc-btn--danger" ng-click="ctrl.chooseDecision('DISMISSED')" ng-disabled="ctrl.saving">Bỏ qua (DISMISSED)</button>
+          <button type="button" class="pc-btn pc-btn--primary" ng-click="ctrl.chooseDecision('REVIEWED')" ng-disabled="ctrl.saving">Đánh dấu REVIEWED</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
