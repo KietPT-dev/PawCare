@@ -143,6 +143,18 @@ class PawcareService {
             return handleReportedConversationMessages(method)
         }
 
+        if (action == 'ai-risk-scores') {
+            return handleAiRiskScores(method)
+        }
+
+        if (action == 'ai-risk-score') {
+            return handleAiRiskScore(method)
+        }
+
+        if (action == 'ai-operational-recommendations') {
+            return handleAiOperationalRecommendations(method)
+        }
+
         if (!RESOURCES.containsKey(action)) {
             throw new ApiException(404, "Unknown endpoint: ${action}")
         }
@@ -792,6 +804,103 @@ class PawcareService {
         recordConversationAudit(profile.id as Long, 'CONVERSATION_REPORTED_VIEWED', 'CONVERSATION', conversationId,
                 "messageCount=${rows.size()}")
         return [success: true, conversation_id: conversationId, messages: rows]
+    }
+
+    /** Bonita-session adapter for read-only AI scoring plus audited human review. */
+    private Object handleAiRiskScores(String method) {
+        Map profile = requireProfile(currentProfile(false))
+        if (!isAdmin(profile)) throw new ApiException(403, 'Admin permission is required')
+        switch (method) {
+            case 'GET':
+                return listAiRiskScores(query('riskLevel'), query('reviewStatus'), query('type'), integerQuery('page', 0), integerQuery('size', 20))
+            case 'PUT':
+                return reviewAiRiskScore(profile, requestBody())
+            default:
+                throw new ApiException(405, "Method ${method} is not allowed for AI risk scores")
+        }
+    }
+
+    private Object handleAiRiskScore(String method) {
+        if (method != 'GET') throw new ApiException(405, "Method ${method} is not allowed for AI risk score detail")
+        Map profile = requireProfile(currentProfile(false))
+        if (!isAdmin(profile)) throw new ApiException(403, 'Admin permission is required')
+        Long id = asLong(query('id'), 'id')
+        Map score = sql.firstRow('''SELECT s.id,s.aggregate_type,s.aggregate_id,s.model_name,s.model_version,s.risk_score,s.risk_level,
+                   s.explanation_summary,s.feature_snapshot,s.scored_at,s.review_status,s.reviewer_profile_id,s.reviewed_at,s.reviewer_note,
+                   reviewer.full_name AS reviewer_name
+            FROM ai_risk_scores s LEFT JOIN user_profiles reviewer ON reviewer.id=s.reviewer_profile_id WHERE s.id=?''', [id])
+        if (score == null) throw new ApiException(404, 'AI risk score not found')
+        return score
+    }
+
+    private Map listAiRiskScores(String riskLevel, String reviewStatus, String type, int page, int size) {
+        int safePage = Math.max(page, 0); int safeSize = Math.min(Math.max(size, 1), 100)
+        List where = ['1=1']; List args = []
+        if (riskLevel) { String level = riskLevel.toUpperCase(); if (!(level in ['LOW','MEDIUM','HIGH'])) throw new ApiException(400, 'Invalid riskLevel'); where << 's.risk_level=?'; args << level }
+        if (reviewStatus) { String status = reviewStatus.toUpperCase(); if (!(status in ['OPEN','REVIEWED','DISMISSED'])) throw new ApiException(400, 'Invalid reviewStatus'); where << 's.review_status=?'; args << status }
+        if (type) { where << 's.aggregate_type=?'; args << type.toUpperCase() }
+        String clause = where.join(' AND ')
+        Long total = sql.firstRow("SELECT COUNT(*) AS total FROM ai_risk_scores s WHERE ${clause}", args).total as Long
+        List rows = sql.rows('''SELECT s.id,s.aggregate_type,s.aggregate_id,s.model_name,s.model_version,s.risk_score,s.risk_level,
+                   s.explanation_summary,s.scored_at,s.review_status,s.reviewer_profile_id,s.reviewed_at,s.reviewer_note,
+                   reviewer.full_name AS reviewer_name
+            FROM ai_risk_scores s LEFT JOIN user_profiles reviewer ON reviewer.id=s.reviewer_profile_id
+            WHERE ''' + clause + ' ORDER BY s.scored_at DESC,s.id DESC LIMIT ? OFFSET ?', args + [safeSize, safePage * safeSize])
+        Map summary = sql.firstRow('''SELECT COUNT(*) AS total,
+                 COALESCE(SUM(review_status='OPEN'),0) AS open_count,
+                 COALESCE(SUM(risk_level='HIGH'),0) AS high_count,
+                 COALESCE(SUM(review_status IN ('REVIEWED','DISMISSED')),0) AS reviewed_count
+                 FROM ai_risk_scores''')
+        return [items: rows, page: safePage, size: safeSize, totalElements: total ?: 0L,
+                totalPages: total ? Math.ceil((total as double)/safeSize) as long : 0L, summary: summary]
+    }
+
+    private Map reviewAiRiskScore(Map profile, Map body) {
+        Long id = asLong(body.id, 'id'); String status = requiredText(body.status, 'status').toUpperCase()
+        if (!(status in ['OPEN','REVIEWED','DISMISSED'])) throw new ApiException(400, 'Invalid review status')
+        String note = body.reviewerNote == null ? null : body.reviewerNote.toString().trim()
+        if (note != null && note.length() > 1000) throw new ApiException(400, 'reviewerNote must not exceed 1000 characters')
+        return sql.withTransaction {
+            Map score = sql.firstRow('SELECT id,review_status FROM ai_risk_scores WHERE id=? FOR UPDATE', [id])
+            if (score == null) throw new ApiException(404, 'AI risk score not found')
+            if (status == 'OPEN') sql.executeUpdate('UPDATE ai_risk_scores SET review_status=?,reviewer_profile_id=NULL,reviewed_at=NULL,reviewer_note=? WHERE id=?', [status,note,id])
+            else sql.executeUpdate('UPDATE ai_risk_scores SET review_status=?,reviewer_profile_id=?,reviewed_at=CURRENT_TIMESTAMP,reviewer_note=? WHERE id=?', [status,profile.id,note,id])
+            recordConversationAudit(profile.id as Long, 'AI_RISK_REVIEW', 'AI_RISK_SCORE', id, "oldStatus=${score.review_status};newStatus=${status}")
+            return [id:id,status:status,reviewer_note:note]
+        }
+    }
+
+    private Object handleAiOperationalRecommendations(String method) {
+        Map profile = requireProfile(currentProfile(false))
+        if (!isAdmin(profile)) throw new ApiException(403, 'Admin permission is required')
+        switch (method) {
+            case 'GET':
+                String status = query('status')?.toUpperCase()
+                if (status && !(status in ['OPEN','REVIEWED','DISMISSED','APPROVED'])) throw new ApiException(400, 'Invalid status')
+                String where = status ? 'WHERE r.status=?' : ''
+                List args = status ? [status] : []
+                return sql.rows('''SELECT r.id,r.recommendation_type,r.subject_name,r.model_name,r.model_version,r.score,r.confidence,r.payload,
+                          r.status,r.created_at,r.reviewer_profile_id,r.reviewed_at,r.reviewer_note,reviewer.full_name AS reviewer_name
+                   FROM ai_operational_recommendations r LEFT JOIN user_profiles reviewer ON reviewer.id=r.reviewer_profile_id ''' + where + ' ORDER BY r.created_at DESC,r.id DESC', args)
+            case 'PUT':
+                return reviewAiOperationalRecommendation(profile, requestBody())
+            default:
+                throw new ApiException(405, "Method ${method} is not allowed for AI operational recommendations")
+        }
+    }
+
+    private Map reviewAiOperationalRecommendation(Map profile, Map body) {
+        Long id = asLong(body.id, 'id'); String status = requiredText(body.status, 'status').toUpperCase()
+        if (!(status in ['OPEN','REVIEWED','DISMISSED','APPROVED'])) throw new ApiException(400, 'Invalid review status')
+        String note = body.reviewerNote == null ? null : body.reviewerNote.toString().trim()
+        if (note != null && note.length() > 1000) throw new ApiException(400, 'reviewerNote must not exceed 1000 characters')
+        return sql.withTransaction {
+            Map recommendation = sql.firstRow('SELECT id,status FROM ai_operational_recommendations WHERE id=? FOR UPDATE', [id])
+            if (recommendation == null) throw new ApiException(404, 'AI recommendation not found')
+            sql.executeUpdate('UPDATE ai_operational_recommendations SET status=?,reviewer_profile_id=?,reviewed_at=CURRENT_TIMESTAMP,reviewer_note=? WHERE id=?', [status,profile.id,note,id])
+            recordConversationAudit(profile.id as Long, 'AI_OPERATIONAL_RECOMMENDATION_REVIEW', 'AI_OPERATIONAL_RECOMMENDATION', id, "oldStatus=${recommendation.status};newStatus=${status}")
+            return [id:id,status:status,reviewer_note:note]
+        }
     }
 
     private Map listConversationReports(String status, int page, int size) {

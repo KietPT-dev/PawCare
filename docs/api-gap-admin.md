@@ -10,6 +10,9 @@ Admin pages use the authenticated Bonita REST extension only:
 - `GET|PUT /bonita/API/extension/users`
 - `GET|PUT /bonita/API/extension/providers`
 - `GET|POST|PUT|DELETE /bonita/API/extension/categories`
+- `GET|PUT /bonita/API/extension/ai-risk-scores`
+- `GET /bonita/API/extension/ai-risk-score?id={id}`
+- `GET|PUT /bonita/API/extension/ai-operational-recommendations`
 
 The upstream service also exposes the authoritative Admin contracts below. They
 are useful when extending the REST extension, but UI Designer pages must not
@@ -39,11 +42,12 @@ The `pawcare_api` permission must be assigned to the Bonita Administrator profil
   (`OPEN`, `REVIEWED`, `DISMISSED`) and audited reported-conversation reads. The
   message route rejects conversations without a report. No general inbox, message
   mutation route, token, or public-API secret is exposed to UI Designer resources.
-- AI risk alerts and operational recommendations (`AdminPawCareAiAlerts` / `AdminPawCareAiRecommendations`) call the upstream Admin contracts (`/api/v1/admin/ai/risk-scores`, `/api/v1/admin/ai/risk-scores/{id}`, `/api/v1/admin/ai/risk-scores/{id}/review`, `/api/v1/admin/ai/operational-recommendations`, `/api/v1/admin/ai/operational-recommendations/{id}/review`), and the following backend gaps currently exist and must not be mocked in the UI:
-  - **Missing Bonita REST extension proxy / session bridge**: `AiAdminController` sits on `public-api` behind JWT `Bearer` authentication (`JwtAuthenticationFilter`), whereas Bonita Portal pages authenticate with Bonita session cookies and must not embed `public-api` credentials (`PAWCARE_JWT_SECRET` or user tokens). Either a same-origin reverse proxy mapping `/api/v1/admin/ai/*` with shared Admin session verification or Bonita REST extension adapters (`/bonita/API/extension/ai-...`) is required in `extensions/pawcareAPI` for seamless Bonita Portal calls.
-  - **Missing `payload` column in `GET /api/v1/admin/ai/operational-recommendations`**: `AiAdminController.recommendations()` selects `id, recommendation_type, subject_name, model_name, model_version, score, confidence, status, created_at, reviewer_profile_id, reviewed_at, reviewer_note` and omits the `payload` JSON column from `ai_operational_recommendations`. Because `payload` is not returned, structured `INDEX` fields (`candidate_columns`, `recommendation`, `reason`) and `CAPACITY_FORECAST` fields (`threshold`, `predicted_days_to_threshold`, `assumption`, `warning`) cannot be populated from the API yet.
-  - **Missing total & summary counts in `GET /api/v1/admin/ai/risk-scores`**: the endpoint returns `{ items, page, size }` without `totalElements`, `totalPages`, or global counts for `OPEN`, `HIGH`, and `REVIEWED`. The UI displays per-page counts accurately rather than fabricating global totals.
-  - **Missing `reviewer_name` join**: both `ai_risk_scores` and `ai_operational_recommendations` return `reviewer_profile_id` only without joining `user_profiles.full_name`.
+- AI risk alerts and operational recommendations (`AdminPawCareAiAlerts` /
+  `AdminPawCareAiRecommendations`) now use Bonita-session extension adapters,
+  not direct calls to the bearer-token-protected Public API. The adapters return
+  recommendation `payload`, reviewer display name, safe risk-score pagination
+  metadata and summary counts. They are read/review tools only: they cannot
+  block a payment, alter a wallet, or apply an index/partition change.
 
 ## Export/import and deployment
 

@@ -84,7 +84,7 @@ function PawCareAdminAiAlertsCtrl($scope, $http) {
     if (vm.filter.reviewStatus) params.reviewStatus = vm.filter.reviewStatus;
     if (vm.filter.type) params.type = vm.filter.type;
 
-    return $http.get('/api/v1/admin/ai/risk-scores', {
+    return $http.get('/bonita/API/extension/ai-risk-scores', {
       params: params,
       withCredentials: true
     }).then(function (r) {
@@ -127,7 +127,8 @@ function PawCareAdminAiAlertsCtrl($scope, $http) {
     vm.detailError = '';
     vm.selectedDetail = null;
     vm.safeFeatures = [];
-    $http.get('/api/v1/admin/ai/risk-scores/' + encodeURIComponent(id), {
+    $http.get('/bonita/API/extension/ai-risk-score', {
+      params: { id: id },
       withCredentials: true
     }).then(function (r) {
       var d = r.data || {};
@@ -170,7 +171,8 @@ function PawCareAdminAiAlertsCtrl($scope, $http) {
     var targetStatus = vm.pendingDecision;
     vm.saving = true;
     vm.detailError = '';
-    $http.put('/api/v1/admin/ai/risk-scores/' + encodeURIComponent(targetId) + '/review', {
+    $http.put('/bonita/API/extension/ai-risk-scores', {
+      id: targetId,
       status: targetStatus,
       reviewerNote: (vm.reviewerNote || '').slice(0, 1000)
     }, {

@@ -121,7 +121,7 @@ function PawCareAdminAiRecommendationsCtrl($scope, $http) {
     var opts = { withCredentials: true };
     if (vm.statusFilter) opts.params = { status: vm.statusFilter };
 
-    return $http.get('/api/v1/admin/ai/operational-recommendations', opts).then(function (r) {
+    return $http.get('/bonita/API/extension/ai-operational-recommendations', opts).then(function (r) {
       var list = Array.isArray(r.data) ? r.data : ((r.data && (r.data.items || r.data.data)) || []);
       vm.error = false;
       if (!keepMessage) vm.message = '';
@@ -164,7 +164,8 @@ function PawCareAdminAiRecommendationsCtrl($scope, $http) {
     var targetId = vm.selected.id;
     var targetStatus = vm.pendingDecision;
     vm.saving = true;
-    $http.put('/api/v1/admin/ai/operational-recommendations/' + encodeURIComponent(targetId) + '/review', {
+    $http.put('/bonita/API/extension/ai-operational-recommendations', {
+      id: targetId,
       status: targetStatus,
       reviewerNote: (vm.reviewerNote || '').slice(0, 1000)
     }, {
