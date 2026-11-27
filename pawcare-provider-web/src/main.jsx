@@ -5,6 +5,8 @@ import { api, rowsOf } from './shared/api'
 import { dateTime } from './shared/format'
 import { Icons } from './shared/icons'
 import Login from './features/auth/Login'
+import Register from './features/auth/Register'
+import VerifyEmail from './features/auth/VerifyEmail'
 import { ChangePassword, ForgotPassword, ResetPassword } from './features/auth/AuthRecovery'
 import Dashboard from './features/dashboard/Dashboard'
 import BookingsPage from './features/bookings/BookingsPage'
@@ -44,7 +46,11 @@ function App() {
   const [notifications, setNotifications] = useState([])
   const [notice, setNotice] = useState('')
   const [account, setAccount] = useState(null)
-  const [authScreen, setAuthScreen] = useState(() => window.location.pathname === '/reset-password' ? 'reset' : 'login')
+  const [authScreen, setAuthScreen] = useState(() => {
+    if (window.location.pathname === '/reset-password') return 'reset'
+    if (window.location.pathname === '/verify-email') return 'verify-email'
+    return 'login'
+  })
   const [verificationBusy, setVerificationBusy] = useState(false)
   const [verificationCooldown, setVerificationCooldown] = useState(0)
   const [syncing, setSyncing] = useState(false)
@@ -142,14 +148,21 @@ function App() {
     logout()
   }
 
-  const exitReset = () => {
+  const exitAuthSubRoute = () => {
     window.history.replaceState({}, '', '/')
     setAuthScreen('login')
   }
 
   const resetSucceeded = () => {
-    exitReset()
+    exitAuthSubRoute()
     setNotice('Đặt lại mật khẩu thành công. Bạn có thể đăng nhập.')
+  }
+
+  const registerCompleted = session => {
+    window.history.replaceState({}, '', '/')
+    setAuthScreen('login')
+    setNotice('')
+    login(session)
   }
 
   // Token auto refresh
@@ -184,14 +197,37 @@ function App() {
   }, [])
 
   if (!token) {
-    const resetToken = new URLSearchParams(window.location.search).get('token') || ''
+    const actionToken = new URLSearchParams(window.location.search).get('token') || ''
     return (
       <>
         {authScreen === 'forgot' && <ForgotPassword onBack={() => setAuthScreen('login')} />}
-        {authScreen === 'reset' && <ResetPassword token={resetToken} onBack={exitReset} onSuccess={resetSucceeded} />}
-        {authScreen === 'login' && <Login onLogin={login} onForgotPassword={() => setAuthScreen('forgot')} />}
+        {authScreen === 'reset' && <ResetPassword token={actionToken} onBack={exitAuthSubRoute} onSuccess={resetSucceeded} />}
+        {authScreen === 'register' && <Register onBack={() => setAuthScreen('login')} onComplete={registerCompleted} />}
+        {authScreen === 'verify-email' && <VerifyEmail token={actionToken} onBack={exitAuthSubRoute} />}
+        {authScreen === 'login' && (
+          <Login
+            onLogin={login}
+            onForgotPassword={() => setAuthScreen('forgot')}
+            onRegister={() => {
+              setNotice('')
+              setAuthScreen('register')
+            }}
+          />
+        )}
         {notice && <p className="session-notice">{notice}</p>}
       </>
+    )
+  }
+
+  if (authScreen === 'verify-email') {
+    const verifyToken = new URLSearchParams(window.location.search).get('token') || ''
+    return (
+      <VerifyEmail
+        token={verifyToken}
+        accessToken={token}
+        onVerified={reload}
+        onBack={exitAuthSubRoute}
+      />
     )
   }
 

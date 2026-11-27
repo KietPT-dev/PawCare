@@ -11,6 +11,8 @@ import OperationsPage from '../features/operations/OperationsPage'
 import ReviewsPage from '../features/reviews/ReviewsPage'
 import Notifications from '../features/notifications/Notifications'
 import Login from '../features/auth/Login'
+import Register, { validateRegisterForm, passwordIsValid } from '../features/auth/Register'
+import VerifyEmail, { extractVerificationToken } from '../features/auth/VerifyEmail'
 
 describe('UI Components Render Tests', () => {
   it('renders Metric with object trend without throwing Objects are not valid as React child error', () => {
@@ -119,10 +121,80 @@ describe('UI Components Render Tests', () => {
     expect(chartHtml).toContain('350.000')
   })
 
-  it('renders Login screen cleanly', () => {
-    const html = renderToString(React.createElement(Login, { onLogin: () => {} }))
+  it('renders Login screen with register trigger cleanly', () => {
+    const html = renderToString(React.createElement(Login, { onLogin: () => {}, onRegister: () => {} }))
     expect(html).toContain('Đăng nhập Đối tác')
     expect(html).toContain('PawCare Partner Portal')
+    expect(html).toContain('Đăng ký tài khoản')
+    expect(html).toContain('Quên mật khẩu?')
+  })
+
+  it('renders Register screen cleanly with Provider fields and back button', () => {
+    const html = renderToString(React.createElement(Register, { onBack: () => {}, onComplete: () => {} }))
+    expect(html).toContain('Đăng ký Đối tác')
+    expect(html).toContain('Cơ sở / Spa / Phòng khám')
+    expect(html).toContain('Cá nhân cung cấp dịch vụ')
+    expect(html).toContain('Xác nhận mật khẩu')
+    expect(html).toContain('Quay lại đăng nhập')
+  })
+
+  it('validates Provider register form payload accurately against backend contract', () => {
+    expect(passwordIsValid('short1')).toBe(false)
+    expect(passwordIsValid('onlyletters')).toBe(false)
+    expect(passwordIsValid('1234567890')).toBe(false)
+    expect(passwordIsValid('PawCare2026!')).toBe(true)
+
+    const invalid = validateRegisterForm({
+      providerType: 'SHOP',
+      fullName: ' ',
+      providerName: '',
+      email: 'bad-email',
+      phone: '123',
+      password: 'weak',
+      confirmPassword: 'other',
+    })
+    expect(invalid.valid).toBe(false)
+    expect(invalid.errors.fullName).toBeTruthy()
+    expect(invalid.errors.providerName).toBeTruthy()
+    expect(invalid.errors.email).toBeTruthy()
+    expect(invalid.errors.phone).toBeTruthy()
+    expect(invalid.errors.password).toBeTruthy()
+    expect(invalid.errors.confirmPassword).toBeTruthy()
+
+    const validShop = validateRegisterForm({
+      providerType: 'SHOP',
+      fullName: 'Nguyễn Thị Phương Thảo',
+      providerName: 'Happy Paws Q1',
+      email: 'Partner@PawCare.VN',
+      phone: '090 123 4567',
+      address: '123 Lê Lợi, Q1',
+      password: 'PawCare2026!',
+      confirmPassword: 'PawCare2026!',
+    })
+    expect(validShop.valid).toBe(true)
+    expect(validShop.payload).toEqual({
+      fullName: 'Nguyễn Thị Phương Thảo',
+      email: 'partner@pawcare.vn',
+      password: 'PawCare2026!',
+      phone: '0901234567',
+      address: '123 Lê Lợi, Q1',
+      role: 'PROVIDER',
+      providerName: 'Happy Paws Q1',
+      providerType: 'SHOP',
+    })
+  })
+
+  it('extracts email verification tokens from deep links and web URLs and renders VerifyEmail', () => {
+    expect(extractVerificationToken('abc_token-123')).toBe('abc_token-123')
+    expect(extractVerificationToken('pawcare://auth/verify-email?token=tok%2B123%3D')).toBe('tok+123=')
+    expect(extractVerificationToken('https://provider.pawcare.vn/verify-email?token=xyz999')).toBe('xyz999')
+
+    const htmlIdle = renderToString(React.createElement(VerifyEmail, { onBack: () => {} }))
+    expect(htmlIdle).toContain('Xác minh email Đối tác')
+    expect(htmlIdle).toContain('Xác nhận email')
+
+    const htmlVerifying = renderToString(React.createElement(VerifyEmail, { token: 'sample-token', onBack: () => {} }))
+    expect(htmlVerifying).toContain('Đang xác thực mã xác minh email')
   })
 
   it('renders WalletPage, ReportsPage, BookingsPage, OperationsPage, ReviewsPage, Notifications', () => {
