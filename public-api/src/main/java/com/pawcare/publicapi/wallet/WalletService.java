@@ -1,6 +1,7 @@
 package com.pawcare.publicapi.wallet;
 
 import com.pawcare.publicapi.auth.CurrentPrincipal;
+import com.pawcare.publicapi.ai.AiOutboxService;
 import com.pawcare.publicapi.bonita.BookingWorkflowEvent;
 import com.pawcare.publicapi.bonita.BookingWorkflowOutbox;
 import com.pawcare.publicapi.wallet.dto.TopUpRequest;
@@ -42,6 +43,7 @@ public class WalletService {
 
     private final JdbcTemplate db;
     private final BookingWorkflowOutbox workflowOutbox;
+    private final AiOutboxService aiOutbox;
     private final String webhookToken;
     private final String qrBank;
     private final String qrAccount;
@@ -49,13 +51,14 @@ public class WalletService {
     private final PayoutProvider payoutProvider;
 
     @Autowired
-    public WalletService(JdbcTemplate db, BookingWorkflowOutbox workflowOutbox, PayoutProvider payoutProvider,
+    public WalletService(JdbcTemplate db, BookingWorkflowOutbox workflowOutbox, AiOutboxService aiOutbox, PayoutProvider payoutProvider,
             @Value("${pawcare.wallet.webhook-token:}") String webhookToken,
             @Value("${pawcare.wallet.vietqr.bank-code:}") String qrBank,
             @Value("${pawcare.wallet.vietqr.account-no:}") String qrAccount,
             @Value("${pawcare.wallet.vietqr.account-name:PawCare}") String qrAccountName) {
         this.db = db;
         this.workflowOutbox = workflowOutbox;
+        this.aiOutbox = aiOutbox;
         this.webhookToken = webhookToken;
         this.qrBank = qrBank;
         this.qrAccount = qrAccount;
@@ -69,7 +72,7 @@ public class WalletService {
      */
     public WalletService(JdbcTemplate db, BookingWorkflowOutbox workflowOutbox,
             String webhookToken, String qrBank, String qrAccount, String qrAccountName) {
-        this(db, workflowOutbox, new LocalManualPayoutProvider(), webhookToken, qrBank, qrAccount, qrAccountName);
+        this(db, workflowOutbox, null, new LocalManualPayoutProvider(), webhookToken, qrBank, qrAccount, qrAccountName);
     }
 
     /** Called inside booking creation's transaction. */
@@ -110,6 +113,7 @@ public class WalletService {
         String code = "PAW" + id;
         String url = qrUrl(code, amount);
         db.update("UPDATE payment_deposits SET payment_code=?,qr_url=? WHERE id=?", code, url, id);
+        if (aiOutbox != null) aiOutbox.enqueue("PAYMENT_DEPOSIT", id, "PAYMENT_DEPOSIT_CREATED", Map.of("hasBooking",true));
         return Map.of("paymentMethod", "VIETQR", "status", "PENDING_PAYMENT", "bookingId", bookingId,
                 "paymentDepositId", id, "paymentCode", code, "amount", amount, "qrUrl", url);
     }
@@ -153,6 +157,7 @@ public class WalletService {
             transaction(wallet, null, "DEPOSIT", expected, before, after,
                     "VietQR wallet top-up " + bankTransactionId + " for " + paymentCode);
             db.update("UPDATE payment_deposits SET bank_tran_id=?,status='PAID' WHERE id=?", bankTransactionId, deposit.get("id"));
+            if (aiOutbox != null) aiOutbox.enqueue("PAYMENT_DEPOSIT", ((Number) deposit.get("id")).longValue(), "PAYMENT_DEPOSIT_PAID", Map.of("hasBooking",false));
             return Map.of("success", true, "idempotent", false, "depositId", deposit.get("id"), "status", "PAID");
         }
         long bookingId = ((Number) deposit.get("booking_id")).longValue();
@@ -173,6 +178,7 @@ public class WalletService {
         transaction(wallet, bookingId, "ESCROW_HOLD", expected.negate(), credited, afterHold,
                 "Escrow hold after VietQR deposit for booking #" + bookingId);
         db.update("UPDATE payment_deposits SET bank_tran_id=?,status='ESCROW_HELD' WHERE id=?", bankTransactionId, deposit.get("id"));
+        if (aiOutbox != null) aiOutbox.enqueue("PAYMENT_DEPOSIT", ((Number) deposit.get("id")).longValue(), "PAYMENT_DEPOSIT_PAID", Map.of("hasBooking",true));
         markBookingAwaitingApproval(bookingId, userId, "VietQR received; escrow held");
         return Map.of("success", true, "idempotent", false, "depositId", deposit.get("id"),
                 "bookingId", bookingId, "status", "ESCROW_HELD");
@@ -273,6 +279,7 @@ public class WalletService {
         long id = lastId();
         String code = "PAW" + id;
         db.update("UPDATE payment_deposits SET payment_code=?,qr_url=? WHERE id=?", code, qrUrl(code, amount), id);
+        if (aiOutbox != null) aiOutbox.enqueue("PAYMENT_DEPOSIT", id, "PAYMENT_DEPOSIT_CREATED", Map.of("hasBooking",false));
         return depositResponse(requireDepositForUser(principal.profileId(), id));
     }
 
@@ -293,7 +300,8 @@ public class WalletService {
         transaction(wallet, null, "WITHDRAWAL", amount.negate(), available, after, "Withdrawal request reserved in locked balance");
         db.update("INSERT INTO withdrawal_requests(wallet_id,amount,bank_name,bank_account_no,bank_account_name,bonita_case_id,status) VALUES(?,?,?,?,?,?, 'PENDING')",
                 wallet.get("id"), amount, clean(request.bankName()), clean(request.bankAccountNo()), clean(request.bankAccountName()), request.bonitaCaseId());
-        return Map.of("success", true, "id", lastId(), "status", "PENDING", "amount", amount);
+        long id=lastId(); if(aiOutbox!=null) aiOutbox.enqueue("WITHDRAWAL_REQUEST",id,"WITHDRAWAL_REQUESTED",Map.of("amount",amount));
+        return Map.of("success", true, "id", id, "status", "PENDING", "amount", amount);
     }
 
     public List<Map<String, Object>> listWithdrawals(CurrentPrincipal principal, String status) {
@@ -395,6 +403,7 @@ public class WalletService {
                     provider.get("owner_profile_id"), "Booking chờ duyệt", "Booking #" + bookingId + " đã thanh toán và chờ bạn duyệt.", "BOOKING_STATUS", "BOOKING", bookingId);
         }
         workflowOutbox.enqueue(bookingId, BookingWorkflowEvent.START, Map.of("bookingId", bookingId));
+        if (aiOutbox != null) aiOutbox.enqueue("BOOKING", bookingId, "BOOKING_FUNDED", Map.of("paymentState","FUNDED"));
     }
 
     private Map<String, Object> lockWallet(String ownerType, long ownerId) {
@@ -423,6 +432,10 @@ public class WalletService {
                              BigDecimal before, BigDecimal after, String description) {
         db.update("INSERT INTO wallet_transactions(wallet_id,booking_id,type,amount,balance_before,balance_after,description) VALUES(?,?,?,?,?,?,?)",
                 wallet.get("id"), bookingId, type, money(amount), money(before), money(after), description);
+        if (aiOutbox != null) {
+            long id=lastId();
+            aiOutbox.enqueue("WALLET_TRANSACTION", id, type, Map.of("transactionType",type,"hasBooking",bookingId!=null));
+        }
     }
 
     private Map<String, Object> walletView(Map<String, Object> wallet) {

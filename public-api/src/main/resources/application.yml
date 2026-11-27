@@ -20,6 +20,10 @@ pawcare:
     secret: ${PAWCARE_JWT_SECRET:CHANGE_ME_GENERATE_A_RANDOM_BASE64_SECRET_AT_LEAST_32_BYTES}
     access-token-minutes: ${PAWCARE_ACCESS_TOKEN_MINUTES:15}
     refresh-token-days: ${PAWCARE_REFRESH_TOKEN_DAYS:30}
+  ai:
+    # Disabled by default. The worker token is environment-only and is never logged.
+    enabled: ${PAWCARE_AI_ENABLED:false}
+    worker-token: ${PAWCARE_AI_WORKER_TOKEN:}
   mail:
     # Disabled unless explicitly configured. Never place provider credentials in
     # source control; local values belong in the ignored .env.local file.
