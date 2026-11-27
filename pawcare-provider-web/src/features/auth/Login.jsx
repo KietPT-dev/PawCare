@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { api } from '../../shared/api'
 import { Icons } from '../../shared/icons'
 
-export default function Login({ onLogin, onForgotPassword }) {
+export default function Login({ onLogin, onForgotPassword, onRegister }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -57,14 +57,16 @@ export default function Login({ onLogin, onForgotPassword }) {
           )}
 
           <div className="form-group">
-            <label className="form-label">Email tài khoản Đối tác</label>
+            <label className="form-label" htmlFor="login-email">Email tài khoản Đối tác</label>
             <div className="auth-input-wrapper">
               <span className="input-icon">
                 <Icons.User size={16} />
               </span>
               <input
+                id="login-email"
                 aria-label="Email"
                 required
+                autoFocus
                 type="email"
                 className="form-input with-icon"
                 value={email}
@@ -77,7 +79,7 @@ export default function Login({ onLogin, onForgotPassword }) {
 
           <div className="form-group">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label className="form-label">Mật khẩu</label>
+              <label className="form-label" htmlFor="login-password">Mật khẩu</label>
               <button
                 type="button"
                 className="btn-text-link"
@@ -91,6 +93,7 @@ export default function Login({ onLogin, onForgotPassword }) {
                 <Icons.Shield size={16} />
               </span>
               <input
+                id="login-password"
                 aria-label="Mật khẩu"
                 required
                 type={showPassword ? 'text' : 'password'}
@@ -128,6 +131,18 @@ export default function Login({ onLogin, onForgotPassword }) {
               </>
             )}
           </button>
+
+          <div className="auth-switch-row">
+            <span className="auth-switch-text">Chưa có tài khoản Đối tác?</span>
+            <button
+              type="button"
+              className="auth-register-trigger"
+              onClick={onRegister}
+              disabled={busy}
+            >
+              Đăng ký tài khoản
+            </button>
+          </div>
         </form>
 
         {/* Escrow Trust Footer */}
