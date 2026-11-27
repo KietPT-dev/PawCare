@@ -6,6 +6,7 @@ import com.pawcare.publicapi.chat.dto.ConversationReportRequest;
 import com.pawcare.publicapi.chat.dto.SendChatMessageRequest;
 import com.pawcare.publicapi.chat.dto.UpdateConversationReportRequest;
 import com.pawcare.publicapi.notification.NotificationService;
+import com.pawcare.publicapi.provider.ProviderAccessGuard;
 import com.pawcare.publicapi.web.ApiException;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,11 +24,13 @@ public class ChatService {
     private final JdbcTemplate db;
     private final NotificationService notifications;
     private final AuditService audit;
+    private final ProviderAccessGuard providerAccess;
 
-    public ChatService(JdbcTemplate db, NotificationService notifications, AuditService audit) {
+    public ChatService(JdbcTemplate db, NotificationService notifications, AuditService audit, ProviderAccessGuard providerAccess) {
         this.db = db;
         this.notifications = notifications;
         this.audit = audit;
+        this.providerAccess = providerAccess;
     }
 
     @Transactional
@@ -64,6 +67,7 @@ public class ChatService {
     }
 
     public List<Map<String, Object>> list(CurrentPrincipal principal, int page, int size) {
+        providerAccess.requireApprovedIfProvider(principal);
         int safePage = Math.max(page, 0), safeSize = Math.min(Math.max(size, 1), 100);
         return db.queryForList("""
                 SELECT c.id,c.booking_id,c.booking_id AS bookingId,c.conversation_type AS conversationType,
@@ -75,6 +79,7 @@ public class ChatService {
                 FROM conversations c
                 JOIN user_profiles customer ON customer.id=c.customer_profile_id
                 JOIN user_profiles provider ON provider.id=c.provider_profile_id
+                JOIN providers provider_account ON provider_account.owner_profile_id=c.provider_profile_id AND provider_account.status='APPROVED' AND provider_account.is_active=1
                 LEFT JOIN chat_messages latest ON latest.id=(SELECT cm.id FROM chat_messages cm WHERE cm.conversation_id=c.id ORDER BY cm.id DESC LIMIT 1)
                 LEFT JOIN (
                     SELECT cm.conversation_id,COUNT(*) unread_count
@@ -90,7 +95,8 @@ public class ChatService {
     }
 
     public List<Map<String, Object>> messages(CurrentPrincipal principal, long conversationId, Long beforeId, int size) {
-        requireParticipant(principal, conversationId);
+        providerAccess.requireApprovedIfProvider(principal);
+        requireConversationProviderApproved(requireParticipant(principal, conversationId));
         int safeSize = Math.min(Math.max(size, 1), 100);
         List<Object> args = new ArrayList<>();
         String before = "";
@@ -108,7 +114,8 @@ public class ChatService {
 
     @Transactional
     public Map<String, Object> send(CurrentPrincipal principal, long conversationId, SendChatMessageRequest request) {
-        Map<String, Object> conversation = requireParticipant(principal, conversationId);
+        providerAccess.requireApprovedIfProvider(principal);
+        Map<String, Object> conversation = requireConversationProviderApproved(requireParticipant(principal, conversationId));
         if (!"OPEN".equals(String.valueOf(conversation.get("status")))) throw new ApiException(409, "Conversation is closed");
         String content = request.content().trim();
         if (content.isBlank()) throw new ApiException(400, "content must not be blank");
@@ -131,7 +138,8 @@ public class ChatService {
 
     @Transactional
     public Map<String, Object> markRead(CurrentPrincipal principal, long conversationId) {
-        requireParticipant(principal, conversationId);
+        providerAccess.requireApprovedIfProvider(principal);
+        requireConversationProviderApproved(requireParticipant(principal, conversationId));
         Long latest = db.queryForObject("SELECT MAX(id) FROM chat_messages WHERE conversation_id=?", Long.class, conversationId);
         ensureReadState(conversationId, principal.profileId());
         db.update("UPDATE conversation_read_states SET last_read_message_id=?,last_read_at=CURRENT_TIMESTAMP WHERE conversation_id=? AND profile_id=?",
@@ -143,7 +151,8 @@ public class ChatService {
 
     @Transactional
     public Map<String, Object> report(CurrentPrincipal principal, long conversationId, ConversationReportRequest request) {
-        requireParticipant(principal, conversationId);
+        providerAccess.requireApprovedIfProvider(principal);
+        requireConversationProviderApproved(requireParticipant(principal, conversationId));
         db.update("INSERT INTO conversation_reports(conversation_id,reporter_profile_id,category,note) VALUES(?,?,?,?)",
                 conversationId, principal.profileId(), request.category().trim().toUpperCase(), blankToNull(request.note()));
         long reportId = lastId();
@@ -227,11 +236,15 @@ public class ChatService {
     }
 
     private Map<String, Object> booking(long bookingId) {
-        Map<String, Object> booking = one("SELECT b.id,b.status,b.customer_profile_id,p.owner_profile_id provider_profile_id FROM bookings b JOIN providers p ON p.id=b.provider_id WHERE b.id=?", bookingId);
+        Map<String, Object> booking = one("SELECT b.id,b.status,b.customer_profile_id,p.owner_profile_id provider_profile_id,p.status provider_status,p.is_active provider_active FROM bookings b JOIN providers p ON p.id=b.provider_id WHERE b.id=?", bookingId);
         if (booking == null) throw new ApiException(404, "Booking not found");
+        if (!"APPROVED".equals(String.valueOf(booking.get("provider_status"))) || !isActive(booking.get("provider_active"))) {
+            throw new ApiException(409, "Nhà cung cấp chưa được phê duyệt để sử dụng trò chuyện", "PROVIDER_APPROVAL_REQUIRED", Map.of("providerStatus", String.valueOf(booking.get("provider_status"))));
+        }
         return booking;
     }
     private void authorizeBookingParty(CurrentPrincipal principal, Map<String, Object> booking) {
+        providerAccess.requireApprovedIfProvider(principal);
         long customer = ((Number) booking.get("customer_profile_id")).longValue();
         long provider = ((Number) booking.get("provider_profile_id")).longValue();
         if (!("CUSTOMER".equals(principal.role()) && customer == principal.profileId()) && !("PROVIDER".equals(principal.role()) && provider == principal.profileId())) throw new ApiException(403, "Only this booking's Customer or Provider can chat");
@@ -242,6 +255,14 @@ public class ChatService {
         long customer = ((Number) conversation.get("customer_profile_id")).longValue();
         long provider = ((Number) conversation.get("provider_profile_id")).longValue();
         if (principal.profileId() != customer && principal.profileId() != provider) throw new ApiException(403, "You are not a conversation participant");
+        return conversation;
+    }
+    private Map<String, Object> requireConversationProviderApproved(Map<String, Object> conversation) {
+        Map<String,Object> provider = one("SELECT id,status,is_active FROM providers WHERE owner_profile_id=?", conversation.get("provider_profile_id"));
+        if (provider == null || !"APPROVED".equals(String.valueOf(provider.get("status"))) || !isActive(provider.get("is_active"))) {
+            String status = provider == null ? "NOT_FOUND" : String.valueOf(provider.get("status"));
+            throw new ApiException(409, "Nhà cung cấp chưa được phê duyệt để sử dụng trò chuyện", "PROVIDER_APPROVAL_REQUIRED", Map.of("providerStatus", status));
+        }
         return conversation;
     }
     private Map<String, Object> conversationByBooking(long bookingId) { return one("SELECT * FROM conversations WHERE booking_id=?", bookingId); }

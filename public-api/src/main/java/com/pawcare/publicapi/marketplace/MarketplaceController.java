@@ -12,6 +12,7 @@ import com.pawcare.publicapi.wallet.PaymentMethod;
 import com.pawcare.publicapi.wallet.WalletService;
 import com.pawcare.publicapi.location.LocationService;
 import com.pawcare.publicapi.media.ProviderCoverService;
+import com.pawcare.publicapi.provider.ProviderAccessGuard;
 import com.pawcare.publicapi.web.ApiException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -34,14 +35,16 @@ public class MarketplaceController {
     private final BookingWorkflowOutbox workflowOutbox;
     private final LocationService locations;
     private final ProviderCoverService covers;
+    private final ProviderAccessGuard providerAccess;
     public MarketplaceController(JdbcTemplate db, WalletService wallets, BookingWorkflowService workflow, BookingWorkflowOutbox workflowOutbox,
-                                 LocationService locations, ProviderCoverService covers) {
+                                 LocationService locations, ProviderCoverService covers, ProviderAccessGuard providerAccess) {
         this.db = db;
         this.wallets = wallets;
         this.workflow = workflow;
         this.workflowOutbox = workflowOutbox;
         this.locations = locations;
         this.covers = covers;
+        this.providerAccess = providerAccess;
     }
 
     // Public catalogue --------------------------------------------------------
@@ -113,8 +116,8 @@ public class MarketplaceController {
     }
     @GetMapping("/services")
     public List<Map<String,Object>> services(@RequestParam(required=false) Long providerId) {
-        if (providerId == null) return db.queryForList("SELECT s.*,p.name provider_name,c.name category_name FROM services s JOIN providers p ON p.id=s.provider_id JOIN service_categories c ON c.id=s.category_id WHERE s.is_active=1 AND p.status='APPROVED' ORDER BY s.id DESC");
-        return db.queryForList("SELECT s.*,c.name category_name FROM services s JOIN service_categories c ON c.id=s.category_id WHERE s.provider_id=? AND s.is_active=1 ORDER BY s.id DESC", providerId);
+        if (providerId == null) return db.queryForList("SELECT s.*,p.name provider_name,c.name category_name FROM services s JOIN providers p ON p.id=s.provider_id JOIN service_categories c ON c.id=s.category_id WHERE s.is_active=1 AND p.status='APPROVED' AND p.is_active=1 ORDER BY s.id DESC");
+        return db.queryForList("SELECT s.*,c.name category_name FROM services s JOIN providers p ON p.id=s.provider_id JOIN service_categories c ON c.id=s.category_id WHERE s.provider_id=? AND s.is_active=1 AND p.status='APPROVED' AND p.is_active=1 ORDER BY s.id DESC", providerId);
     }
 
     // Pets: Customer owns their own records ---------------------------------
@@ -240,7 +243,7 @@ public class MarketplaceController {
     @GetMapping("/bookings")
     public List<Map<String,Object>> bookings(@CurrentUser CurrentPrincipal p) {
         if("CUSTOMER".equals(p.role())) return db.queryForList("SELECT b.*,pr.name provider_name,s.name service_name FROM bookings b JOIN providers pr ON pr.id=b.provider_id JOIN services s ON s.id=b.service_id WHERE b.customer_profile_id=? ORDER BY b.booking_start DESC",p.profileId());
-        if("PROVIDER".equals(p.role())) return db.queryForList("SELECT b.*,u.full_name customer_name,s.name service_name FROM bookings b JOIN providers pr ON pr.id=b.provider_id JOIN user_profiles u ON u.id=b.customer_profile_id JOIN services s ON s.id=b.service_id WHERE pr.owner_profile_id=? AND b.status<>'PENDING_PAYMENT' ORDER BY b.booking_start DESC",p.profileId());
+        if("PROVIDER".equals(p.role())) { providerId(p); return db.queryForList("SELECT b.*,u.full_name customer_name,s.name service_name FROM bookings b JOIN providers pr ON pr.id=b.provider_id JOIN user_profiles u ON u.id=b.customer_profile_id JOIN services s ON s.id=b.service_id WHERE pr.owner_profile_id=? AND b.status<>'PENDING_PAYMENT' ORDER BY b.booking_start DESC",p.profileId()); }
         throw new ApiException(403,"Unsupported role");
     }
     @PostMapping("/bookings")
@@ -250,7 +253,7 @@ public class MarketplaceController {
         customer(p);
         long pet=request.petId(),provider=request.providerId(),service=request.serviceId();
         own("SELECT id FROM pets WHERE id=? AND customer_profile_id=? AND is_active=1",pet,p.profileId());
-        Map<String,Object>s=one("SELECT * FROM services WHERE id=? AND provider_id=? AND is_active=1",service,provider);if(s==null)throw new ApiException(400,"Service is unavailable");
+        Map<String,Object>s=one("SELECT s.* FROM services s JOIN providers pr ON pr.id=s.provider_id WHERE s.id=? AND s.provider_id=? AND s.is_active=1 AND pr.status='APPROVED' AND pr.is_active=1",service,provider);if(s==null)throw new ApiException(400,"Service is unavailable");
         String start = parseBookingStart(request.bookingStart());
         Long staff=request.staffId();
         if(staff!=null) {
@@ -269,7 +272,7 @@ public class MarketplaceController {
         Map<String,Object> booking=one("SELECT * FROM bookings WHERE id=?",id);if(booking==null)throw new ApiException(404,"Booking not found");
         String next=request.status().trim().toUpperCase(Locale.ROOT); String current=String.valueOf(booking.get("status"));
         boolean customer="CUSTOMER".equals(p.role())&&((Number)booking.get("customer_profile_id")).longValue()==p.profileId()&&"CANCELLED".equals(next);
-        boolean provider="PROVIDER".equals(p.role())&&ownsProvider(((Number)booking.get("provider_id")).longValue(),p.profileId())&&List.of("CONFIRMED","REJECTED","CHECKED_IN","IN_SERVICE","SERVICE_DONE").contains(next);
+        boolean provider="PROVIDER".equals(p.role())&&ownsProvider(((Number)booking.get("provider_id")).longValue(),p)&&List.of("CONFIRMED","REJECTED","CHECKED_IN","IN_SERVICE","SERVICE_DONE").contains(next);
         // A provider may report that work is done, but never settles escrow.
         // The dedicated customer confirmation endpoint is the only normal path
         // that can move SERVICE_DONE to COMPLETED.
@@ -328,7 +331,9 @@ public class MarketplaceController {
     // Reviews and notifications ---------------------------------------------
     @GetMapping("/reviews")
     public List<Map<String,Object>> reviews(@RequestParam(required=false) Long providerId) {
-        return providerId==null?db.queryForList("SELECT * FROM reviews WHERE is_visible=1 ORDER BY id DESC"):db.queryForList("SELECT * FROM reviews WHERE provider_id=? AND is_visible=1 ORDER BY id DESC",providerId);
+        return providerId==null
+                ? db.queryForList("SELECT r.* FROM reviews r JOIN providers p ON p.id=r.provider_id WHERE r.is_visible=1 AND p.status='APPROVED' AND p.is_active=1 ORDER BY r.id DESC")
+                : db.queryForList("SELECT r.* FROM reviews r JOIN providers p ON p.id=r.provider_id WHERE r.provider_id=? AND r.is_visible=1 AND p.status='APPROVED' AND p.is_active=1 ORDER BY r.id DESC",providerId);
     }
     @PostMapping("/reviews")
     public Map<String,Object> createReview(@CurrentUser CurrentPrincipal p,@RequestBody Map<String,Object>b) {
@@ -390,9 +395,12 @@ public class MarketplaceController {
         return Map.of("success",true,"id",lastId());
     }
 
-    private Map<String,Object> providerFor(CurrentPrincipal p){if(!"PROVIDER".equals(p.role()))throw new ApiException(403,"Provider account required");Map<String,Object>x=one("SELECT * FROM providers WHERE owner_profile_id=? AND is_active=1",p.profileId());if(x==null)throw new ApiException(403,"Provider profile unavailable");return x;}
-    private long providerId(CurrentPrincipal p){return ((Number)providerFor(p).get("id")).longValue();}
-    private boolean ownsProvider(long id,long profile){return one("SELECT id FROM providers WHERE id=? AND owner_profile_id=?",id,profile)!=null;}
+    private Map<String,Object> providerFor(CurrentPrincipal p){return providerAccess.requireProviderProfile(p);}
+    private long providerId(CurrentPrincipal p){return ((Number)providerAccess.requireApprovedProvider(p).get("id")).longValue();}
+    private boolean ownsProvider(long id,CurrentPrincipal principal){
+        Map<String,Object> provider = providerAccess.requireApprovedProvider(principal);
+        return ((Number) provider.get("id")).longValue() == id;
+    }
     private void customer(CurrentPrincipal p){if(!"CUSTOMER".equals(p.role()))throw new ApiException(403,"Customer account required");}
     private void own(String q,Object...args){if(one(q,args)==null)throw new ApiException(403,"Record not found or not owned by you");}
     private Map<String,Object> one(String q,Object...args){List<Map<String,Object>>r=db.queryForList(q,args);return r.isEmpty()?null:r.get(0);}

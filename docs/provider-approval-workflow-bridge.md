@@ -20,6 +20,12 @@ PAWCARE_BONITA_PROVIDER_APPROVAL_PASSWORD='the Bonita password'
 PAWCARE_BONITA_PROVIDER_APPROVAL_BRIDGE_TOKEN='a-long-random-shared-secret'
 ```
 
+The deployment must generate a new bridge token and set it in both the API
+environment and the two Bonita REST connectors. The tracked diagram contains
+only a deployment placeholder, never a usable token. Configure its connector
+value in Bonita immediately before deployment; do not save a real token back
+into the project source.
+
 The API user must be mapped to the ProviderApproval actors only if it needs to
 claim/execute tasks. The recommended mapping is `pawcare.workflow` as an
 additional allowed user, while administrators remain mapped through their normal
@@ -68,6 +74,16 @@ the Public API checks the provider ID and performs an idempotent transition.
    provider itself.
 5. The selected service task calls the secured callback. Only then does PawCare
    update `providers.status`, create one notification and one audit record.
+
+## 4. Verify a live case
+
+After registering a Provider, inspect `GET /api/v1/admin/providers/{providerId}/workflow`
+as an Admin. A healthy bridge has a non-null `provider.bonita_case_id` and a
+`START` outbox event with `status=SENT`. `FAILED` retains a safe operational
+error and can be retried with `POST /api/v1/admin/providers/{providerId}/workflow/retry`.
+While the case is pending, business endpoints return
+`PROVIDER_APPROVAL_REQUIRED`; they must never grant access just because the
+Provider account can log in.
 
 The callback accepts `X-PawCare-Workflow-Token`, `Authorization: Bearer …`, or
 `Authorization: Apikey …`. Keep the token only in environment/configuration,

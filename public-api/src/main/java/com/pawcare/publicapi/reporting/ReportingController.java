@@ -3,6 +3,7 @@ package com.pawcare.publicapi.reporting;
 import com.pawcare.publicapi.auth.CurrentPrincipal;
 import com.pawcare.publicapi.auth.CurrentUser;
 import com.pawcare.publicapi.web.ApiException;
+import com.pawcare.publicapi.provider.ProviderAccessGuard;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,8 +26,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 public class ReportingController {
     private final JdbcTemplate db;
+    private final ProviderAccessGuard providerAccess;
 
-    public ReportingController(JdbcTemplate db) { this.db = db; }
+    public ReportingController(JdbcTemplate db, ProviderAccessGuard providerAccess) { this.db = db; this.providerAccess = providerAccess; }
 
     @GetMapping("/provider/reports")
     public Map<String, Object> providerReport(@CurrentUser CurrentPrincipal principal,
@@ -36,7 +38,7 @@ public class ReportingController {
                                                @RequestParam(defaultValue = "DAY") String granularity,
                                                @RequestParam(defaultValue = "0") int page,
                                                @RequestParam(defaultValue = "50") int size) {
-        requireRole(principal, "PROVIDER");
+        providerAccess.requireApprovedProvider(principal);
         validateRange(from, to);
         ReportQuery query = reportQuery(timezone, granularity, page, size);
         Long providerId = scalar("SELECT id FROM providers WHERE owner_profile_id=?", principal.profileId());

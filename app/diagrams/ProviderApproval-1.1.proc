@@ -42,7 +42,7 @@
                 <expression xmi:type="expression:TableExpression" xmi:id="_ibCgoOQbEfG_a6r9MsGSng">
                   <expressions xmi:type="expression:ListExpression" xmi:id="_4sZX8OQdEfG_a6r9MsGSng">
                     <expressions xmi:type="expression:Expression" xmi:id="_4sb0MOQdEfG_a6r9MsGSng" name="X-PawCare-Workflow-Token" content="X-PawCare-Workflow-Token"/>
-                    <expressions xmi:type="expression:Expression" xmi:id="_4scbQOQdEfG_a6r9MsGSng" name="newScript()" content="'pawcare-provider-approval-local-2026-9mK4vR7xQ2'" interpreter="GROOVY" type="TYPE_READ_ONLY_SCRIPT"/>
+                    <expressions xmi:type="expression:Expression" xmi:id="_4scbQOQdEfG_a6r9MsGSng" name="newScript()" content="'__CONFIGURE_PROVIDER_APPROVAL_BRIDGE_TOKEN_AT_DEPLOYMENT__'" interpreter="GROOVY" type="TYPE_READ_ONLY_SCRIPT"/>
                   </expressions>
                 </expression>
               </parameters>
@@ -255,7 +255,7 @@
                 <expression xmi:type="expression:TableExpression" xmi:id="_LaxGKuQfEfG_a6r9MsGSng">
                   <expressions xmi:type="expression:ListExpression" xmi:id="_LaxGK-QfEfG_a6r9MsGSng">
                     <expressions xmi:type="expression:Expression" xmi:id="_LaxGLOQfEfG_a6r9MsGSng" name="X-PawCare-Workflow-Token" content="X-PawCare-Workflow-Token"/>
-                    <expressions xmi:type="expression:Expression" xmi:id="_LaxGLeQfEfG_a6r9MsGSng" name="newScript()" content="'pawcare-provider-approval-local-2026-9mK4vR7xQ2'" interpreter="GROOVY" type="TYPE_READ_ONLY_SCRIPT"/>
+                    <expressions xmi:type="expression:Expression" xmi:id="_LaxGLeQfEfG_a6r9MsGSng" name="newScript()" content="'__CONFIGURE_PROVIDER_APPROVAL_BRIDGE_TOKEN_AT_DEPLOYMENT__'" interpreter="GROOVY" type="TYPE_READ_ONLY_SCRIPT"/>
                   </expressions>
                 </expression>
               </parameters>

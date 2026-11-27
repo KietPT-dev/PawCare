@@ -1,6 +1,7 @@
 package com.pawcare.publicapi.web;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,8 +17,13 @@ public class ApiErrorHandler {
     private static final Logger log = LoggerFactory.getLogger(ApiErrorHandler.class);
     @ExceptionHandler(ApiException.class)
     ResponseEntity<Map<String, Object>> known(ApiException e) {
-        return ResponseEntity.status(e.status()).body(Map.of(
-                "status", e.status(), "error", e.getMessage(), "timestamp", Instant.now().toString()));
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", e.status());
+        body.put("error", e.getMessage());
+        if (e.code() != null) body.put("code", e.code());
+        body.putAll(e.details());
+        body.put("timestamp", Instant.now().toString());
+        return ResponseEntity.status(e.status()).body(body);
     }
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<Map<String, Object>> invalid(MethodArgumentNotValidException e) {

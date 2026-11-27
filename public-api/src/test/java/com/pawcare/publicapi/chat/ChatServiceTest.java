@@ -17,6 +17,7 @@ import com.pawcare.publicapi.auth.CurrentPrincipal;
 import com.pawcare.publicapi.chat.dto.SendChatMessageRequest;
 import com.pawcare.publicapi.chat.dto.UpdateConversationReportRequest;
 import com.pawcare.publicapi.notification.NotificationService;
+import com.pawcare.publicapi.provider.ProviderAccessGuard;
 import com.pawcare.publicapi.web.ApiException;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,7 @@ class ChatServiceTest {
     @Test
     void onlyBookingPartiesCanCreateConversation() {
         JdbcTemplate db = mock(JdbcTemplate.class);
-        when(db.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(Map.of("id", 77L, "status", "CONFIRMED", "customer_profile_id", 11L, "provider_profile_id", 22L)));
+        when(db.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(Map.of("id", 77L, "status", "CONFIRMED", "customer_profile_id", 11L, "provider_profile_id", 22L, "provider_status", "APPROVED", "provider_active", 1)));
         ChatService service = service(db);
 
         ApiException error = assertThrows(ApiException.class, () -> service.createOrGet(OUTSIDER, 77L));
@@ -44,10 +45,11 @@ class ChatServiceTest {
     void duplicateClientMessageReturnsExistingWithoutSendingNotificationAgain() {
         JdbcTemplate db = mock(JdbcTemplate.class);
         Map<String,Object> conversation = Map.of("id", 8L, "status", "OPEN", "customer_profile_id", 11L, "provider_profile_id", 22L);
+        Map<String,Object> provider = Map.of("id", 7L, "status", "APPROVED", "is_active", 1);
         Map<String,Object> message = Map.of("id", 91L, "conversation_id", 8L, "sender_profile_id", 11L, "content", "Xin chào");
-        when(db.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(conversation), List.of(message));
+        when(db.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(conversation), List.of(provider), List.of(message));
         NotificationService notifications = mock(NotificationService.class);
-        ChatService service = new ChatService(db, notifications, mock(AuditService.class));
+        ChatService service = new ChatService(db, notifications, mock(AuditService.class), mock(ProviderAccessGuard.class));
 
         Map<String,Object> result = service.send(CUSTOMER, 8L, new SendChatMessageRequest("Xin chào", "client-1"));
 
@@ -72,7 +74,7 @@ class ChatServiceTest {
         AuditService audit = mock(AuditService.class);
         when(db.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(Map.of(
                 "id", 4L, "conversation_id", 8L, "status", "OPEN")));
-        ChatService service = new ChatService(db, mock(NotificationService.class), audit);
+        ChatService service = new ChatService(db, mock(NotificationService.class), audit, mock(ProviderAccessGuard.class));
 
         Map<String,Object> result = service.updateReport(ADMIN, 4L,
                 new UpdateConversationReportRequest("REVIEWED", "Handled"));
@@ -93,7 +95,7 @@ class ChatServiceTest {
         AuditService audit = mock(AuditService.class);
         when(db.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(Map.of(
                 "id", 4L, "conversation_id", 8L, "status", "REVIEWED", "reviewer_note", "Handled")));
-        ChatService service = new ChatService(db, mock(NotificationService.class), audit);
+        ChatService service = new ChatService(db, mock(NotificationService.class), audit, mock(ProviderAccessGuard.class));
 
         Map<String,Object> result = service.updateReport(ADMIN, 4L,
                 new UpdateConversationReportRequest("REVIEWED", "Handled"));
@@ -127,7 +129,22 @@ class ChatServiceTest {
         assertEquals(403, error.status());
     }
 
+    @Test
+    void customerCannotSendToConversationWhenProviderIsPending() {
+        JdbcTemplate db = mock(JdbcTemplate.class);
+        Map<String,Object> conversation = Map.of("id", 8L, "status", "OPEN", "customer_profile_id", 11L, "provider_profile_id", 22L);
+        Map<String,Object> provider = Map.of("id", 7L, "status", "PENDING", "is_active", 0);
+        when(db.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(conversation), List.of(provider));
+        ChatService service = service(db);
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.send(CUSTOMER, 8L, new SendChatMessageRequest("Xin chào", "client-2")));
+
+        assertEquals(409, error.status());
+        assertEquals("PROVIDER_APPROVAL_REQUIRED", error.code());
+    }
+
     private ChatService service(JdbcTemplate db) {
-        return new ChatService(db, mock(NotificationService.class), mock(AuditService.class));
+        return new ChatService(db, mock(NotificationService.class), mock(AuditService.class), mock(ProviderAccessGuard.class));
     }
 }

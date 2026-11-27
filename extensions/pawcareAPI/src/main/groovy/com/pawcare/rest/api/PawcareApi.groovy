@@ -222,7 +222,16 @@ class PawcareService {
     private Object listResource(String resource, Map definition) {
         Map profile = currentProfile(false)
 
-        if (resource in ['providers', 'categories', 'services']) {
+        if (resource == 'providers') {
+            return listRows(definition.table, "status = 'APPROVED' AND is_active = 1", [])
+        }
+
+        if (resource == 'services') {
+            return listRows('services s JOIN providers p ON p.id = s.provider_id',
+                    "s.is_active = 1 AND p.status = 'APPROVED' AND p.is_active = 1", [], 's.*', 's.id')
+        }
+
+        if (resource == 'categories') {
             return listRows(definition.table, null, null)
         }
 
@@ -247,7 +256,7 @@ class PawcareService {
 
                 return listRows(
                         'staff s JOIN providers p ON p.id = s.provider_id',
-                        'p.owner_profile_id = ?',
+                        "p.owner_profile_id = ? AND p.status = 'APPROVED' AND p.is_active = 1",
                         [profile.id],
                         's.*',
                         's.id'
@@ -262,7 +271,7 @@ class PawcareService {
                         'staff_schedules ss ' +
                                 'JOIN staff s ON s.id = ss.staff_id ' +
                                 'JOIN providers p ON p.id = s.provider_id',
-                        'p.owner_profile_id = ?',
+                        "p.owner_profile_id = ? AND p.status = 'APPROVED' AND p.is_active = 1",
                         [profile.id],
                         'ss.*',
                         'ss.id'
@@ -334,9 +343,15 @@ class PawcareService {
 
             case 'providers':
                 requireRole(profile, ['PROVIDER', 'ADMIN'])
+                // Approval fields are canonical backend state. Only the
+                // authenticated ProviderApproval workflow callback may change them.
+                body.remove('status')
+                body.remove('is_active')
+                body.remove('approval_decided_at')
+                body.remove('approval_review_note')
+                body.remove('rejection_reason')
                 if (!isAdmin(profile)) {
                     assertProviderOwner(id, profile.id as Long)
-                    body.remove('status')
                     body.remove('owner_profile_id')
                 }
                 break
@@ -391,21 +406,8 @@ class PawcareService {
                 break
 
             case 'providers':
-                requireRole(profile, ['PROVIDER', 'ADMIN'])
-                if (!isAdmin(profile)) {
-                    assertProviderOwner(id, profile.id as Long)
-                }
-
-                sql.executeUpdate(
-                        'UPDATE providers SET status = ?, is_active = 0 WHERE id = ?',
-                        ['SUSPENDED', id]
-                )
-
-                return [
-                        success: true,
-                        message: 'Provider has been suspended',
-                        id     : id
-                ]
+                throw new ApiException(409,
+                        'Provider status is controlled by the ProviderApproval workflow')
 
             case 'categories':
                 requireAdmin()
@@ -1393,12 +1395,12 @@ class PawcareService {
 
     private Long ownedProviderId(Map profile) {
         Map provider = sql.firstRow(
-                'SELECT id FROM providers WHERE owner_profile_id = ? AND is_active = 1',
+                "SELECT id FROM providers WHERE owner_profile_id = ? AND status = 'APPROVED' AND is_active = 1",
                 [profile.id]
         )
 
         if (provider == null) {
-            throw new ApiException(403, 'Your profile does not own an active provider')
+            throw new ApiException(403, 'Provider approval is required before this business action')
         }
 
         return provider.id as Long

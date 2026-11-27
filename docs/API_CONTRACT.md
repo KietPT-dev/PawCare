@@ -107,6 +107,19 @@ active Providers. `size` is capped at 100; `X-Page` and `X-Page-Size` echo the
 effective page. Allowed `sort` values are `DEFAULT`, `RATING`, `NEWEST` and
 `NEAREST`.
 
+## Provider approval gate
+
+Provider registration creates a `PENDING` profile and a durable Bonita
+`ProviderApproval` start event. A Provider can verify email and view/update
+their own application at `/provider/me`, but business APIs require
+`providers.status=APPROVED` and an active profile. This includes Provider
+dashboard, services, staff, schedules, bookings, revenue, wallet, reports,
+review replies and chat participation. A blocked request returns HTTP `403`
+with `{ "code": "PROVIDER_APPROVAL_REQUIRED", "providerStatus": "PENDING" }`.
+Only the authenticated Bonita callback can transition the canonical PawCare
+provider record to `APPROVED` or `REJECTED`; Admin submits a decision to the
+Bonita human task and cannot bypass that callback.
+
 `NEAREST` requires an authenticated Customer whose saved address has
 `geocodeStatus: RESOLVED`; otherwise the API returns `409`. It orders with the
 server-side Haversine distance and includes scalar `distance_km`. The API never

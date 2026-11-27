@@ -13,6 +13,7 @@ import com.pawcare.publicapi.auth.CurrentPrincipal;
 import com.pawcare.publicapi.bonita.BookingWorkflowOutbox;
 import com.pawcare.publicapi.location.LocationService;
 import com.pawcare.publicapi.media.ProviderCoverService;
+import com.pawcare.publicapi.provider.ProviderAccessGuard;
 import com.pawcare.publicapi.marketplace.dto.BookingStatusRequest;
 import com.pawcare.publicapi.marketplace.dto.ReviewReplyRequest;
 import com.pawcare.publicapi.wallet.WalletService;
@@ -30,13 +31,16 @@ class MarketplaceControllerTest {
     private JdbcTemplate db;
     private MarketplaceController controller;
     private WalletService wallets;
+    private ProviderAccessGuard providerAccess;
 
     @BeforeEach
     void setUp() {
         db = mock(JdbcTemplate.class);
         wallets = mock(WalletService.class);
+        providerAccess = mock(ProviderAccessGuard.class);
+        when(providerAccess.requireApprovedProvider(any())).thenReturn(Map.of("id", 8L, "status", "APPROVED", "is_active", 1));
         controller = new MarketplaceController(db, wallets, mock(BookingWorkflowService.class),
-                mock(BookingWorkflowOutbox.class), mock(LocationService.class), mock(ProviderCoverService.class));
+                mock(BookingWorkflowOutbox.class), mock(LocationService.class), mock(ProviderCoverService.class), providerAccess);
     }
 
     @Test
