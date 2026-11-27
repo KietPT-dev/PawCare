@@ -1,5 +1,5 @@
 package com.pawcare.publicapi.auth;
-import com.pawcare.publicapi.auth.dto.ActionTokenRequest;
+import com.pawcare.publicapi.auth.dto.EmailVerificationCodeRequest;
 import com.pawcare.publicapi.auth.dto.ChangePasswordRequest;
 import com.pawcare.publicapi.auth.dto.EmailRequest;
 import com.pawcare.publicapi.auth.dto.LoginRequest;
@@ -24,5 +24,5 @@ public class AuthController {
  @PostMapping("/password-reset/request") @ResponseStatus(HttpStatus.ACCEPTED) Map<String,Object> requestPasswordReset(@Valid @RequestBody EmailRequest b){return auth.requestPasswordReset(b.email());}
  @PostMapping("/password-reset/confirm") Map<String,Object> resetPassword(@Valid @RequestBody PasswordResetRequest b){return auth.resetPassword(b.token(),b.newPassword());}
  @PostMapping("/email-verification/request") @ResponseStatus(HttpStatus.ACCEPTED) Map<String,Object> requestEmailVerification(@CurrentUser CurrentPrincipal p){return auth.requestEmailVerification(p);}
- @PostMapping("/email-verification/confirm") Map<String,Object> verifyEmail(@Valid @RequestBody ActionTokenRequest b){return auth.verifyEmail(b.token());}
+ @PostMapping("/email-verification/confirm") Map<String,Object> verifyEmail(@CurrentUser CurrentPrincipal p,@Valid @RequestBody EmailVerificationCodeRequest b){return auth.verifyEmail(p, b.code());}
 }

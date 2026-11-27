@@ -134,7 +134,8 @@ function App() {
     try {
       await api('/auth/email-verification/request', { method: 'POST' }, token)
       setVerificationCooldown(60)
-      setNotice('Đã gửi email xác minh. Vui lòng kiểm tra hộp thư của bạn.')
+      setNotice('Đã gửi mã xác minh 6 chữ số. Vui lòng kiểm tra hộp thư của bạn.')
+      setAuthScreen('verify-email')
     } catch (error) {
       setNotice(error.message || 'Không thể gửi email xác minh. Vui lòng thử lại.')
     } finally {

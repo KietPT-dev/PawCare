@@ -224,16 +224,15 @@ raw message content is never written to audit logs.
 `POST /api/v1/auth/password-reset/request` accepts `{ "email": "..." }` and
 always returns an accepted response so an attacker cannot enumerate accounts.
 `POST /api/v1/auth/password-reset/confirm` accepts `{ "token": "...",
-"newPassword": "..." }`. Email verification follows the equivalent
-`/email-verification/request` and `/email-verification/confirm` endpoints.
-Tokens are stored only as hashes, expire after 30 minutes, are single-use and
-revoke prior tokens of the same purpose. The deployment still needs an actual
-mail sender to deliver the raw token; PawCare deliberately does not log or
-return it. When transactional email is enabled, the message contains one of
-these app deep links (with its URL-encoded token):
-
-- `pawcare://auth/verify-email?token=...`
-- `pawcare://auth/reset-password?token=...`
+"newPassword": "..." }`. Email verification is deliberately different so it
+works in both Provider Web and Customer Mobile: the authenticated account calls
+`POST /email-verification/request`, receives a six-digit code by email, then
+calls `POST /email-verification/confirm` with `{ "code": "123456" }` and its
+Bearer token. The code is bound to that account, stored only as a hash, expires
+after 10 minutes, is single-use, and a new request revokes the prior code.
+PawCare never logs or returns the code. Password-reset tokens remain hashed,
+single-use, and expire after 30 minutes; their email contains the URL-encoded
+`pawcare://auth/reset-password?token=...` deep link.
 
 `PUT /api/v1/auth/password` continues to require the current password. On a
 successful change, PawCare revokes existing refresh tokens and may send a

@@ -1,37 +1,21 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../../shared/api'
 import { Icons } from '../../shared/icons'
 
-/**
- * Extracts raw verification token from either a plain token string
- * or a full URL/deep-link such as pawcare://auth/verify-email?token=...
- */
-export function extractVerificationToken(rawInput) {
-  const raw = String(rawInput || '').trim()
-  if (!raw) return ''
-  const match = raw.match(/[?&]token=([^&#\s]+)/i)
-  if (match && match[1]) {
-    try {
-      return decodeURIComponent(match[1]).trim()
-    } catch {
-      return match[1].trim()
-    }
-  }
-  return raw
-}
+/** Keep only digits so pasted codes such as "123 456" remain convenient. */
+export const normalizeVerificationCode = rawInput => String(rawInput || '').replace(/\D/g, '').slice(0, 6)
 
 export default function VerifyEmail({ token: initialToken = '', accessToken = '', onBack, onVerified }) {
-  const [manualInput, setManualInput] = useState(initialToken)
-  const [busy, setBusy] = useState(Boolean(initialToken))
-  const [status, setStatus] = useState(initialToken ? 'verifying' : 'idle') // 'idle' | 'verifying' | 'success' | 'error'
+  const [manualInput, setManualInput] = useState(normalizeVerificationCode(initialToken))
+  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState('idle') // 'idle' | 'verifying' | 'success' | 'error'
   const [message, setMessage] = useState('')
-  const attemptedInitialRef = useRef('')
 
   async function confirmToken(rawValue) {
-    const cleanToken = extractVerificationToken(rawValue)
-    if (!cleanToken) {
+    const code = normalizeVerificationCode(rawValue)
+    if (!/^\d{6}$/.test(code)) {
       setStatus('error')
-      setMessage('Vui lòng nhập mã xác minh hoặc liên kết từ email.')
+      setMessage('Vui lòng nhập đủ 6 chữ số trong email.')
       return
     }
     setBusy(true)
@@ -40,25 +24,18 @@ export default function VerifyEmail({ token: initialToken = '', accessToken = ''
     try {
       await api('/auth/email-verification/confirm', {
         method: 'POST',
-        body: JSON.stringify({ token: cleanToken }),
-      })
+        body: JSON.stringify({ code }),
+      }, accessToken)
       setStatus('success')
       setMessage('Email tài khoản Đối tác của bạn đã được xác minh thành công.')
       if (onVerified) onVerified()
     } catch (err) {
       setStatus('error')
-      setMessage(err.message || 'Liên kết hoặc mã xác minh không hợp lệ hoặc đã hết hạn.')
+      setMessage(err.message || 'Mã xác minh không hợp lệ hoặc đã hết hạn.')
     } finally {
       setBusy(false)
     }
   }
-
-  useEffect(() => {
-    const clean = extractVerificationToken(initialToken)
-    if (!clean || attemptedInitialRef.current === clean) return
-    attemptedInitialRef.current = clean
-    confirmToken(clean)
-  }, [initialToken])
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -110,7 +87,7 @@ export default function VerifyEmail({ token: initialToken = '', accessToken = ''
           <form className="auth-form" onSubmit={handleSubmit}>
             <div className="form-group">
               <label className="form-label" htmlFor="verify-token-input">
-                Mã xác minh hoặc liên kết trong email
+                Mã xác minh gồm 6 chữ số
               </label>
               <div className="auth-input-wrapper">
                 <span className="input-icon">
@@ -119,16 +96,19 @@ export default function VerifyEmail({ token: initialToken = '', accessToken = ''
                 <input
                   id="verify-token-input"
                   type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   autoFocus
                   className="form-input with-icon"
                   value={manualInput}
-                  onChange={e => setManualInput(e.target.value)}
-                  placeholder="Dán mã token hoặc liên kết verify-email..."
+                  onChange={e => setManualInput(normalizeVerificationCode(e.target.value))}
+                  placeholder="Ví dụ: 123456"
+                  maxLength="6"
                   required
                 />
               </div>
               <p className="auth-hint">
-                Liên kết có hiệu lực trong 30 phút và chỉ sử dụng được một lần.
+                Mã có hiệu lực trong 10 phút và chỉ sử dụng được một lần.
               </p>
             </div>
 

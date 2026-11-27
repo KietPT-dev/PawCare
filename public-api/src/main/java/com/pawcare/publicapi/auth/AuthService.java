@@ -58,6 +58,13 @@ public class AuthService {
             throw new ApiException(400, "role must be CUSTOMER or PROVIDER");
         }
 
+        String phone = text(body, "phone");
+        if (role.equals("PROVIDER")) {
+            if (phone == null || !phone.matches("^\\+?\\d{9,13}$")) {
+                throw new ApiException(400, "Provider phone must contain 9 to 13 digits");
+            }
+        }
+
         validatePassword(password);
 
         if (db.queryForObject(
@@ -75,7 +82,7 @@ public class AuthService {
                 VALUES (NULL, ?, ?, ?, ?, ?, ?, 1, 0)
                 """,
                 name,
-                text(body, "phone"),
+                phone,
                 email,
                 text(body, "address"),
                 role,
@@ -104,7 +111,7 @@ public class AuthService {
                     id,
                     providerType,
                     providerName,
-                    text(body, "phone"),
+                    phone,
                     email,
                     Optional.ofNullable(text(body, "address")).orElse("To be completed")
             );
@@ -237,16 +244,27 @@ public class AuthService {
     @Transactional
     public Map<String, Object> requestEmailVerification(CurrentPrincipal principal) {
         Map<String, Object> account = profile(principal.profileId());
-        String token = issueActionToken(principal.profileId(), "EMAIL_VERIFY");
+        requireNotRateLimited("EMAIL_VERIFY_SEND", String.valueOf(principal.profileId()));
+        String code = issueEmailVerificationCode(principal.profileId());
         sendAfterCommit(AccountEmailFactory.verification(
-                account.get("email").toString(), account.get("full_name").toString(), actionLinkBase(), token));
-        return Map.of("accepted", true, "message", "Verification instructions will be sent.");
+                account.get("email").toString(), account.get("full_name").toString(), code));
+        recordAttempt("EMAIL_VERIFY_SEND", String.valueOf(principal.profileId()));
+        return Map.of("accepted", true, "message", "A six-digit verification code will be sent.");
     }
 
     @Transactional
-    public Map<String, Object> verifyEmail(String rawToken) {
-        long profileId = consumeActionToken(rawToken, "EMAIL_VERIFY");
-        db.update("UPDATE user_profiles SET email_verified=1 WHERE id=?", profileId);
+    public Map<String, Object> verifyEmail(CurrentPrincipal principal, String code) {
+        String subject = String.valueOf(principal.profileId());
+        requireNotRateLimited("EMAIL_VERIFY_CONFIRM", subject);
+        Map<String, Object> row = one("SELECT id FROM auth_action_tokens WHERE profile_id=? AND token_hash=? AND purpose='EMAIL_VERIFY' AND used_at IS NULL AND revoked_at IS NULL AND expires_at>CURRENT_TIMESTAMP FOR UPDATE",
+                principal.profileId(), hash(code));
+        if (row == null) {
+            recordFailedAttempt("EMAIL_VERIFY_CONFIRM", subject);
+            throw new ApiException(400, "Verification code is invalid or expired");
+        }
+        db.update("UPDATE auth_action_tokens SET used_at=CURRENT_TIMESTAMP WHERE id=?", row.get("id"));
+        db.update("UPDATE user_profiles SET email_verified=1 WHERE id=?", principal.profileId());
+        clearAttempts("EMAIL_VERIFY_CONFIRM", subject);
         return Map.of("success", true);
     }
 
@@ -387,6 +405,21 @@ public class AuthService {
         db.update("INSERT INTO auth_action_tokens(profile_id,purpose,token_hash,expires_at) VALUES(?,?,?,DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 30 MINUTE))",
                 profileId, purpose, hash(token));
         return token;
+    }
+
+    private String issueEmailVerificationCode(long profileId) {
+        db.update("UPDATE auth_action_tokens SET revoked_at=CURRENT_TIMESTAMP WHERE profile_id=? AND purpose='EMAIL_VERIFY' AND used_at IS NULL AND revoked_at IS NULL", profileId);
+        for (int attempt = 0; attempt < 3; attempt++) {
+            String code = String.format(Locale.ROOT, "%06d", random.nextInt(1_000_000));
+            try {
+                db.update("INSERT INTO auth_action_tokens(profile_id,purpose,token_hash,expires_at) VALUES(?,'EMAIL_VERIFY',?,DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 10 MINUTE))",
+                        profileId, hash(code));
+                return code;
+            } catch (org.springframework.dao.DuplicateKeyException ignored) {
+                // A six-digit code colliding with an active hashed value is rare; draw again.
+            }
+        }
+        throw new IllegalStateException("Could not issue a verification code");
     }
 
     @Value("${pawcare.mail.app-deep-link-base:pawcare://auth}")

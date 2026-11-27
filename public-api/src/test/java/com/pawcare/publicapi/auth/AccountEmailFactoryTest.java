@@ -18,11 +18,13 @@ class AccountEmailFactoryTest {
     }
 
     @Test
-    void verificationEmailEscapesDisplayNameInHtml() {
+    void verificationEmailContainsSixDigitCodeAndEscapesDisplayNameInHtml() {
         TransactionalEmail email = AccountEmailFactory.verification(
-                "customer@example.test", "<test>", "pawcare://auth/", "token");
+                "customer@example.test", "<test>", "012345");
 
         assertTrue(email.htmlBody().contains("&lt;test&gt;"));
-        assertTrue(email.textBody().contains("pawcare://auth/verify-email?token=token"));
+        assertTrue(email.textBody().contains("012345"));
+        assertTrue(email.htmlBody().contains("012345"));
+        assertTrue(email.textBody().contains("10 phút"));
     }
 }

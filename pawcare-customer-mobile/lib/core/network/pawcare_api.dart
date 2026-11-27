@@ -88,10 +88,12 @@ class PawCareApi {
     await post('/auth/email-verification/request', {});
   }
 
-  Future<void> confirmEmailVerification(String token) async {
-    await post('/auth/email-verification/confirm', {'token': token},
-        authenticated: false);
+  Future<void> confirmEmailVerification(String code) async {
+    await post('/auth/email-verification/confirm', {'code': code});
   }
+
+  Future<Map<String, dynamic>> currentProfile() async =>
+      Map<String, dynamic>.from(await get('/auth/me') as Map);
 
   Future<List<Map<String, dynamic>>> listCareNotes() => list('/care-notes');
 

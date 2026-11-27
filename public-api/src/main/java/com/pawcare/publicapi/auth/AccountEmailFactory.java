@@ -6,15 +6,15 @@ import java.nio.charset.StandardCharsets;
 final class AccountEmailFactory {
     private AccountEmailFactory() { }
 
-    static TransactionalEmail verification(String email, String fullName, String baseLink, String token) {
-        String link = actionLink(baseLink, "verify-email", token);
+    static TransactionalEmail verification(String email, String fullName, String code) {
         String greeting = greeting(fullName);
         return new TransactionalEmail(email, "Xác minh email PawCare",
-                greeting + "\n\nBạn vừa yêu cầu xác minh email cho tài khoản PawCare. Mở liên kết này trong ứng dụng PawCare để hoàn tất: "
-                        + link + "\n\nLiên kết có hiệu lực trong 30 phút và chỉ dùng được một lần. Không chia sẻ liên kết này. Nếu bạn không thực hiện yêu cầu, hãy bỏ qua email này.",
+                greeting + "\n\nMã xác minh PawCare của bạn là: " + code
+                        + "\n\nMã có hiệu lực trong 10 phút và chỉ dùng được một lần. Không chia sẻ mã này. Nếu bạn không thực hiện yêu cầu, hãy bỏ qua email này.",
                 "<p>" + greetingHtml(fullName) + "</p><p>Bạn vừa yêu cầu xác minh email cho tài khoản PawCare.</p>"
-                        + "<p><a href=\"" + escapeHtml(link) + "\">Xác minh email trong ứng dụng PawCare</a></p>"
-                        + "<p>Liên kết có hiệu lực trong 30 phút và chỉ dùng được một lần. Không chia sẻ liên kết này. Nếu bạn không thực hiện yêu cầu, hãy bỏ qua email này.</p>",
+                        + "<p>Mã xác minh của bạn là:</p><p style=\"font-size:28px;letter-spacing:6px;font-weight:700\">"
+                        + escapeHtml(code) + "</p>"
+                        + "<p>Mã có hiệu lực trong 10 phút và chỉ dùng được một lần. Không chia sẻ mã này. Nếu bạn không thực hiện yêu cầu, hãy bỏ qua email này.</p>",
                 "EMAIL_VERIFY");
     }
 

@@ -592,17 +592,20 @@ class ProfileScreen extends StatelessWidget {
 
   // ── Sheet: Xác minh email ──
   void _verifyEmail(BuildContext context) {
-    final busy = ValueNotifier(false);
+    final code = TextEditingController();
+    bool sending = false;
+    bool sent = false;
+    bool confirming = false;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (sheet) => LiquidModalSheet(
-        title: 'Xác minh email',
-        subtitle: 'Xác thực tài khoản để nhận đầy đủ quyền lợi thành viên',
-        child: ValueListenableBuilder<bool>(
-            valueListenable: busy,
-            builder: (sheet, sending, _) => SingleChildScrollView(
+      builder: (sheet) => StatefulBuilder(
+          builder: (sheet, setSheetState) => LiquidModalSheet(
+                title: 'Xác minh email',
+                subtitle:
+                    'Xác thực tài khoản để nhận đầy đủ quyền lợi thành viên',
+                child: SingleChildScrollView(
                     child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -618,9 +621,11 @@ class ProfileScreen extends StatelessWidget {
                             const Icon(Icons.mark_email_read_rounded,
                                 color: AppColors.teal, size: 24),
                             const SizedBox(width: 12),
-                            const Expanded(
+                            Expanded(
                               child: Text(
-                                'Chúng tôi sẽ gửi một liên kết xác minh đến email đăng ký của bạn.',
+                                sent
+                                    ? 'Nhập mã xác minh 6 chữ số vừa được gửi tới email đăng ký của bạn.'
+                                    : 'Chúng tôi sẽ gửi mã xác minh 6 chữ số tới email đăng ký của bạn.',
                                 style: TextStyle(
                                     fontSize: 13,
                                     height: 1.35,
@@ -628,15 +633,14 @@ class ProfileScreen extends StatelessWidget {
                               ),
                             ),
                             TextButton(
-                              onPressed: sending
+                              onPressed: sending || confirming
                                   ? null
                                   : () async {
-                                      busy.value = true;
+                                      setSheetState(() => sending = true);
                                       try {
                                         await api.requestEmailVerification();
                                         if (sheet.mounted) {
-                                          _unavailable(sheet,
-                                              'Đã gửi email xác minh. Hãy mở liên kết trên thiết bị này.');
+                                          setSheetState(() => sent = true);
                                         }
                                       } catch (e) {
                                         if (sheet.mounted) {
@@ -644,7 +648,9 @@ class ProfileScreen extends StatelessWidget {
                                               sheet, ApiMessages.friendly(e));
                                         }
                                       } finally {
-                                        busy.value = false;
+                                        if (sheet.mounted) {
+                                          setSheetState(() => sending = false);
+                                        }
                                       }
                                     },
                               style: TextButton.styleFrom(
@@ -663,9 +669,65 @@ class ProfileScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                    ]))),
-      ),
-    );
+                      if (sent) ...[
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: code,
+                          enabled: !confirming,
+                          maxLength: 6,
+                          keyboardType: TextInputType.number,
+                          textInputAction: TextInputAction.done,
+                          decoration: const InputDecoration(
+                            labelText: 'Mã xác minh 6 chữ số',
+                            hintText: 'Ví dụ: 123456',
+                            prefixIcon: Icon(Icons.password_rounded),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        FilledButton.icon(
+                          onPressed: confirming
+                              ? null
+                              : () async {
+                                  final value =
+                                      code.text.replaceAll(RegExp(r'\D'), '');
+                                  if (!RegExp(r'^\d{6}$').hasMatch(value)) {
+                                    _unavailable(
+                                        sheet, 'Vui lòng nhập đủ mã 6 chữ số.');
+                                    return;
+                                  }
+                                  setSheetState(() => confirming = true);
+                                  try {
+                                    await api.confirmEmailVerification(value);
+                                    final updated = await api.currentProfile();
+                                    onProfileUpdated(updated);
+                                    if (sheet.mounted) {
+                                      Navigator.of(sheet).pop();
+                                    }
+                                  } catch (e) {
+                                    if (sheet.mounted) {
+                                      _unavailable(
+                                          sheet, ApiMessages.friendly(e));
+                                    }
+                                  } finally {
+                                    if (sheet.mounted) {
+                                      setSheetState(() => confirming = false);
+                                    }
+                                  }
+                                },
+                          icon: confirming
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.verified_rounded),
+                          label: Text(
+                              confirming ? 'Đang xác minh' : 'Xác minh email'),
+                        ),
+                      ],
+                    ])),
+              )),
+    ).whenComplete(code.dispose);
   }
 
   // ── Sheet: Gửi khiếu nại ──

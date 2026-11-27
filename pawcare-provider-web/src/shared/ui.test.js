@@ -12,7 +12,7 @@ import ReviewsPage from '../features/reviews/ReviewsPage'
 import Notifications from '../features/notifications/Notifications'
 import Login from '../features/auth/Login'
 import Register, { validateRegisterForm, passwordIsValid } from '../features/auth/Register'
-import VerifyEmail, { extractVerificationToken } from '../features/auth/VerifyEmail'
+import VerifyEmail, { normalizeVerificationCode } from '../features/auth/VerifyEmail'
 
 describe('UI Components Render Tests', () => {
   it('renders Metric with object trend without throwing Objects are not valid as React child error', () => {
@@ -184,17 +184,15 @@ describe('UI Components Render Tests', () => {
     })
   })
 
-  it('extracts email verification tokens from deep links and web URLs and renders VerifyEmail', () => {
-    expect(extractVerificationToken('abc_token-123')).toBe('abc_token-123')
-    expect(extractVerificationToken('pawcare://auth/verify-email?token=tok%2B123%3D')).toBe('tok+123=')
-    expect(extractVerificationToken('https://provider.pawcare.vn/verify-email?token=xyz999')).toBe('xyz999')
+  it('normalizes six-digit verification codes and renders VerifyEmail', () => {
+    expect(normalizeVerificationCode('123 456')).toBe('123456')
+    expect(normalizeVerificationCode('code: 12a34b56c7')).toBe('123456')
 
     const htmlIdle = renderToString(React.createElement(VerifyEmail, { onBack: () => {} }))
     expect(htmlIdle).toContain('Xác minh email Đối tác')
     expect(htmlIdle).toContain('Xác nhận email')
 
-    const htmlVerifying = renderToString(React.createElement(VerifyEmail, { token: 'sample-token', onBack: () => {} }))
-    expect(htmlVerifying).toContain('Đang xác thực mã xác minh email')
+    expect(htmlIdle).toContain('Mã xác minh gồm 6 chữ số')
   })
 
   it('renders WalletPage, ReportsPage, BookingsPage, OperationsPage, ReviewsPage, Notifications', () => {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../shared/api'
 import { Icons } from '../../shared/icons'
-import { extractVerificationToken } from './VerifyEmail'
+import { normalizeVerificationCode } from './VerifyEmail'
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 const PHONE_RE = /^\+?\d{9,13}$/
@@ -39,7 +39,9 @@ export function validateRegisterForm(form) {
     errors.email = 'Địa chỉ email chưa đúng định dạng.'
   }
 
-  if (phone && !PHONE_RE.test(phone)) {
+  if (!phone) {
+    errors.phone = 'Vui lòng nhập số điện thoại liên hệ.'
+  } else if (!PHONE_RE.test(phone)) {
     errors.phone = 'Số điện thoại cần 9–13 chữ số hợp lệ.'
   }
 
@@ -62,7 +64,7 @@ export function validateRegisterForm(form) {
       fullName,
       email,
       password,
-      phone: phone || undefined,
+      phone,
       address: address || undefined,
       role: 'PROVIDER',
       providerName: providerName || fullName,
@@ -134,7 +136,7 @@ export default function Register({ onBack, onComplete }) {
       await api('/auth/email-verification/request', { method: 'POST' }, accessToken)
       setCooldown(60)
       setVerifyStatus('sent')
-      setVerifyNotice('PawCare đã gửi hướng dẫn xác minh email tới hộp thư của bạn. Vui lòng kiểm tra và hoàn tất xác nhận.')
+      setVerifyNotice('PawCare đã gửi mã xác minh 6 chữ số tới hộp thư của bạn. Vui lòng nhập mã bên dưới.')
     } catch (err) {
       setVerifyStatus('send-failed')
       setVerifyError(err.message || 'Tài khoản đã được tạo nhưng chưa thể gửi email xác minh lúc này. Bạn có thể bấm gửi lại.')
@@ -169,9 +171,9 @@ export default function Register({ onBack, onComplete }) {
 
   async function handleConfirmToken(e) {
     e.preventDefault()
-    const cleanToken = extractVerificationToken(tokenInput)
-    if (!cleanToken) {
-      setVerifyError('Vui lòng nhập mã xác minh hoặc liên kết từ email.')
+    const code = normalizeVerificationCode(tokenInput)
+    if (!/^\d{6}$/.test(code)) {
+      setVerifyError('Vui lòng nhập đủ mã xác minh 6 chữ số.')
       return
     }
     setConfirmBusy(true)
@@ -179,8 +181,8 @@ export default function Register({ onBack, onComplete }) {
     try {
       await api('/auth/email-verification/confirm', {
         method: 'POST',
-        body: JSON.stringify({ token: cleanToken }),
-      })
+        body: JSON.stringify({ code }),
+      }, registeredSession?.accessToken)
       let nextSession = registeredSession
       if (registeredSession?.accessToken) {
         try {
@@ -198,7 +200,7 @@ export default function Register({ onBack, onComplete }) {
       setVerifyStatus('verified')
       setVerifyNotice('Email đã được xác minh thành công! Tài khoản Đối tác đang ở trạng thái chờ Admin phê duyệt hồ sơ cơ sở.')
     } catch (err) {
-      setVerifyError(err.message || 'Mã hoặc liên kết xác minh không hợp lệ hoặc đã hết hạn.')
+      setVerifyError(err.message || 'Mã xác minh không hợp lệ hoặc đã hết hạn.')
     } finally {
       setConfirmBusy(false)
     }
@@ -348,7 +350,7 @@ export default function Register({ onBack, onComplete }) {
               </div>
 
               <div className="form-group">
-                <label className="form-label" htmlFor="reg-phone">Số điện thoại liên hệ</label>
+                <label className="form-label" htmlFor="reg-phone">Số điện thoại liên hệ <span className="req-mark">*</span></label>
                 <div className="auth-input-wrapper">
                   <span className="input-icon">
                     <Icons.Phone size={16} />
@@ -361,6 +363,7 @@ export default function Register({ onBack, onComplete }) {
                     onChange={e => updateField('phone', e.target.value)}
                     placeholder="0901234567"
                     autoComplete="tel"
+                    required
                   />
                 </div>
                 {fieldErrors.phone && <span className="field-error">{fieldErrors.phone}</span>}
@@ -505,7 +508,7 @@ export default function Register({ onBack, onComplete }) {
                 <form className="auth-form" onSubmit={handleConfirmToken}>
                   <div className="form-group">
                     <label className="form-label" htmlFor="reg-verify-token">
-                      Nhập mã token hoặc liên kết xác minh từ email
+                      Nhập mã xác minh 6 chữ số
                     </label>
                     <div className="auth-input-wrapper">
                       <span className="input-icon">
@@ -515,14 +518,17 @@ export default function Register({ onBack, onComplete }) {
                         id="reg-verify-token"
                         autoFocus
                         type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
                         className="form-input with-icon"
                         value={tokenInput}
-                        onChange={e => setTokenInput(e.target.value)}
-                        placeholder="Dán liên kết pawcare://... hoặc mã token"
+                        onChange={e => setTokenInput(normalizeVerificationCode(e.target.value))}
+                        placeholder="Ví dụ: 123456"
+                        maxLength="6"
                       />
                     </div>
                     <span className="auth-hint">
-                      Mở liên kết xác minh trong email hoặc dán mã token tại đây để kích hoạt trạng thái đã xác minh.
+                      Nhập mã được gửi trong email để kích hoạt trạng thái đã xác minh. Mã có hiệu lực trong 10 phút.
                     </span>
                   </div>
 

@@ -21,9 +21,9 @@ Set `PAWCARE_MAIL_PROVIDER=RESEND`, a Resend sending API key in
 `PAWCARE_RESEND_API_KEY`, and a sender verified by Resend in
 `PAWCARE_MAIL_FROM`. For the PawCare domain configuration, the sender is
 `PawCare <noreply@mail.pawcare.click>`. Configure
-`PAWCARE_APP_DEEP_LINK_BASE=pawcare://auth` so verification and reset emails
-open the installed customer app rather than a web page. `PAWCARE_MAIL_REPLY_TO`
-is optional.
+`PAWCARE_APP_DEEP_LINK_BASE=pawcare://auth` for password-reset links.
+Email verification instead sends a six-digit code so the same message works in
+Provider Web and Customer Mobile. `PAWCARE_MAIL_REPLY_TO` is optional.
 
 Leave the provider disabled when mail configuration is absent; account flows
 remain non-enumerating and no action-token link is logged. Rotate a Resend key
@@ -35,7 +35,9 @@ For a deliberate local smoke check, set the variables in ignored `.env.local`,
 start the API, authenticate as a test account, then call
 `POST /api/v1/auth/email-verification/request` or
 `POST /api/v1/auth/password-reset/request`. Confirm receipt in the selected
-test mailbox and open the `pawcare://auth/...` deep link from an installed app.
+test mailbox. Email verification must show a six-digit code; enter it from an
+authenticated Provider Web or Customer Mobile session. Password-reset mail
+continues to include the `pawcare://auth/...` deep link.
 
 ## Run and verify
 
