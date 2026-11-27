@@ -19,6 +19,12 @@ ENABLED = os.getenv("PAWCARE_AI_ENABLED", "false").lower() == "true"
 BASE = os.getenv("PAWCARE_API_BASE_URL", "").rstrip("/")
 TOKEN = os.getenv("PAWCARE_AI_WORKER_TOKEN", "")
 MODEL_NAME = "isolation_forest"
+API_FEATURE_NAMES = {
+    "amount": "amount", "hour_of_day": "hourOfDay", "day_of_week": "dayOfWeek",
+    "account_age_days": "accountAgeDays", "transaction_count_10m": "transactionCount10m",
+    "transaction_count_1h": "transactionCount1h", "transaction_count_24h": "transactionCount24h",
+    "amount_sum_24h": "amountSum24h", "prior_failed_attempts": "priorFailedAttempts",
+}
 
 
 def request(method, path, body=None):
@@ -45,15 +51,9 @@ def model_features(event):
     features = event.get("features")
     if not isinstance(features, dict):
         return None
-    api_names = {
-        "amount": "amount", "hour_of_day": "hourOfDay", "day_of_week": "dayOfWeek",
-        "account_age_days": "accountAgeDays", "transaction_count_10m": "transactionCount10m",
-        "transaction_count_1h": "transactionCount1h", "transaction_count_24h": "transactionCount24h",
-        "amount_sum_24h": "amountSum24h", "prior_failed_attempts": "priorFailedAttempts",
-    }
     result = {"transaction_id": str(event.get("eventId", ""))}
     for model_name in FEATURE_COLUMNS:
-        value = features.get(api_names[model_name])
+        value = features.get(API_FEATURE_NAMES[model_name])
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             return None
         result[model_name] = value
@@ -65,7 +65,7 @@ def result_payload(row):
         "modelName": MODEL_NAME, "modelVersion": str(row["model_version"]),
         "riskScore": float(row["risk_score"]), "riskLevel": str(row["risk_level"]),
         "explanationSummary": str(row["explanation"]),
-        "featureSnapshot": {key: row[key] for key in FEATURE_COLUMNS},
+        "featureSnapshot": {API_FEATURE_NAMES[key]: row[key] for key in FEATURE_COLUMNS},
     }
 
 

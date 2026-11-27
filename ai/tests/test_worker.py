@@ -48,4 +48,4 @@ def test_result_payload_is_camel_case():
                 "amount_sum_24h": 1, "prior_failed_attempts": 0})
     payload = worker.result_payload(row)
     assert set(payload) == {"modelName", "modelVersion", "riskScore", "riskLevel", "explanationSummary", "featureSnapshot"}
-    assert "risk_score" not in payload and payload["featureSnapshot"]["hour_of_day"] == 1
+    assert "risk_score" not in payload and payload["featureSnapshot"]["hourOfDay"] == 1
