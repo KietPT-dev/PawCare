@@ -14,7 +14,7 @@ PYTHONPATH=src python scripts/train_risk.py
 PYTHONPATH=src python scripts/evaluate_risk.py
 PYTHONPATH=src python scripts/operational_advice.py > recommendations.json
 PYTHONPATH=src python scripts/worker.py                 # dry run (default)
-PAWCARE_AI_ENABLED=true PAWCARE_API_BASE_URL=https://api.example PAWCARE_AI_WORKER_TOKEN=... PYTHONPATH=src python scripts/worker.py
+PAWCARE_AI_ENABLED=true PAWCARE_API_BASE_URL=http://localhost:8080 PAWCARE_AI_WORKER_TOKEN=... PYTHONPATH=src python scripts/worker.py
 pytest -q
 ```
 
@@ -30,4 +30,14 @@ Growth Forecast M10 applies linear regression to >=60 daily observations for `wa
 
 ## HTTP guardrails
 
-HTTP is disabled unless `PAWCARE_AI_ENABLED=true`. It reads only `GET /api/v1/internal/ai/scoring-events` and can POST results/recommendations to the documented internal endpoints. Requests use bounded retries and in-memory duplicate suppression; tokens, PII, and raw financial payloads are not logged. Production callers should enforce idempotency server-side too.
+HTTP is disabled unless `PAWCARE_AI_ENABLED=true`, `PAWCARE_API_BASE_URL`, and
+`PAWCARE_AI_WORKER_TOKEN` are all present. It reads only
+`GET /api/v1/internal/ai/scoring-events` and can POST results/recommendations to
+the documented internal endpoints. Every request uses
+`X-PawCare-AI-Token`; it never uses an Authorization bearer token. The worker
+reads `eventId`, maps camelCase API features to the local model schema, and
+posts the camelCase result contract (`modelName`, `modelVersion`, `riskScore`,
+`riskLevel`, `explanationSummary`, `featureSnapshot`). It skips incomplete
+features without posting a result. Requests use bounded retries and in-memory
+duplicate suppression; tokens, PII, and raw financial payloads are not logged.
+Production callers should enforce idempotency server-side too.
