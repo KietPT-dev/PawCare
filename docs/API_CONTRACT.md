@@ -67,6 +67,20 @@ the environment-only `PAWCARE_AI_WORKER_TOKEN`. Internal endpoints are
 and `POST /api/v1/internal/ai/operational-recommendations`. Scores accept a
 0..1 risk score and `LOW`, `MEDIUM`, or `HIGH`; results are idempotent.
 
+`GET /api/v1/internal/ai/scoring-events` leases eligible work and returns
+`eventId`, `aggregateType`, `aggregateId`, `eventType`, `payloadVersion`, and a
+safe `features` object. For a scoreable payment-deposit event, `features` is
+limited to `amount`, `hourOfDay`, `dayOfWeek`, `accountAgeDays`,
+`transactionCount10m`, `transactionCount1h`, `transactionCount24h`,
+`amountSum24h`, `priorFailedAttempts`, and `eventAgeSeconds`. It never includes
+email, names, tokens, bank account data, or raw payment payloads. Incomplete
+aggregates are not enqueued.
+
+The worker posts `POST /api/v1/internal/ai/scoring-events/{eventId}/result` with
+camelCase JSON: `modelName`, `modelVersion`, `riskScore`, `riskLevel`,
+`explanationSummary`, and `featureSnapshot`. The snapshot contains only the
+nine model features above (not `eventAgeSeconds`).
+
 Admins can list/read/review risk scores under `/api/v1/admin/ai/risk-scores`
 and review operational suggestions under `/api/v1/admin/ai/operational-recommendations`.
 These APIs never block a payment, alter a wallet or account, run DDL, or apply

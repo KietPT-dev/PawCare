@@ -17,7 +17,11 @@ transactions. When AI is disabled or its tables are unavailable, the optional
 write cannot cause a money movement to fail. Leases, unique dedupe keys and a
 unique score-per-outbox-event make retries safe.
 
-Feature snapshots are constrained to coarse operational features (event type,
-amount bands where applicable, and booleans). Do not send raw PII, bank payloads,
-account numbers, payment tokens, passwords, or internal tokens. Simulated AI
-data must never be mixed into ledger or payment business records.
+Feature snapshots are constrained to real, coarse payment-deposit features:
+`amount`, `hourOfDay`, `dayOfWeek`, `accountAgeDays`, `transactionCount10m`,
+`transactionCount1h`, `transactionCount24h`, `amountSum24h`, and
+`priorFailedAttempts`; the delivery API additionally derives `eventAgeSeconds`.
+The outbox stores only this allow-listed snapshot. Do not send raw PII, bank
+payloads, account numbers, payment tokens, passwords, or internal tokens.
+Aggregates that cannot provide every model feature are not enqueued. Simulated
+AI data must never be mixed into ledger or payment business records.
