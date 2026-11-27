@@ -1,0 +1,8 @@
+data/generated/
+data/*.csv
+models/*.joblib
+logs/
+*.log
+__pycache__/
+.pytest_cache/
+.venv/
