@@ -881,9 +881,10 @@ class PawcareService {
                 if (status && !(status in ['OPEN','REVIEWED','DISMISSED','APPROVED'])) throw new ApiException(400, 'Invalid status')
                 String where = status ? 'WHERE r.status=?' : ''
                 List args = status ? [status] : []
-                return sql.rows('''SELECT r.id,r.recommendation_type,r.subject_name,r.model_name,r.model_version,r.score,r.confidence,r.payload,
+                List rows = sql.rows('''SELECT r.id,r.recommendation_type,r.subject_name,r.model_name,r.model_version,r.score,r.confidence,r.payload,
                           r.status,r.created_at,r.reviewer_profile_id,r.reviewed_at,r.reviewer_note,reviewer.full_name AS reviewer_name
                    FROM ai_operational_recommendations r LEFT JOIN user_profiles reviewer ON reviewer.id=r.reviewer_profile_id ''' + where + ' ORDER BY r.created_at DESC,r.id DESC', args)
+                return [items: rows]
             case 'PUT':
                 return reviewAiOperationalRecommendation(profile, requestBody())
             default:
