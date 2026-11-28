@@ -1353,6 +1353,23 @@ class PawcareService {
                 [currentBonitaUserId()]
         )
 
+        /*
+         * Development organizations are imported by Bonita with runtime-generated
+         * user IDs.  The original PawCare seed used fixed IDs (10001..10003), so
+         * a real Bonita Administrator could otherwise be rejected before the API
+         * reached its role check.  The Bonita session profile is authoritative for
+         * this compatibility path; a regular customer can never reach it.
+         *
+         * Keep the returned PawCare profile for audit/reviewer foreign keys.  The
+         * legacy row is deliberately limited to the seeded ADMIN identity rather
+         * than selecting an arbitrary administrator profile.
+         */
+        if (profile == null && hasBonitaAdministratorProfile()) {
+            profile = sql.firstRow(
+                    "SELECT * FROM user_profiles WHERE bonita_user_id = 10003 AND role_code = 'ADMIN' AND is_active = 1"
+            )
+        }
+
         if (profile == null && failWhenMissing) {
             throw new ApiException(
                     403,
@@ -1365,6 +1382,10 @@ class PawcareService {
 
     private Long currentBonitaUserId() {
         return context.apiSession.userId as Long
+    }
+
+    private boolean hasBonitaAdministratorProfile() {
+        return (context.apiSession.profiles ?: []).contains('Administrator')
     }
 
     private Map requireProfile(Map profile) {
