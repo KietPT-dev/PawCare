@@ -1,6 +1,9 @@
 """Optional internal HTTP worker. Dry-run is the safe default.
 
 The worker never opens a MySQL connection and deliberately logs identifiers only.
+Set PAWCARE_AI_POLL_SECONDS to a positive value to keep it running as a local
+background worker.  Without that variable it processes one batch and exits,
+which is convenient for deterministic tests and manual troubleshooting.
 """
 import hashlib
 import os
@@ -74,12 +77,13 @@ def valid_result(payload):
             and 0 <= payload["riskScore"] <= 1 and payload["riskLevel"] in {"LOW", "MEDIUM", "HIGH"})
 
 
-def main():
+def run_once(model_data=None):
     response = request("GET", "/api/v1/internal/ai/scoring-events")
     if response is None:
-        return
-    model_data = restore(os.getenv("PAWCARE_AI_MODEL", "models/isolation_forest.joblib"))
+        return 0
+    model_data = model_data or restore(os.getenv("PAWCARE_AI_MODEL", "models/isolation_forest.joblib"))
     seen = set()
+    processed = 0
     for event in response.json():
         event_id = str(event.get("eventId", ""))
         key = hashlib.sha256(event_id.encode()).hexdigest()
@@ -94,6 +98,39 @@ def main():
         if valid_result(payload):
             request("POST", f"/api/v1/internal/ai/scoring-events/{event_id}/result", payload)
             seen.add(key)
+            processed += 1
+    return processed
+
+
+def poll_seconds():
+    raw = os.getenv("PAWCARE_AI_POLL_SECONDS", "0")
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError("PAWCARE_AI_POLL_SECONDS must be a non-negative integer") from exc
+    if value < 0:
+        raise RuntimeError("PAWCARE_AI_POLL_SECONDS must be a non-negative integer")
+    return value
+
+
+def main():
+    interval = poll_seconds()
+    if interval == 0:
+        return run_once()
+
+    # Restore once, then reuse the model for every leased batch.
+    model_data = restore(os.getenv("PAWCARE_AI_MODEL", "models/isolation_forest.joblib"))
+    print(f"AI worker started; polling every {interval}s")
+    while True:
+        try:
+            processed = run_once(model_data)
+            if processed:
+                print(f"scored={processed}")
+        except requests.RequestException as exc:
+            # Keep the process alive.  Leased events are eligible again after
+            # their server-side lease expires, so a temporary outage loses none.
+            print(f"AI worker request failed: {exc}")
+        time.sleep(interval)
 
 
 if __name__ == "__main__":

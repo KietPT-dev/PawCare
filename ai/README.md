@@ -15,6 +15,7 @@ PYTHONPATH=src python scripts/evaluate_risk.py
 PYTHONPATH=src python scripts/operational_advice.py > recommendations.json
 PYTHONPATH=src python scripts/worker.py                 # dry run (default)
 PAWCARE_AI_ENABLED=true PAWCARE_API_BASE_URL=http://127.0.0.1:8081 PAWCARE_AI_WORKER_TOKEN=... PYTHONPATH=src python scripts/worker.py
+PAWCARE_AI_ENABLED=true PAWCARE_API_BASE_URL=http://127.0.0.1:8081 PAWCARE_AI_WORKER_TOKEN=... PAWCARE_AI_POLL_SECONDS=10 PYTHONPATH=src python scripts/worker.py
 pytest -q
 ```
 
@@ -41,3 +42,12 @@ posts the camelCase result contract (`modelName`, `modelVersion`, `riskScore`,
 features without posting a result. Requests use bounded retries and in-memory
 duplicate suppression; tokens, PII, and raw financial payloads are not logged.
 Production callers should enforce idempotency server-side too.
+
+## Continuous local worker
+
+By default the worker leases and processes one batch, then exits. For a local
+demo that should score new eligible payment deposits continuously, set a
+positive `PAWCARE_AI_POLL_SECONDS` value (for example `10`). The worker keeps
+the local model in memory between polls. The backend outbox leases work for a
+bounded time and retries it after the lease expires, so stopping the worker
+does not discard pending events.
